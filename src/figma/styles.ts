@@ -37,7 +37,7 @@ export async function fetchStyles(
 ): Promise<Token[]> {
   if (!teamId) {
     throw new Error(
-      "This Figma file uses styles (not variables). Add \"figma.teamId\" to drift-checker.config.json " +
+      "This Figma file uses styles (not variables). Add \"figma.teamId\" to elf.config.json " +
         "so styles can be looked up via the team styles endpoint.",
     );
   }

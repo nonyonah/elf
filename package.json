@@ -1,20 +1,48 @@
 {
-  "name": "design-token-drift-checker",
+  "name": "elf-tokens",
   "version": "1.0.0",
   "description": "Compare Figma design tokens against the tokens in your codebase and surface drift as a PR comment.",
   "type": "module",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nonyonah/elf.git"
+  },
+  "keywords": [
+    "figma",
+    "design-tokens",
+    "design-systems",
+    "tailwind",
+    "css",
+    "ci",
+    "cli",
+    "drift"
+  ],
+  "bin": {
+    "elf-tokens": "bin/elf-tokens.js"
+  },
+  "files": [
+    "bin",
+    "src",
+    "fixtures",
+    "elf.config.json",
+    "README.md",
+    "LICENSE"
+  ],
   "engines": {
-    "node": ">=18"
+    "node": ">=20"
   },
   "scripts": {
     "check-drift": "tsx src/cli.ts",
     "check-drift:sample": "tsx src/cli.ts --sample",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run typecheck"
+  },
+  "dependencies": {
+    "tsx": "^4.19.2"
   },
   "devDependencies": {
     "@types/node": "^20.14.0",
-    "tsx": "^4.19.2",
     "typescript": "^5.6.3"
   }
 }

@@ -1,10 +1,11 @@
-# Design Token Drift Checker
+# elf-tokens
 
 **A CI-friendly CLI that compares your Figma design tokens against the tokens actually used in your codebase — and posts the differences as a PR comment, so drift gets caught before it ships.**
 
+[![npm version](https://img.shields.io/npm/v/elf-tokens)](https://www.npmjs.com/package/elf-tokens)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![CI — Design Token Drift Checker](https://github.com/nonyonah/elf/actions/workflows/drift-checker.yml/badge.svg)](https://github.com/nonyonah/elf/actions/workflows/drift-checker.yml)
-[![Node.js >= 18](https://img.shields.io/badge/node-%3E%3D18-339933.svg)](package.json)
+[![Node.js >= 20](https://img.shields.io/badge/node-%3E%3D20-339933.svg)](package.json)
 
 Design tokens are supposed to be the single source of truth for how a product looks. In practice they drift: a designer tweaks `primary/500` in Figma, the Tailwind config keeps the old hex, and nobody notices until the marketing site ships with two slightly different blues. This tool closes that loop — it diffs Figma's tokens against your codebase's tokens on every pull request and leaves the result as a comment on the PR.
 
@@ -16,7 +17,7 @@ Design tokens are supposed to be the single source of truth for how a product lo
 
 ```
 ┌─────────────┐   Figma REST API   ┌──────────────────────┐   reads   ┌─────────────────┐
-│  Figma file │ ─────────────────► │    drift-checker     │ ────────► │ codebase tokens │
+│  Figma file │ ─────────────────► │     elf-tokens       │ ────────► │ codebase tokens │
 │  (variables │   (cached in-run)  │       src/cli.ts     │           │  tailwind | css │
 │   / styles) │                    └──────────┬───────────┘           │  | tokens.json  │
 └─────────────┘                               │                       └─────────────────┘
@@ -44,7 +45,16 @@ Design tokens are supposed to be the single source of truth for how a product lo
 
 ## Quick start
 
-### 1. Install
+### Option A — use it in any project (npm package)
+
+```bash
+npm install --save-dev elf-tokens
+npx elf-tokens --config elf.config.json
+```
+
+`elf-tokens` has no runtime dependencies of its own to worry about — it runs wherever Node ≥ 20 does.
+
+### Option B — run it from this repo
 
 ```bash
 git clone https://github.com/nonyonah/elf.git
@@ -52,15 +62,13 @@ cd elf
 npm install
 ```
 
-Requires Node.js ≥ 18. No runtime dependencies — only `tsx` and `typescript` as dev tools.
-
-### 2. Create a Figma token
+### 1. Create a Figma token
 
 In Figma: **Account settings → Security → Personal access tokens → Generate new token**. Scope: `Files: Read only` is enough. Treat it like a password — it goes in an environment variable, never in the repo.
 
-### 3. Fill in the config
+### 2. Fill in the config
 
-Copy `drift-checker.config.json` and point it at your file and your token source:
+Copy `elf.config.json` and point it at your file and your token source:
 
 ```jsonc
 {
@@ -90,27 +98,27 @@ Copy `drift-checker.config.json` and point it at your file and your token source
 }
 ```
 
-### 4. Run it locally
+### 3. Run it locally
 
 ```bash
 export FIGMA_API_TOKEN=your_token_here
-npm run check-drift
+npx elf-tokens
 ```
 
 No token handy (or just want to see it work)? Sample data is bundled:
 
 ```bash
-npm run check-drift -- --sample                 # variables vs. tailwind
-npm run check-drift -- --sample css             # variables vs. CSS custom properties
-npm run check-drift -- --sample tokens-json     # variables vs. tokens.json
-npm run check-drift -- --sample styles          # styles API vs. tailwind
+npx elf-tokens --sample                 # variables vs. tailwind
+npx elf-tokens --sample css             # variables vs. CSS custom properties
+npx elf-tokens --sample tokens-json     # variables vs. tokens.json
+npx elf-tokens --sample styles          # styles API vs. tailwind
 ```
 
-The report is printed to the terminal and written to `drift-report.md` (plus a machine-readable `drift-status.json`). The script **always exits 0** unless you pass `--fail-on-drift` (exit code 2) — see the decision note below.
+The report is printed to the terminal and written to `drift-report.md` (plus a machine-readable `drift-status.json`). The check **always exits 0** unless you pass `--fail-on-drift` (exit code 2) — see the decision note below.
 
-### 5. Wire it into GitHub Actions
+### 4. Wire it into GitHub Actions
 
-Add `FIGMA_API_TOKEN` as a [repository secret](https://docs.github.com/en/actions/security-guides/using-secrets-in-github-actions) (Settings → Secrets and variables → Actions), commit your filled-in `drift-checker.config.json`, and the included [workflow](.github/workflows/drift-checker.yml) handles the rest:
+Add `FIGMA_API_TOKEN` as a [repository secret](https://docs.github.com/en/actions/security-guides/using-secrets-in-github-actions) (Settings → Secrets and variables → Actions), commit your filled-in `elf.config.json`, and the included [workflow](.github/workflows/drift-checker.yml) handles the rest:
 
 - runs on every PR (push, open, reopen)
 - runs the check, then creates **or updates** a single comment (marked with `<!-- design-token-drift-checker -->`)
@@ -118,7 +126,7 @@ Add `FIGMA_API_TOKEN` as a [repository secret](https://docs.github.com/en/action
 - never fails the build — the check is advisory in v1
 
 ```bash
-git add drift-checker.config.json
+git add elf.config.json
 git commit -m "Add design token drift checker"
 git push
 ```
@@ -128,9 +136,9 @@ git push
 ## CLI reference
 
 ```
-npm run check-drift [options]
+elf-tokens [options]
 
-  --config <path>     config file (default: drift-checker.config.json)
+  --config <path>     config file (default: elf.config.json)
   --out <path>        where to write the report (default: drift-report.md)
   --sample [format]   run against bundled sample data, no token needed
   --fail-on-drift     exit with code 2 when drift is found (off by default)

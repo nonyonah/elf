@@ -16,7 +16,7 @@ export function detectCodebaseSource(path: string): CodebaseSource {
   if (base.endsWith(".json")) return "tokens-json";
   throw new Error(
     `Could not detect the token format from "${path}". ` +
-      `Set "codebase.source" in drift-checker.config.json to one of: tailwind | css | tokens-json.`,
+      `Set "codebase.source" in elf.config.json to one of: tailwind | css | tokens-json.`,
   );
 }
 

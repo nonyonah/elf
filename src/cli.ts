@@ -12,16 +12,17 @@ import { buildReport } from "./report.js";
 import { buildSampleConfig, createSampleFigmaApi, type SampleFormat } from "./sample.js";
 import type { DriftConfig, FigmaSource, Token } from "./types.js";
 
-const USAGE = `Design token drift checker
+const USAGE = `elf-tokens — design token drift checker
 
 Compares Figma design tokens against the tokens in your codebase and
 reports value mismatches and missing tokens on either side.
 
 Usage:
+  elf-tokens [options]
   npm run check-drift [options]
 
 Options:
-  --config <path>        Path to the config file (default: drift-checker.config.json)
+  --config <path>        Path to the config file (default: elf.config.json)
   --out <path>           Where to write the markdown report (default: drift-report.md)
   --sample [format]      Run against bundled sample data, no Figma token needed.
                          Optional format: variables | styles | tailwind | css | tokens-json
@@ -84,7 +85,7 @@ async function main(): Promise<number> {
 
   const config: DriftConfig = args.sample
     ? buildSampleConfig(typeof args.sample === "string" ? (args.sample as SampleFormat) : undefined)
-    : loadConfig(args.config ?? "drift-checker.config.json");
+    : loadConfig(args.config ?? "elf.config.json");
 
   const api: FigmaApi = args.sample ? createSampleFigmaApi() : createLiveApi(config);
 
