@@ -1,0 +1,14 @@
+{
+  "figma": {
+    "fileKey": "YOUR_FIGMA_FILE_KEY",
+    "apiTokenEnv": "FIGMA_API_TOKEN",
+    "source": "auto",
+    "teamId": ""
+  },
+  "codebase": {
+    "source": "auto",
+    "path": "./tailwind.config.js"
+  },
+  "modeName": null,
+  "nameMapping": {}
+}

@@ -1,0 +1,143 @@
+{
+  "meta": {
+    "variableCollections": {
+      "VariableCollectionID:1:1": {
+        "id": "VariableCollectionID:1:1",
+        "name": "Tokens",
+        "modes": [
+          { "modeId": "VariableModeID:1:3", "name": "Default" }
+        ]
+      }
+    },
+    "variables": {
+      "VariableID:1:10": {
+        "id": "VariableID:1:10",
+        "name": "Color/Primary/500",
+        "key": "var:10",
+        "variableCollectionId": "VariableCollectionID:1:1",
+        "resolvedType": "COLOR",
+        "valuesByMode": { "VariableModeID:1:3": { "type": "COLOR", "value": { "r": 0.0588, "g": 0.0902, "b": 0.1647, "a": 1 } } }
+      },
+      "VariableID:1:11": {
+        "id": "VariableID:1:11",
+        "name": "Color/Primary/400",
+        "key": "var:11",
+        "variableCollectionId": "VariableCollectionID:1:1",
+        "resolvedType": "COLOR",
+        "valuesByMode": { "VariableModeID:1:3": { "type": "COLOR", "value": { "r": 0.2, "g": 0.2549, "b": 0.3333, "a": 1 } } }
+      },
+      "VariableID:1:12": {
+        "id": "VariableID:1:12",
+        "name": "Color/Accent/500",
+        "key": "var:12",
+        "variableCollectionId": "VariableCollectionID:1:1",
+        "resolvedType": "COLOR",
+        "valuesByMode": { "VariableModeID:1:3": { "type": "COLOR", "value": { "r": 0.3882, "g": 0.4, "b": 0.9451, "a": 1 } } }
+      },
+      "VariableID:1:13": {
+        "id": "VariableID:1:13",
+        "name": "Color/Accent/400",
+        "key": "var:13",
+        "variableCollectionId": "VariableCollectionID:1:1",
+        "resolvedType": "COLOR",
+        "valuesByMode": { "VariableModeID:1:3": { "type": "COLOR", "value": { "r": 0.5059, "g": 0.549, "b": 0.9725, "a": 1 } } }
+      },
+      "VariableID:1:14": {
+        "id": "VariableID:1:14",
+        "name": "Color/Neutral/0",
+        "key": "var:14",
+        "variableCollectionId": "VariableCollectionID:1:1",
+        "resolvedType": "COLOR",
+        "valuesByMode": { "VariableModeID:1:3": { "type": "COLOR", "value": { "r": 1, "g": 1, "b": 1, "a": 1 } } }
+      },
+      "VariableID:1:15": {
+        "id": "VariableID:1:15",
+        "name": "Color/Danger/500",
+        "key": "var:15",
+        "variableCollectionId": "VariableCollectionID:1:1",
+        "resolvedType": "COLOR",
+        "valuesByMode": { "VariableModeID:1:3": { "type": "COLOR", "value": { "r": 0.9373, "g": 0.2667, "b": 0.2667, "a": 1 } } }
+      },
+      "VariableID:1:16": {
+        "id": "VariableID:1:16",
+        "name": "Color/Info/500",
+        "key": "var:16",
+        "variableCollectionId": "VariableCollectionID:1:1",
+        "resolvedType": "COLOR",
+        "valuesByMode": { "VariableModeID:1:3": { "type": "COLOR", "value": { "r": 0.2314, "g": 0.5098, "b": 0.9647, "a": 1 } } }
+      },
+      "VariableID:1:20": {
+        "id": "VariableID:1:20",
+        "name": "Spacing/1",
+        "key": "var:20",
+        "variableCollectionId": "VariableCollectionID:1:1",
+        "resolvedType": "FLOAT",
+        "valuesByMode": { "VariableModeID:1:3": { "type": "FLOAT", "value": 4 } }
+      },
+      "VariableID:1:21": {
+        "id": "VariableID:1:21",
+        "name": "Spacing/2",
+        "key": "var:21",
+        "variableCollectionId": "VariableCollectionID:1:1",
+        "resolvedType": "FLOAT",
+        "valuesByMode": { "VariableModeID:1:3": { "type": "FLOAT", "value": 8 } }
+      },
+      "VariableID:1:22": {
+        "id": "VariableID:1:22",
+        "name": "Spacing/3",
+        "key": "var:22",
+        "variableCollectionId": "VariableCollectionID:1:1",
+        "resolvedType": "FLOAT",
+        "valuesByMode": { "VariableModeID:1:3": { "type": "FLOAT", "value": 12 } }
+      },
+      "VariableID:1:23": {
+        "id": "VariableID:1:23",
+        "name": "Spacing/4",
+        "key": "var:23",
+        "variableCollectionId": "VariableCollectionID:1:1",
+        "resolvedType": "FLOAT",
+        "valuesByMode": { "VariableModeID:1:3": { "type": "FLOAT", "value": 16 } }
+      },
+      "VariableID:1:24": {
+        "id": "VariableID:1:24",
+        "name": "Spacing/6",
+        "key": "var:24",
+        "variableCollectionId": "VariableCollectionID:1:1",
+        "resolvedType": "FLOAT",
+        "valuesByMode": { "VariableModeID:1:3": { "type": "FLOAT", "value": 24 } }
+      },
+      "VariableID:1:30": {
+        "id": "VariableID:1:30",
+        "name": "Font/Family/Sans",
+        "key": "var:30",
+        "variableCollectionId": "VariableCollectionID:1:1",
+        "resolvedType": "STRING",
+        "valuesByMode": { "VariableModeID:1:3": { "type": "STRING", "value": "Inter" } }
+      },
+      "VariableID:1:31": {
+        "id": "VariableID:1:31",
+        "name": "Font/Size/Body",
+        "key": "var:31",
+        "variableCollectionId": "VariableCollectionID:1:1",
+        "resolvedType": "FLOAT",
+        "valuesByMode": { "VariableModeID:1:3": { "type": "FLOAT", "value": 16 } }
+      },
+      "VariableID:1:32": {
+        "id": "VariableID:1:32",
+        "name": "Font/Size/H1",
+        "key": "var:32",
+        "variableCollectionId": "VariableCollectionID:1:1",
+        "resolvedType": "FLOAT",
+        "valuesByMode": { "VariableModeID:1:3": { "type": "FLOAT", "value": 48 } }
+      },
+      "VariableID:1:33": {
+        "id": "VariableID:1:33",
+        "name": "Font/Size/Caption",
+        "key": "var:33",
+        "variableCollectionId": "VariableCollectionID:1:1",
+        "resolvedType": "FLOAT",
+        "valuesByMode": { "VariableModeID:1:3": { "type": "FLOAT", "value": 12 } }
+      }
+    }
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "styles": [
+    {
+      "key": "S:1",
+      "name": "Color/Primary/500",
+      "node_id": "1:10",
+      "style_type": "FILL"
+    },
+    {
+      "key": "S:2",
+      "name": "Color/Accent/500",
+      "node_id": "1:20",
+      "style_type": "FILL"
+    },
+    {
+      "key": "S:3",
+      "name": "Color/Info/500",
+      "node_id": "1:30",
+      "style_type": "FILL"
+    },
+    {
+      "key": "S:4",
+      "name": "Typography/H1",
+      "node_id": "1:40",
+      "style_type": "TEXT"
+    }
+  ]
+}

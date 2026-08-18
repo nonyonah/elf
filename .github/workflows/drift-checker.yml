@@ -1,0 +1,99 @@
+name: Design Token Drift Checker
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: design-token-drift-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  check-drift:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type-check
+        run: npm run typecheck
+
+      - name: Run drift check
+        id: drift
+        env:
+          FIGMA_API_TOKEN: ${{ secrets.FIGMA_API_TOKEN }}
+        run: npm run check-drift -- --out drift-report.md
+        # v1 decision: report-only. The check never hard-fails the PR
+        # so false positives can't block anyone. Revisit turning on
+        # `--fail-on-drift` once the false-positive rate is known.
+        continue-on-error: true
+
+      - name: Comment the report on the PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const marker = '<!-- design-token-drift-checker -->';
+            const reportPath = 'drift-report.md';
+            const statusPath = 'drift-status.json';
+
+            const report = fs.existsSync(reportPath) ? fs.readFileSync(reportPath, 'utf8') : '';
+            const status = fs.existsSync(statusPath)
+              ? JSON.parse(fs.readFileSync(statusPath, 'utf8'))
+              : null;
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const botComment = comments.find((c) => c.body && c.body.includes(marker));
+
+            const upsertComment = async (body) => {
+              if (botComment) {
+                await github.rest.issues.updateComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  comment_id: botComment.id,
+                  body,
+                });
+              } else {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: context.issue.number,
+                  body,
+                });
+              }
+            };
+
+            if (!status) {
+              await upsertComment(
+                '## Design token drift check failed\n\n' +
+                'The drift check did not produce a report — see the workflow logs for details.\n\n' +
+                marker
+              );
+            } else if (status.driftFound) {
+              await upsertComment(report + '\n\n' + marker);
+            } else if (botComment) {
+              // Clean: remove the previous drift comment so resolved drift
+              // doesn't leave stale noise on the PR.
+              await github.rest.issues.deleteComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+              });
+            }
