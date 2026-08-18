@@ -1,0 +1,47 @@
+name: Publish Drift Data
+
+on:
+  schedule:
+    # Daily 04:00 UTC. Feeds the Figma plugin's status panel via the
+    # worker bridge: plugin → worker → drift-data branch.
+    - cron: "0 4 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run drift check
+        env:
+          FIGMA_API_TOKEN: ${{ secrets.FIGMA_API_TOKEN }}
+        run: npm run check-drift -- --out drift-report.md
+        # Report-only: publish what we have even if the check errors
+        # (missing token, Figma down), so the plugin always has data.
+        continue-on-error: true
+
+      - name: Publish drift data to the drift-data branch
+        run: |
+          git checkout --orphan drift-data
+          git rm -rf --quiet . || true
+          git add -f drift-report.md drift-status.json
+          git -c user.name="elf-tokens bot" -c user.email="actions@users.noreply.github.com" \
+            commit -m "Drift data $(date -u +%Y-%m-%dT%H:%M:%SZ)" || true
+          git push origin HEAD:drift-data --force

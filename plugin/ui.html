@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <style>
+    :root {
+      --bg: var(--figma-color-bg, #1e1e1e);
+      --bg-secondary: var(--figma-color-bg-secondary, #2c2c2c);
+      --text: var(--figma-color-text, #ffffff);
+      --text-secondary: var(--figma-color-text-secondary, #b3b3b3);
+      --accent: var(--figma-color-bg-brand, #0d99ff);
+      --danger: var(--figma-color-text-danger, #f24822);
+      --success: #1fc04d;
+      --border: var(--figma-color-border, #333333);
+      --radius: 6px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 12px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    h1 { font-size: 14px; font-weight: 600; }
+    .file {
+      color: var(--text-secondary);
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 8px 10px;
+      font-size: 11px;
+    }
+    .file strong { color: var(--text); font-weight: 600; }
+    label { display: block; color: var(--text-secondary); margin-bottom: 4px; font-size: 11px; }
+    input {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      padding: 7px 10px;
+      font-size: 12px;
+    }
+    input:focus { outline: 1px solid var(--accent); }
+    button {
+      background: var(--accent);
+      color: #ffffff;
+      border: none;
+      border-radius: var(--radius);
+      padding: 8px 12px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button:disabled { opacity: 0.5; cursor: default; }
+    .row { display: flex; gap: 8px; align-items: end; }
+    .row > div { flex: 1; }
+    .badge {
+      border-radius: var(--radius);
+      padding: 7px 10px;
+      font-weight: 600;
+      font-size: 12px;
+    }
+    .badge.clean { background: rgba(31, 192, 77, 0.15); color: var(--success); }
+    .badge.drift { background: rgba(242, 72, 34, 0.15); color: var(--danger); }
+    .badge.error { background: rgba(242, 72, 34, 0.12); color: var(--text); }
+    .counts { display: flex; gap: 8px; }
+    .count-card {
+      flex: 1;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 8px;
+      text-align: center;
+    }
+    .count-card .num { font-size: 18px; font-weight: 700; }
+    .count-card .cap { color: var(--text-secondary); font-size: 10px; margin-top: 2px; }
+    .muted { color: var(--text-secondary); font-size: 11px; }
+    pre {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 10px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 10.5px;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      word-break: break-word;
+      max-height: 240px;
+      overflow-y: auto;
+      color: var(--text);
+    }
+    .hidden { display: none; }
+    .footer { color: var(--text-secondary); font-size: 10px; margin-top: auto; }
+  </style>
+</head>
+<body>
+  <h1>Elf Tokens — Design Drift</h1>
+
+  <div class="file">
+    <strong id="fileName">…</strong><br />
+    File key: <span id="fileKey">…</span>
+  </div>
+
+  <div class="row">
+    <div>
+      <label for="workerUrl">Worker URL</label>
+      <input id="workerUrl" type="url" placeholder="https://elf-tokens-bridge.subdomain.workers.dev" />
+    </div>
+  </div>
+  <div class="row">
+    <div>
+      <label for="passcode">Passcode</label>
+      <input id="passcode" type="password" placeholder="matches FIGMA_PASSCODE on the worker" />
+    </div>
+    <button id="checkBtn">Check drift</button>
+  </div>
+
+  <div id="result" class="hidden">
+    <div class="badge" id="badge"></div>
+    <div class="counts" id="counts"></div>
+    <div class="muted" id="meta"></div>
+    <pre id="report" class="hidden"></pre>
+  </div>
+
+  <div class="footer">
+    Data comes from the <code>drift-data</code> branch, refreshed daily by the
+    <code>Publish Drift Data</code> workflow in the repo behind your worker.
+  </div>
+
+  <script>
+    const state = { workerUrl: "", passcode: "" };
+
+    const $ = (id) => document.getElementById(id);
+
+    function renderResult(done) {
+      const result = document.getElementById("result");
+      result.classList.remove("hidden");
+      const badge = document.getElementById("badge");
+      const counts = document.getElementById("counts");
+      const meta = document.getElementById("meta");
+      const report = document.getElementById("report");
+
+      if (!done.ok) {
+        badge.className = "badge error";
+        badge.textContent = "Check failed";
+        counts.textContent = done.error || "Unknown error";
+        meta.textContent = "";
+        report.classList.add("hidden");
+        return;
+      }
+
+      const data = done.data || {};
+      const drift = !!data.driftFound;
+      badge.className = "badge " + (drift ? "drift" : "clean");
+      badge.textContent = drift ? "Drift found" : "In sync";
+      meta.textContent = [
+        data.repo ? "Repo: " + data.repo : "",
+        data.checkedAt ? "Checked: " + new Date(data.checkedAt).toLocaleString() : "No data yet",
+      ].filter(Boolean).join("  ·  ");
+
+      if (drift && data.counts) {
+        counts.innerHTML = "";
+        for (const [key, cap] of [
+          ["valueMismatches", "Value mismatches"],
+          ["missingInCode", "Missing in code"],
+          ["missingInFigma", "Missing in Figma"],
+        ]) {
+          const card = document.createElement("div");
+          card.className = "count-card";
+          card.innerHTML =
+            `<div class="num">${data.counts[key]}</div><div class="cap">${cap}</div>`;
+          counts.appendChild(card);
+        }
+        if (data.report) {
+          report.textContent = data.report;
+          report.classList.remove("hidden");
+        } else {
+          report.classList.add("hidden");
+        }
+      } else {
+        counts.textContent = "";
+        report.classList.add("hidden");
+      }
+    }
+
+    $("workerUrl").addEventListener("input", (e) => {
+      state.workerUrl = e.target.value;
+      parent.postMessage({ pluginMessage: { type: "save-config", workerUrl: state.workerUrl, passcode: state.passcode } }, "*");
+    });
+    $("passcode").addEventListener("input", (e) => {
+      state.passcode = e.target.value;
+      parent.postMessage({ pluginMessage: { type: "save-config", workerUrl: state.workerUrl, passcode: state.passcode } }, "*");
+    });
+
+    $("checkBtn").addEventListener("click", () => {
+      $("checkBtn").disabled = true;
+      $("checkBtn").textContent = "Checking…";
+      parent.postMessage({ pluginMessage: { type: "check" } }, "*");
+    });
+
+    window.onmessage = (event) => {
+      const msg = event.data.pluginMessage;
+      if (!msg) return;
+      if (msg.type === "context") {
+        $("fileName").textContent = msg.file.fileName;
+        $("fileKey").textContent = msg.file.fileKey;
+        state.workerUrl = msg.config.workerUrl || "";
+        state.passcode = msg.config.passcode || "";
+        $("workerUrl").value = state.workerUrl;
+        $("passcode").value = state.passcode;
+      } else if (msg.type === "result") {
+        renderResult(msg);
+        $("checkBtn").disabled = false;
+        $("checkBtn").textContent = "Check drift";
+      }
+    };
+
+    parent.postMessage({ pluginMessage: { type: "context" } }, "*");
+  </script>
+</body>
+</html>

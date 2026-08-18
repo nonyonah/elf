@@ -137,7 +137,7 @@ git push
 
 The PR check covers drift introduced by *code* changes. Live mode covers the other direction: when a designer changes tokens in Figma, the repo finds out without waiting for anyone to open a PR.
 
-Figma webhooks can't authenticate to GitHub's API directly, so the hop goes through a ~30-line Cloudflare Worker bridge (included in `worker/`) that verifies the webhook's passcode and forwards the event:
+Figma webhooks can't authenticate to GitHub's API directly, so the hop goes through a ~60-line Cloudflare Worker bridge (included in `worker/`) that verifies the webhook's passcode and forwards the event:
 
 ```
 ┌──────────┐  webhook POST  ┌───────────────────────┐  dispatch POST  ┌───────────────────────┐
@@ -149,6 +149,23 @@ Figma webhooks can't authenticate to GitHub's API directly, so the hop goes thro
                                                                 a "design token drift"
                                                                 issue with the report
 ```
+
+### The Figma plugin (drift inside Figma)
+
+The worker's `GET` route also serves the latest drift data to the bundled Figma plugin (`plugin/`), closing the loop in the design tool itself — each Figma file checks *its own* code, because the plugin reads the file key it's running in:
+
+```
+┌──────────┐    GET /?fileKey=…&passcode=…   ┌───────────────────────┐  raw fetch   ┌──────────────────┐
+│ Figma    │ ──────────────────────────────► │ Cloudflare Worker     │ ────────────► │ drift-data branch│
+│ plugin   │  (drift status for THIS file)   │ verifies, proxies     │  (Bearer PAT)│ (pushed nightly) │
+└──────────┘                                 └───────────────────────┘               └──────────────────┘
+```
+
+The plugin shows the file name + key it's running in, the worker URL and passcode (saved per file via `setPluginData`, so each file's association is independent — no central mapping to maintain), and on **Check drift** renders: in-sync/drift badge, value-mismatch / missing-in-code / missing-in-Figma counts, the last check time, and the full report.
+
+The data it reads comes from the `drift-data` branch, refreshed daily by `.github/workflows/drift-data.yml` (or on demand via its `workflow_dispatch` trigger).
+
+**Load the plugin in Figma:** Plugins → Development → New plugin → *Link existing plugin* → pick `plugin/manifest.json` from this repo. The plugin fetch is browser-CORS; the worker already answers with `Access-Control-Allow-Origin: *`.
 
 ### Setup
 
@@ -189,6 +206,8 @@ Figma webhooks can't authenticate to GitHub's API directly, so the hop goes thro
    ```
 
    This sends a fake Figma event through your worker; a drift check run should appear on the repo's Actions tab. You can also check what's registered with `npx elf-tokens webhook --list`.
+
+6. **Enable the nightly drift data** (for the plugin) — the `drift-data` workflow is committed; it runs daily at 04:00 UTC and force-pushes `drift-report.md` + `drift-status.json` to the `drift-data` branch. Trigger it once with **Actions → Publish Drift Data → Run workflow**, then open the plugin in Figma and hit **Check drift**.
 
 ---
 
