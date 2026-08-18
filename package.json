@@ -36,6 +36,7 @@
   "scripts": {
     "check-drift": "tsx src/cli.ts",
     "check-drift:sample": "tsx src/cli.ts --sample",
+    "test": "node --import tsx --test test/diff.test.ts test/report.test.ts test/webhook.test.ts",
     "typecheck": "tsc --noEmit",
     "prepublishOnly": "npm run typecheck"
   },

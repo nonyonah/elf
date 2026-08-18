@@ -31,6 +31,9 @@ jobs:
       - name: Type-check
         run: npm run typecheck
 
+      - name: Run unit tests
+        run: npm test
+
       - name: Run drift check
         id: drift
         env:
