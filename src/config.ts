@@ -32,5 +32,10 @@ export function loadConfig(configPath: string): DriftConfig {
     },
     modeName: config.modeName ?? null,
     nameMapping: config.nameMapping ?? {},
+    webhook: {
+      endpoint: config.webhook?.endpoint ?? "",
+      eventTypes: config.webhook?.eventTypes ?? [],
+      passcodeEnv: config.webhook?.passcodeEnv ?? "FIGMA_WEBHOOK_PASSCODE",
+    },
   };
 }

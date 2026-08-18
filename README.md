@@ -133,16 +133,81 @@ git push
 
 ---
 
+## Live mode: Figma edits notify the repo (optional)
+
+The PR check covers drift introduced by *code* changes. Live mode covers the other direction: when a designer changes tokens in Figma, the repo finds out without waiting for anyone to open a PR.
+
+Figma webhooks can't authenticate to GitHub's API directly, so the hop goes through a ~30-line Cloudflare Worker bridge (included in `worker/`) that verifies the webhook's passcode and forwards the event:
+
+```
+┌──────────┐  webhook POST  ┌───────────────────────┐  dispatch POST  ┌───────────────────────┐
+│ Figma    │ ─────────────► │ Cloudflare Worker     │ ──────────────► │ GitHub Actions        │
+│ file     │   (passcode)   │ verifies, forwards    │  (Bearer PAT)   │ figma-drift-watch.yml │
+└──────────┘                └───────────────────────┘                 └───────────┬───────────┘
+                                                                                   ▼
+                                                                opens / updates / closes
+                                                                a "design token drift"
+                                                                issue with the report
+```
+
+### Setup
+
+1. **Deploy the worker** (one-time Cloudflare login):
+
+   ```bash
+   cd worker
+   npx wrangler@latest deploy
+   ```
+
+   Note the worker URL (`https://elf-tokens-bridge.<your-subdomain>.workers.dev`) and set `GITHUB_REPO` in `worker/wrangler.toml` to `owner/repo`.
+
+2. **Set worker secrets:**
+
+   ```bash
+   npx wrangler secret put GITHUB_TOKEN    # GitHub PAT with repo scope (classic) — used for repository_dispatch
+   npx wrangler secret put FIGMA_PASSCODE  # any value ≥ 8 chars; reuse it in the next step
+   ```
+
+3. **Register the Figma webhooks** with the same passcode in your environment:
+
+   ```bash
+   export FIGMA_WEBHOOK_PASSCODE=<the value from step 2>
+   npx elf-tokens webhook --endpoint https://elf-tokens-bridge.<your-subdomain>.workers.dev
+   ```
+
+   This subscribes the file to `FILE_VARIABLES_UPDATE`, `FILE_VARIABLES_CREATE`, and `FILE_VARIABLES_REMOVE` (overridable via `webhook.eventTypes` in `elf.config.json`). It's idempotent — re-running updates instead of duplicating. If you skip the env var, a passcode is generated and printed; set it as the worker's `FIGMA_PASSCODE` secret afterwards.
+
+4. **Commit the receiving workflow** — `.github/workflows/figma-drift-watch.yml` triggers on `repository_dispatch` with type `figma-tokens-updated`, runs the check, and:
+   - opens a **"Design token drift: Figma vs codebase"** issue with the report (updating and reopening the same issue on repeat drift — never duplicates),
+   - closes it with a ✅ comment once the tokens are back in sync,
+   - needs the same `FIGMA_API_TOKEN` secret as the PR check.
+
+5. **Test the whole chain:**
+
+   ```bash
+   npx elf-tokens webhook --test
+   ```
+
+   This sends a fake Figma event through your worker; a drift check run should appear on the repo's Actions tab. You can also check what's registered with `npx elf-tokens webhook --list`.
+
+---
+
 ## CLI reference
 
 ```
 elf-tokens [options]
+elf-tokens webhook [options]
 
   --config <path>     config file (default: elf.config.json)
   --out <path>        where to write the report (default: drift-report.md)
   --sample [format]   run against bundled sample data, no token needed
   --fail-on-drift     exit with code 2 when drift is found (off by default)
   --help              show usage
+
+webhook subcommand:
+  --endpoint <url>    worker URL (default: webhook.endpoint in the config)
+  --list              list webhooks registered for the file
+  --test              send a fake Figma event through the worker
 ```
 
 Exit codes: `0` — ran (drift may or may not exist), `1` — error (bad config, missing token, network), `2` — drift found with `--fail-on-drift`.
@@ -218,6 +283,7 @@ Every project I've worked on has had the same arc: the design system starts as a
 - **Tailwind configs must be plain object literals** (`module.exports` / `export default`). Function-based configs are not supported.
 - **Styles mode needs a Figma team ID** (`figma.teamId`), and only solid paint fills are read — gradients and effects are skipped.
 - **One file, one token set.** Multi-mode variable collections compare only the first mode (or `modeName` if set).
+- **Live mode needs a Cloudflare account** and runs on the repo's default branch only (`repository_dispatch` always executes the default branch's workflow).
 
 ## Decisions worth revisiting
 

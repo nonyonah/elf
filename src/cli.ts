@@ -11,6 +11,12 @@ import { fetchVariables } from "./figma/variables.js";
 import { buildReport } from "./report.js";
 import { buildSampleConfig, createSampleFigmaApi, type SampleFormat } from "./sample.js";
 import type { DriftConfig, FigmaSource, Token } from "./types.js";
+import {
+  DEFAULT_PASSCODE_ENV,
+  generatePasscode,
+  listWebhooks,
+  registerWebhooks,
+} from "./webhook.js";
 
 const USAGE = `elf-tokens — design token drift checker
 
@@ -19,7 +25,13 @@ reports value mismatches and missing tokens on either side.
 
 Usage:
   elf-tokens [options]
+  elf-tokens webhook [options]
   npm run check-drift [options]
+
+Commands:
+  webhook              Register Figma webhooks that notify the repo
+                       when tokens change in the file (see --help with
+                       the webhook command for details).
 
 Options:
   --config <path>        Path to the config file (default: elf.config.json)
@@ -33,12 +45,41 @@ Requires the Figma API token in the environment variable named by
 figma.apiTokenEnv in the config (default: FIGMA_API_TOKEN).
 `;
 
+const WEBHOOK_USAGE = `elf-tokens webhook — wire Figma token changes to this repo
+
+Register (or update) webhooks on the Figma file so that token edits
+trigger a GitHub Actions run via your Cloudflare Worker bridge:
+
+  Figma file ──webhook POST──► Worker (passcode check) ──dispatch──► GitHub Actions
+
+Usage:
+  elf-tokens webhook [options]
+  elf-tokens webhook --list
+  elf-tokens webhook --test
+
+Options:
+  --endpoint <url>      Your worker URL (default: webhook.endpoint in the config)
+  --list                List webhooks currently registered for the file
+  --test                Send a fake Figma event through the worker and report the result
+  --config <path>       Path to the config file (default: elf.config.json)
+  --help                Show this help
+
+Environment:
+  <figma.apiTokenEnv>   Figma API token (default: FIGMA_API_TOKEN)
+  <webhook.passcodeEnv> Passcode for the worker (default: FIGMA_WEBHOOK_PASSCODE).
+                        Set it before registering so it matches the worker's
+                        FIGMA_PASSCODE secret; otherwise one is generated and printed.
+`;
+
 interface CliArgs {
   help: boolean;
   sample: string | boolean;
   config?: string;
   out?: string;
   failOnDrift?: boolean;
+  endpoint?: string;
+  list?: boolean;
+  test?: boolean;
 }
 
 function parseArgs(argv: string[]): CliArgs {
@@ -77,10 +118,15 @@ function parseArgs(argv: string[]): CliArgs {
 }
 
 async function main(): Promise<number> {
-  const args = parseArgs(process.argv.slice(2));
+  const rawArgs = process.argv.slice(2);
+  const [command, ...rest] = rawArgs[0] && !rawArgs[0].startsWith("-") ? rawArgs : ["", ...rawArgs];
+  const args = parseArgs(rest);
   if (args.help) {
-    console.log(USAGE);
+    console.log(command === "webhook" ? WEBHOOK_USAGE : USAGE);
     return 0;
+  }
+  if (command === "webhook") {
+    return runWebhookCommand(args);
   }
 
   const config: DriftConfig = args.sample
@@ -127,6 +173,78 @@ function statusPayload(result: DriftResult): Record<string, unknown> {
     missingInCode: result.missingInCode.length,
     missingInFigma: result.missingInFigma.length,
   };
+}
+
+async function runWebhookCommand(args: CliArgs): Promise<number> {
+  const config: DriftConfig = loadConfig(args.config ?? "elf.config.json");
+  const figmaToken = process.env[config.figma.apiTokenEnv];
+  if (!figmaToken) {
+    throw new Error(`Figma API token not found. Set the ${config.figma.apiTokenEnv} environment variable.`);
+  }
+
+  const passcodeEnv = config.webhook?.passcodeEnv ?? DEFAULT_PASSCODE_ENV;
+  const endpoint = args.endpoint ?? config.webhook?.endpoint ?? "";
+
+  if (args.list) {
+    const webhooks = await listWebhooks(config.figma.fileKey, figmaToken);
+    if (webhooks.length === 0) {
+      console.log("No webhooks registered for this file.");
+    } else {
+      console.log(`Webhooks for file ${config.figma.fileKey}:`);
+      for (const webhook of webhooks) {
+        console.log(`  ${webhook.event_type}\t${webhook.status ?? "?"}\t${webhook.endpoint}\t(${webhook.id})`);
+      }
+    }
+    return 0;
+  }
+
+  if (args.test) {
+    if (!endpoint) {
+      throw new Error("No webhook endpoint configured: pass --endpoint <url> or set webhook.endpoint in elf.config.json.");
+    }
+    const passcode = process.env[passcodeEnv];
+    if (!passcode) {
+      throw new Error(`Passcode not found. Set the ${passcodeEnv} environment variable (must match the worker's FIGMA_PASSCODE secret).`);
+    }
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        event_type: "FILE_VARIABLES_UPDATE",
+        file_key: config.figma.fileKey,
+        file_name: "elf-tokens test",
+        passcode,
+        timestamp: new Date().toISOString(),
+      }),
+    });
+    const body = (await response.text().catch(() => "")).slice(0, 300);
+    console.log(`Test delivery: ${response.status} ${body}`);
+    console.log(response.ok ? "If the worker forwarded it, a drift check run should appear on the repo's Actions tab." : "Check the worker's FIGMA_PASSCODE secret and GITHUB_TOKEN/GITHUB_REPO configuration.");
+    return response.ok ? 0 : 1;
+  }
+
+  if (!endpoint) {
+    throw new Error("No webhook endpoint configured: pass --endpoint <url> or set webhook.endpoint in elf.config.json.");
+  }
+
+  const passcode = process.env[passcodeEnv];
+  const generated = !passcode;
+  const finalPasscode = passcode ?? generatePasscode();
+  if (finalPasscode.length < 8) {
+    throw new Error(`Passcode is too short (Figma requires at least 8 characters).`);
+  }
+
+  const results = await registerWebhooks(config, figmaToken, endpoint, finalPasscode);
+  console.log(`Registered webhooks for file ${config.figma.fileKey} → ${endpoint}`);
+  for (const line of results) {
+    console.log(`  ${line}`);
+  }
+  console.log(generated
+    ? `Passcode: ${finalPasscode} (generated — set it as the worker's FIGMA_PASSCODE secret)`
+    : "Passcode: from environment");
+  console.log("Done. Token edits in Figma will now trigger the figma-drift-watch workflow.");
+
+  return 0;
 }
 
 function createLiveApi(config: DriftConfig): FigmaApi {

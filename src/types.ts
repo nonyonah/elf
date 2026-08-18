@@ -24,4 +24,9 @@ export interface DriftConfig {
   };
   modeName?: string | null;
   nameMapping: Record<string, string>;
+  webhook?: {
+    endpoint?: string;
+    eventTypes?: string[];
+    passcodeEnv?: string;
+  };
 }

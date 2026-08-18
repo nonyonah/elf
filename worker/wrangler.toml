@@ -1,0 +1,11 @@
+name = "elf-tokens-bridge"
+main = "index.js"
+compatibility_date = "2024-11-01"
+
+# Point this at the repo that should receive Figma token-change events.
+[vars]
+GITHUB_REPO = "nonyonah/elf"
+
+# Set these with `npx wrangler secret put`:
+#   GITHUB_TOKEN   — GitHub PAT with repo scope (used for repository_dispatch)
+#   FIGMA_PASSCODE — must match the passcode used when registering the webhook

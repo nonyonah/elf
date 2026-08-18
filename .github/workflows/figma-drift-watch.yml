@@ -1,0 +1,103 @@
+name: Figma Drift Watch
+
+on:
+  repository_dispatch:
+    types: [figma-tokens-updated]
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  report-drift:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run drift check
+        id: drift
+        env:
+          FIGMA_API_TOKEN: ${{ secrets.FIGMA_API_TOKEN }}
+        run: npm run check-drift -- --out drift-report.md
+        # Same policy as the PR check: report-only, never fail the run.
+        continue-on-error: true
+
+      - name: Open, update, or close the drift issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const marker = '<!-- elf-tokens-figma-drift -->';
+            const title = 'Design token drift: Figma vs codebase';
+
+            const report = fs.existsSync('drift-report.md') ? fs.readFileSync('drift-report.md', 'utf8') : '';
+            const status = fs.existsSync('drift-status.json')
+              ? JSON.parse(fs.readFileSync('drift-status.json', 'utf8'))
+              : null;
+
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'all',
+              per_page: 100,
+            });
+            const issue = issues.find((i) => i.body && i.body.includes(marker));
+
+            const upsert = async (body, open) => {
+              if (issue) {
+                await github.rest.issues.update({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  body,
+                  state: open ? 'open' : 'closed',
+                });
+                return issue.number;
+              }
+              const created = await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body,
+              });
+              return created.data.number;
+            };
+
+            if (!status) {
+              const number = await upsert(
+                '## Design token drift check failed\n\n' +
+                'The drift check did not produce a report — see the workflow logs for details.\n\n' +
+                marker,
+                true,
+              );
+              console.log(`Opened/updated issue #${number} (check failed)`);
+            } else if (status.driftFound) {
+              const number = await upsert(report + '\n\n' + marker, true);
+              console.log(`Opened/updated issue #${number} (drift found)`);
+            } else if (issue) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                body: '✅ Drift resolved — Figma and codebase tokens are in sync.',
+              });
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                state: 'closed',
+              });
+              console.log(`Closed issue #${issue.number} (drift resolved)`);
+            } else {
+              console.log('Clean — nothing to report.');
+            }

@@ -25,6 +25,7 @@
     "bin",
     "src",
     "fixtures",
+    "worker",
     "elf.config.json",
     "README.md",
     "LICENSE"

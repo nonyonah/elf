@@ -10,5 +10,14 @@
     "path": "./tailwind.config.js"
   },
   "modeName": null,
-  "nameMapping": {}
+  "nameMapping": {},
+  "webhook": {
+    "endpoint": "",
+    "eventTypes": [
+      "FILE_VARIABLES_UPDATE",
+      "FILE_VARIABLES_CREATE",
+      "FILE_VARIABLES_REMOVE"
+    ],
+    "passcodeEnv": "FIGMA_WEBHOOK_PASSCODE"
+  }
 }
