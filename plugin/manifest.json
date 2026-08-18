@@ -5,6 +5,8 @@
   "ui": "ui.html",
   "editorType": ["figma"],
   "networkAccess": {
-    "allowedDomains": ["https://*"]
+    "allowedDomains": ["*"],
+    "reasoning": "Fetches design-token drift status from the Cloudflare Worker endpoint configured by the user in the plugin settings.",
+    "devAllowedDomains": []
   }
 }
