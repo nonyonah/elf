@@ -41,6 +41,15 @@ Design tokens are supposed to be the single source of truth for how a product lo
    - **Missing in Figma** — exists in the codebase, not found in Figma
 5. **Comment** — the markdown report is written to `drift-report.md` and (in CI) posted to the PR. The same comment is **updated** on every push — never duplicated — and removed again once the drift is fixed.
 
+### Four ways it runs
+
+| Where | Trigger | Result |
+|---|---|---|
+| **Local** | `npx elf-tokens` | Report in the terminal + `drift-report.md` / `drift-status.json`. No GitHub or Cloudflare involved |
+| **PR check (CI)** | every push/open/reopen of a pull request | One comment on the PR — updated on every push, deleted when clean |
+| **Live webhook** | a token is edited in Figma | Figma webhook → worker (passcode check) → GitHub issue opened / updated / closed |
+| **Figma plugin** | designer clicks "Check drift" inside Figma | Panel shows drift for the file it's running in, fed by the nightly `drift-data` branch |
+
 ---
 
 ## Quick start
@@ -65,6 +74,26 @@ npm install
 ### 1. Create a Figma token
 
 In Figma: **Account settings → Security → Personal access tokens → Generate new token**. Scope: `Files: Read only` is enough. Treat it like a password — it goes in an environment variable, never in the repo.
+
+### Where each credential lives
+
+| Credential | Purpose | Where it lives |
+|---|---|---|
+| `FIGMA_API_TOKEN` (Figma PAT, `figd_…`) | Read tokens from Figma for every check | **Local CLI:** shell env var — `export FIGMA_API_TOKEN=figd_…` (persist in `~/.zshrc`). **GitHub Actions:** a repository secret of the same name (Settings → Secrets and variables → Actions), passed by the workflows as `${{ secrets.FIGMA_API_TOKEN }}` |
+| `FIGMA_WEBHOOK_PASSCODE` | Auths webhook registration (designer → repo chain) | Your shell env while running `elf-tokens webhook`; must equal the worker's `FIGMA_PASSCODE` |
+| `FIGMA_PASSCODE` | Verifies webhook events at the worker | Cloudflare worker secret: `npx wrangler secret put FIGMA_PASSCODE` |
+| `GITHUB_TOKEN` | Worker → GitHub: `repository_dispatch` + drift-data reads | Cloudflare worker secret: `npx wrangler secret put GITHUB_TOKEN` — classic PAT with `repo` scope, or fine-grained with **Actions: read/write** + **Contents: read** |
+| Figma file key | Picks *which* file to check | `figma.fileKey` in `elf.config.json`, copied once from `figma.com/design/<KEY>/…`. Only the CLI/CI need it — the plugin reads its own file key automatically |
+
+**Never** put a token or passcode inside `elf.config.json` or any committed file — the config stores only the env-var *name* (`apiTokenEnv`). Committed secrets get leaked.
+
+Verify the token is actually picked up:
+
+```bash
+env | grep FIGMA_API_TOKEN   # is it loaded into the shell?
+npx elf-tokens --sample      # CLI works (offline demo, no token needed)
+npx elf-tokens               # live check against your file
+```
 
 ### 2. Fill in the config
 
@@ -208,6 +237,21 @@ The data it reads comes from the `drift-data` branch, refreshed daily by `.githu
    This sends a fake Figma event through your worker; a drift check run should appear on the repo's Actions tab. You can also check what's registered with `npx elf-tokens webhook --list`.
 
 6. **Enable the nightly drift data** (for the plugin) — the `drift-data` workflow is committed; it runs daily at 04:00 UTC and force-pushes `drift-report.md` + `drift-status.json` to the `drift-data` branch. Trigger it once with **Actions → Publish Drift Data → Run workflow**, then open the plugin in Figma and hit **Check drift**.
+
+---
+
+## Troubleshooting
+
+**"Figma API token not found. Set the FIGMA_API_TOKEN environment variable"**
+The CLI reads the token from the environment of whatever process runs it, nothing else. A GitHub repository secret does **not** reach your local shell (and a local `export` does not reach the workflows). Place `figd_…` locally per the credential table above, and the same-named repository secret for CI. If the error persists locally, check whether the token was ever generated (`env | grep FIGMA_API_TOKEN`).
+
+**GitHub Actions jobs never start** — the run record exists but shows *"The job was not started because your account is locked due to a billing issue"*. That annotation is GitHub account config (Settings → Billing), not this tool — no workflow can run until it's resolved. The check itself runs fine locally meanwhile.
+
+**Plugin shows "no drift data yet"** — the `drift-data` branch hasn't been seeded. Run **Actions → Publish Drift Data → Run workflow** once (or wait for the nightly run), then hit Check drift again.
+
+**`webhook --test` fails with a GitHub error from the worker** — the worker's `GITHUB_TOKEN` needs perms for `repository_dispatch`: classic PAT with `repo`, or fine-grained with **Actions: read/write**. A token with Actions: read only fails with 403 *"Resource not accessible by personal access token"*.
+
+**Value mismatches that look like false positives** — `rem` values assume a 16px root; if your project uses another root font size, convert or accept those entries (see Limitations).
 
 ---
 
