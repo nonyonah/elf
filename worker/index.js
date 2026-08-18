@@ -14,6 +14,7 @@ async function fetchDriftData(env) {
   }
   const headers = {
     Accept: "application/vnd.github+json",
+    "User-Agent": "elf-tokens-bridge/1.0",
     ...(env.GITHUB_TOKEN ? { Authorization: `Bearer ${env.GITHUB_TOKEN}` } : {}),
   };
 
@@ -99,6 +100,7 @@ export default {
         Authorization: `Bearer ${token}`,
         Accept: "application/vnd.github+json",
         "Content-Type": "application/json",
+        "User-Agent": "elf-tokens-bridge/1.0",
       },
       body: JSON.stringify({
         event_type: "figma-tokens-updated",
@@ -113,7 +115,7 @@ export default {
 
     if (!response.ok) {
       const body = await response.text().catch(() => "");
-      return json({ ok: false, error: `github: ${response.status} ${body.slice(0, 200)}` }, 502);
+      return json({ ok: false, error: `github: ${response.status} ${body.slice(0, 500)}` }, 502);
     }
 
     return json({ ok: true, forwarded: true });

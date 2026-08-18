@@ -48,6 +48,7 @@ r = await worker.fetch(post({ event_type: "FILE_VARIABLES_UPDATE", file_key: "ab
 const call = calls[0];
 check("event forwards to dispatches", r.status === 200 && call.url === "https://api.github.com/repos/nonyonah/elf/dispatches");
 check("auth header present", call.init.headers.Authorization === "Bearer ghp_fake");
+check("user-agent header present", call.init.headers["User-Agent"] === "elf-tokens-bridge/1.0");
 const body = JSON.parse(call.init.body);
 check(
   "event_type + client_payload shape",
