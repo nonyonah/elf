@@ -1,15 +1,55 @@
-export type Category = "color" | "spacing" | "typography";
+export type Category = "color" | "spacing" | "typography" | "radius" | "shadow";
 
 export interface Token {
   name: string;
   category: Category;
   value: string;
   source: "figma" | "code";
+  /** Set when comparing every mode ("all") or a list: Light, Dark, … */
+  mode?: string;
 }
 
-export type FigmaSource = "auto" | "variables" | "styles";
+export type FigmaSource = "auto" | "variables" | "styles" | "bridge";
 
 export type CodebaseSource = "auto" | "tailwind" | "css" | "tokens-json";
+
+/** How variable collections turn into modes. */
+export type ModeStrategy = "modes" | "collections";
+
+/** `"all"` compares every mode; an array compares the named modes. */
+export type ModeName = string | string[] | null;
+
+export type DeprecationType = "token" | "component";
+
+/** One entry of the config's `deprecations` allowlist. */
+export interface Deprecation {
+  /** Token name as reported (post nameMapping), or component name/codeKey. */
+  name: string;
+  type: DeprecationType;
+  reason?: string;
+  /** YYYY-MM-DD; informational. */
+  since?: string;
+  /** YYYY-MM-DD; once in the past, the item counts as drift. */
+  removeBy?: string;
+}
+
+/** Where the component side of the sync lives (written by elf-batch). */
+export interface ComponentsConfig {
+  /** Folder holding component files + sidecars. */
+  path: string;
+  /** Path to elf.manifest.json — the code↔Figma map. */
+  manifest: string;
+}
+
+/** Where drift alerts go when `--notify` is passed. The URL itself lives in the environment. */
+export interface NotifyConfig {
+  /** Name of the environment variable holding the webhook URL — never the URL. */
+  webhookEnv: string;
+  /** `"slack"` posts Block Kit JSON (Slack, or Discord with a `/slack` suffix); `"text"` posts a plain body (e.g. ntfy). */
+  format: "slack" | "text";
+  /** Optional file for the dedupe state; defaults to drift-status.json next to the report. */
+  stateFile?: string;
+}
 
 export interface DriftConfig {
   figma: {
@@ -22,8 +62,14 @@ export interface DriftConfig {
     path: string;
     source: CodebaseSource;
   };
-  modeName?: string | null;
+  modeName: ModeName;
+  modeStrategy: ModeStrategy;
   nameMapping: Record<string, string>;
+  /** Opt-in component diff; absent means tokens only. */
+  components?: ComponentsConfig;
+  deprecations: Deprecation[];
+  /** Opt-in drift alerts; used when the CLI runs with `--notify`. */
+  notify?: NotifyConfig;
   webhook?: {
     endpoint?: string;
     eventTypes?: string[];

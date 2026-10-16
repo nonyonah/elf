@@ -3,6 +3,7 @@ dist/
 drift-report.md
 drift-status.json
 .env
+worker/.dev.vars
 *.log
 batch/elf.manifest.json
 *.tgz

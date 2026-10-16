@@ -1,4 +1,4 @@
-import { rgbToHex, slugify } from "../normalize.js";
+import { figmaEffectsToShadow, rgbToHex, slugify, type FigmaEffect } from "../normalize.js";
 import type { Token } from "../types.js";
 import type { FigmaApi } from "./client.js";
 
@@ -26,6 +26,7 @@ interface StyleNode {
   styles?: { fill?: string; text?: string };
   fills?: PaintFill[];
   style?: TextStyle;
+  effects?: FigmaEffect[];
 }
 
 const NODE_CHUNK_SIZE = 50;
@@ -47,7 +48,7 @@ export async function fetchStyles(
   );
 
   const relevant = styles.filter(
-    (style) => style.style_type === "FILL" || style.style_type === "TEXT",
+    (style) => style.style_type === "FILL" || style.style_type === "TEXT" || style.style_type === "EFFECT",
   );
 
   const tokens: Token[] = [];
@@ -87,6 +88,11 @@ function styleToToken(style: TeamStyle, node: StyleNode): Token | null {
     if (text.fontWeight) parts.push(String(text.fontWeight));
     if (text.fontFamily) parts.push(text.fontFamily);
     return { name, category: "typography", value: parts.join(" "), source: "figma" };
+  }
+
+  if (style.style_type === "EFFECT") {
+    const shadow = figmaEffectsToShadow(node.effects ?? []);
+    return shadow ? { name, category: "shadow", value: shadow, source: "figma" } : null;
   }
 
   return null;

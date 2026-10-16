@@ -109,5 +109,39 @@ globalThis.fetch = async () => new Response("forbidden", { status: 401 });
 r = await worker.fetch(post({ event_type: "FILE_VARIABLES_UPDATE", file_key: "abc", passcode: "testpasscode123" }), env);
 check("github 401 becomes 502", r.status === 502);
 
+// --- Slack notification ---
+
+const slackEnv = { ...env, SLACK_WEBHOOK_URL: "https://hooks.slack.com/services/T000/B000/XXX" };
+const slackCalls = (list) => list.filter((c) => String(c.url).startsWith("https://hooks.slack.com/"));
+
+globalThis.fetch = async (url, init) => {
+  calls.push({ url, init });
+  return new Response(null, { status: 204 });
+};
+calls.length = 0;
+r = await worker.fetch(post({ event_type: "FILE_VARIABLES_UPDATE", file_key: "abc123", file_name: "Tokens", passcode: "testpasscode123" }), slackEnv);
+const notified = slackCalls(calls);
+check("accepted events ping Slack", r.status === 200 && notified.length === 1);
+const slackBody = JSON.parse(notified[0].init.body);
+check("slack message names the file and the event", /Tokens/.test(slackBody.text) && /FILE_VARIABLES_UPDATE/.test(slackBody.text) && /drift check/i.test(slackBody.text));
+
+calls.length = 0;
+r = await worker.fetch(post({ event_type: "FILE_VARIABLES_UPDATE", file_key: "abc123", file_name: "Tokens", passcode: "testpasscode123" }), { FIGMA_PASSCODE: "testpasscode123", SLACK_WEBHOOK_URL: slackEnv.SLACK_WEBHOOK_URL });
+check("Slack-only mode (no GitHub configured) still alerts and returns 200", r.status === 200 && slackCalls(calls).length === 1);
+const slackOnlyBody = await r.json();
+check("Slack-only mode reports not forwarded", slackOnlyBody.forwarded === false);
+
+globalThis.fetch = async (url, init) => {
+  calls.push({ url, init });
+  if (String(url).startsWith("https://hooks.slack.com/")) throw new Error("slack down");
+  return new Response(null, { status: 204 });
+};
+r = await worker.fetch(post({ event_type: "FILE_VARIABLES_UPDATE", file_key: "abc", passcode: "testpasscode123" }), slackEnv);
+check("Slack failure never fails the webhook", r.status === 200);
+
+calls.length = 0;
+r = await worker.fetch(post({ event_type: "PING", passcode: "testpasscode123" }), slackEnv);
+check("PING does not ping Slack", r.status === 200 && slackCalls(calls).length === 0);
+
 console.log(failures === 0 ? "\nAll worker checks passed" : `\n${failures} check(s) failed`);
 process.exit(failures === 0 ? 0 : 1);

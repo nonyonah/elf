@@ -92,6 +92,29 @@ export class FakeBridge implements BridgeCaller {
         return { style: { id: `TS:${this.calls.length}`, created: true } } as T;
       case "upsert_effect_style":
         return { style: { id: `ES:${this.calls.length}`, created: true } } as T;
+      case "get_node":
+        return {
+          node: {
+            id: params.nodeId,
+            name: "Fake",
+            type: "COMPONENT",
+            codeKey: null,
+            layoutMode: "NONE",
+            width: 100,
+            height: 40,
+            x: 10,
+            y: 20,
+            itemSpacing: 0,
+            paddingTop: 0,
+            paddingRight: 0,
+            paddingBottom: 0,
+            paddingLeft: 0,
+            cornerRadius: 0,
+            fills: [],
+            boundVariables: {},
+            children: [],
+          },
+        } as T;
       default:
         throw new Error(`FakeBridge has no handler for "${method}".`);
     }

@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { categoryFromName, cssColorToHex, slugify, toPx } from "../normalize.js";
+import { categoryFromName, cssColorToHex, normalizeShadow, slugify, toPx } from "../normalize.js";
 import type { Category, Token } from "../types.js";
 
 export function parseCss(cssPath: string): Token[] {
@@ -32,6 +32,18 @@ function toToken(name: string, rawValue: string): Token | null {
     const px = toPx(rawValue);
     if (px) return { name, category, value: px, source: "code" };
     if (category === "typography") return { name, category, value: rawValue, source: "code" };
+    return null;
+  }
+
+  if (category === "radius") {
+    const px = toPx(rawValue);
+    if (px) return { name, category, value: px, source: "code" };
+    return null;
+  }
+
+  if (category === "shadow") {
+    const shadow = normalizeShadow(rawValue);
+    if (shadow) return { name, category, value: shadow, source: "code" };
     return null;
   }
 

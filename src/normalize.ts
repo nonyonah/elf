@@ -12,13 +12,19 @@ export function slugify(name: string): string {
 const COLOR_WORDS = ["color", "colour"];
 const TYPOGRAPHY_WORDS = ["font", "typography", "type", "size", "leading", "tracking", "letter", "weight"];
 const SPACING_WORDS = ["space", "spacing", "gap", "padding", "margin"];
-const SKIPPED_WORDS = ["radius", "border", "shadow", "easing", "duration", "opacity"];
+const RADIUS_WORDS = ["radius", "corner", "rounded"];
+const SHADOW_WORDS = ["shadow", "elevation"];
+const SKIPPED_WORDS = ["easing", "duration", "opacity"];
 
 export function categoryFromName(name: string): Category | "other" {
+  // Opacity/easing/duration stay out of scope; they are not comparable values.
   if (SKIPPED_WORDS.some((word) => name.includes(word))) return "other";
   if (COLOR_WORDS.some((word) => name.includes(word))) return "color";
   if (TYPOGRAPHY_WORDS.some((word) => name.includes(word))) return "typography";
   if (SPACING_WORDS.some((word) => name.includes(word))) return "spacing";
+  // radius before border, so "border-radius" is a radius and "border-width" stays out.
+  if (RADIUS_WORDS.some((word) => name.includes(word))) return "radius";
+  if (SHADOW_WORDS.some((word) => name.includes(word))) return "shadow";
   return "other";
 }
 
@@ -87,4 +93,104 @@ export function toPx(value: string | number): string | null {
   const n = parseFloat(match[1]);
   if (match[2] === "rem") return `${Math.round(n * 16 * 100) / 100}px`;
   return `${n}px`;
+}
+
+// ---------------------------------------------------------------------------
+// Shadows — compared as one normalized string: `[inset ]x y blur spread #color`
+// ---------------------------------------------------------------------------
+
+export interface FigmaEffect {
+  type: string;
+  visible?: boolean;
+  radius?: number;
+  spread?: number;
+  offset?: { x: number; y: number };
+  color?: { r: number; g: number; b: number; a?: number };
+}
+
+/**
+ * CSS `box-shadow` → canonical string, so the same shadow written two ways
+ * compares equal. Unparseable values (named colors, `var(…)`, `none`,
+ * `currentColor`) return null and are skipped rather than guessed.
+ */
+export function normalizeShadow(value: string): string | null {
+  const text = value.trim();
+  if (!text || /^none$/i.test(text)) return null;
+
+  const layers: string[] = [];
+  for (const layer of splitTopLevel(text, ",")) {
+    const normalized = normalizeShadowLayer(layer.trim());
+    if (normalized === null) return null;
+    layers.push(normalized);
+  }
+  return layers.length > 0 ? layers.join(", ") : null;
+}
+
+function normalizeShadowLayer(layer: string): string | null {
+  let inset = false;
+  const lengths: string[] = [];
+  let color: string | null = null;
+
+  for (const token of splitTopLevel(layer, " ")) {
+    if (!token) continue;
+    if (token.toLowerCase() === "inset") {
+      inset = true;
+      continue;
+    }
+    const hex = token.includes("(") || token.startsWith("#") ? cssColorToHex(token) : null;
+    if (hex !== null) {
+      color = hex;
+      continue;
+    }
+    const px = toPx(token);
+    if (px !== null) {
+      lengths.push(px);
+      continue;
+    }
+    return null;
+  }
+
+  if (lengths.length < 2 || lengths.length > 4 || color === null) return null;
+  while (lengths.length < 4) lengths.push("0px");
+  return `${inset ? "inset " : ""}${lengths.join(" ")} ${color}`;
+}
+
+/** Figma drop/inner shadows → the same canonical string normalizeShadow produces. */
+export function figmaEffectsToShadow(effects: readonly FigmaEffect[]): string | null {
+  const layers = effects
+    .filter(
+      (effect) =>
+        effect.visible !== false && (effect.type === "DROP_SHADOW" || effect.type === "INNER_SHADOW"),
+    )
+    .map((effect) => {
+      const inset = effect.type === "INNER_SHADOW" ? "inset " : "";
+      const x = effect.offset?.x ?? 0;
+      const y = effect.offset?.y ?? 0;
+      const blur = effect.radius ?? 0;
+      const spread = effect.spread ?? 0;
+      const color = effect.color
+        ? rgbToHex(effect.color.r, effect.color.g, effect.color.b, effect.color.a ?? 1)
+        : "#000000";
+      return `${inset}${toPx(x)} ${toPx(y)} ${toPx(blur)} ${toPx(spread)} ${color}`;
+    });
+  return layers.length > 0 ? layers.join(", ") : null;
+}
+
+/** Splits on a separator that is outside parentheses — `rgb(0 0 0 / 1)` stays whole. */
+function splitTopLevel(text: string, separator: string): string[] {
+  const parts: string[] = [];
+  let depth = 0;
+  let current = "";
+  for (const char of text) {
+    if (char === "(") depth++;
+    if (char === ")") depth = Math.max(0, depth - 1);
+    if (char === separator && depth === 0) {
+      parts.push(current);
+      current = "";
+    } else {
+      current += char;
+    }
+  }
+  parts.push(current);
+  return parts;
 }

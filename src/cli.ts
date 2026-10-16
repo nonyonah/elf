@@ -3,14 +3,25 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { detectCodebaseSource, parseCodebaseTokens } from "./codebase/index.js";
+import { diffComponents } from "./components.js";
 import { loadConfig } from "./config.js";
-import { diffTokens, type DriftResult } from "./diff.js";
+import { applyDeprecations } from "./deprecations.js";
+import { diffTokens, hasDrift } from "./diff.js";
+import { connectBridge, type BridgeCaller } from "./figma/bridge.js";
 import { FigmaClient, type FigmaApi } from "./figma/client.js";
-import { fetchStyles } from "./figma/styles.js";
-import { fetchVariables } from "./figma/variables.js";
-import { buildReport } from "./report.js";
+import { fetchFigmaTokens } from "./figma/source.js";
+import {
+  buildNotifyMessage,
+  decideNotification,
+  driftFingerprint,
+  postNotification,
+  readNotifyState,
+  writeNotifyState,
+  type NotifyState,
+} from "./notify.js";
+import { buildReport, buildStatusPayload } from "./report.js";
 import { buildSampleConfig, createSampleFigmaApi, type SampleFormat } from "./sample.js";
-import type { DriftConfig, FigmaSource, Token } from "./types.js";
+import type { DriftConfig } from "./types.js";
 import {
   DEFAULT_PASSCODE_ENV,
   generatePasscode,
@@ -39,10 +50,15 @@ Options:
   --sample [format]      Run against bundled sample data, no Figma token needed.
                          Optional format: variables | styles | tailwind | css | tokens-json
   --fail-on-drift        Exit with code 2 when drift is found (off by default)
+  --notify               Post a summary to the webhook named by "notify.webhookEnv"
+                         in the config (a Slack incoming webhook by default), only
+                         when the drift state changed since the last run
   --help                 Show this help
 
 Requires the Figma API token in the environment variable named by
-figma.apiTokenEnv in the config (default: FIGMA_API_TOKEN).
+figma.apiTokenEnv in the config (default: FIGMA_API_TOKEN). The notify
+webhook URL also lives in an environment variable — it is never stored
+in the config itself.
 `;
 
 const WEBHOOK_USAGE = `elf-tokens webhook — wire Figma token changes to this repo
@@ -77,6 +93,7 @@ interface CliArgs {
   config?: string;
   out?: string;
   failOnDrift?: boolean;
+  notify?: boolean;
   endpoint?: string;
   list?: boolean;
   test?: boolean;
@@ -133,46 +150,144 @@ async function main(): Promise<number> {
     ? buildSampleConfig(typeof args.sample === "string" ? (args.sample as SampleFormat) : undefined)
     : loadConfig(args.config ?? "elf.config.json");
 
-  const api: FigmaApi = args.sample ? createSampleFigmaApi() : createLiveApi(config);
+  if (args.notify) {
+    if (!config.notify) {
+      throw new Error('--notify needs a "notify" section in the config, e.g. {"notify": {"webhookEnv": "SLACK_WEBHOOK_URL"}}.');
+    }
+    if (!process.env[config.notify.webhookEnv]) {
+      throw new Error(
+        `Webhook URL not found. Set the ${config.notify.webhookEnv} environment variable ` +
+          `(the URL itself is never stored in the config).`,
+      );
+    }
+  }
+  const webhookUrl = config.notify ? process.env[config.notify.webhookEnv] ?? "" : "";
 
-  const [figmaTokens, figmaSource] = await fetchFigmaTokens(api, config);
+  let api: FigmaApi | null = null;
+  const restApi = (): FigmaApi => {
+    api ??= args.sample ? createSampleFigmaApi() : createLiveApi(config);
+    return api;
+  };
+
+  let bridge: BridgeCaller | null = null;
+  const getBridge = async (): Promise<BridgeCaller> => {
+    bridge ??= await connectBridge();
+    return bridge;
+  };
+
+  try {
+    return await runDriftCheck(args, config, restApi, getBridge, webhookUrl);
+  } finally {
+    // The bridge websocket would otherwise keep the process alive after the report.
+    bridge?.close();
+  }
+}
+
+async function runDriftCheck(
+  args: CliArgs,
+  config: DriftConfig,
+  restApi: () => FigmaApi,
+  getBridge: () => Promise<BridgeCaller>,
+  webhookUrl: string,
+): Promise<number> {
+  const { tokens: figmaTokens, source: figmaSource } = await fetchFigmaTokens(config, restApi, getBridge);
 
   const codebaseSource =
     config.codebase.source === "auto" ? detectCodebaseSource(config.codebase.path) : config.codebase.source;
   const codeTokens = await parseCodebaseTokens(codebaseSource, config.codebase.path);
 
-  const result = diffTokens(figmaTokens, codeTokens, config.nameMapping);
+  let result = diffTokens(figmaTokens, codeTokens, config.nameMapping);
 
-  const report = buildReport(result, {
+  let codeComponents: { name: string; codeKey: string }[] = [];
+  if (config.components) {
+    const componentDiff = await diffComponents(
+      config.components.path,
+      config.components.manifest,
+      await getBridge(),
+    );
+    codeComponents = componentDiff.codeComponents;
+    result = {
+      ...result,
+      componentsOutOfDate: componentDiff.outOfDate,
+      componentsChangedInFigma: componentDiff.changedInFigma,
+      componentsInCodeNotInFigma: componentDiff.inCodeNotInFigma,
+      componentsInFigmaNotInCode: componentDiff.inFigmaNotInCode,
+    };
+    result.driftFound = hasDrift(result);
+  }
+
+  result = applyDeprecations(
+    result,
+    config.deprecations,
+    { codeTokens, codeComponents },
+    new Date().toISOString().slice(0, 10),
+  );
+
+  const meta = {
     fileKey: config.figma.fileKey,
     figmaSource,
     codebaseSource,
     figmaTokenCount: figmaTokens.length,
     codeTokenCount: codeTokens.length,
     checkedAt: new Date().toISOString(),
-  });
+  };
+  const report = buildReport(result, meta);
 
   const outPath = resolve(args.out ?? "drift-report.md");
   const statusPath = join(dirname(outPath), "drift-status.json");
   mkdirSync(dirname(outPath), { recursive: true });
   writeFileSync(outPath, `${report}\n`);
-  writeFileSync(statusPath, JSON.stringify({ ...statusPayload(result), checkedAt: new Date().toISOString() }, null, 2));
 
   console.log(report);
   console.log(`\nReport written to ${outPath} (${result.driftFound ? "drift found" : "clean"}).`);
   console.log("Exit code reflects drift only with --fail-on-drift.");
 
+  let statusFingerprint = driftFingerprint(result);
+
+  if (args.notify && config.notify) {
+    const notifyConfig = config.notify;
+    const statePath = notifyConfig.stateFile ?? statusPath;
+    const previousState = readNotifyState(statePath);
+    const decision = decideNotification(previousState, result);
+
+    let posted = false;
+    if (decision.send) {
+      try {
+        await postNotification(
+          webhookUrl,
+          notifyConfig.format,
+          buildNotifyMessage(result, meta, notifyConfig.format, previousState),
+        );
+        posted = true;
+        console.log(`Notification posted (via ${notifyConfig.webhookEnv}).`);
+      } catch (error) {
+        console.error(`Notification failed: ${(error as Error).message}`);
+      }
+    } else {
+      console.log("No notification sent: drift state unchanged since the last run.");
+    }
+
+    // Keep the old state on a failed post so the next run retries.
+    const persist: NotifyState | null =
+      decision.send && !posted ? previousState : { fingerprint: decision.fingerprint, driftFound: result.driftFound };
+    if (notifyConfig.stateFile) {
+      if (persist) writeNotifyState(notifyConfig.stateFile, persist);
+    } else {
+      statusFingerprint = persist?.fingerprint ?? "";
+    }
+  }
+
+  writeFileSync(
+    statusPath,
+    JSON.stringify({ ...buildStatusPayload(result), fingerprint: statusFingerprint, checkedAt: new Date().toISOString() }, null, 2),
+  );
+
   if (args.failOnDrift && result.driftFound) return 2;
   return 0;
-}
-
-function statusPayload(result: DriftResult): Record<string, unknown> {
-  return {
-    driftFound: result.driftFound,
-    valueMismatches: result.valueMismatches.length,
-    missingInCode: result.missingInCode.length,
-    missingInFigma: result.missingInFigma.length,
-  };
+  } finally {
+    // The bridge websocket would otherwise keep the process alive after the report.
+    bridge?.close();
+  }
 }
 
 async function runWebhookCommand(args: CliArgs): Promise<number> {
@@ -219,7 +334,19 @@ async function runWebhookCommand(args: CliArgs): Promise<number> {
     });
     const body = (await response.text().catch(() => "")).slice(0, 300);
     console.log(`Test delivery: ${response.status} ${body}`);
-    console.log(response.ok ? "If the worker forwarded it, a drift check run should appear on the repo's Actions tab." : "Check the worker's FIGMA_PASSCODE secret and GITHUB_TOKEN/GITHUB_REPO configuration.");
+    if (!response.ok) {
+      console.log("Check the worker's FIGMA_PASSCODE secret and GITHUB_TOKEN/GITHUB_REPO configuration.");
+    } else {
+      let forwarded: boolean | undefined;
+      try {
+        forwarded = (JSON.parse(body) as { forwarded?: boolean }).forwarded;
+      } catch {
+        forwarded = undefined;
+      }
+      console.log(forwarded === false
+        ? "Accepted (Slack-only worker: no GITHUB_REPO/GITHUB_TOKEN configured) — a ping should appear in Slack if SLACK_WEBHOOK_URL is set."
+        : "If the worker forwarded it, a drift check run should appear on the repo's Actions tab, and a Slack ping if SLACK_WEBHOOK_URL is set.");
+    }
     return response.ok ? 0 : 1;
   }
 
@@ -256,24 +383,6 @@ function createLiveApi(config: DriftConfig): FigmaApi {
     );
   }
   return new FigmaClient(token);
-}
-
-async function fetchFigmaTokens(
-  api: FigmaApi,
-  config: DriftConfig,
-): Promise<[Token[], FigmaSource]> {
-  const { fileKey } = config.figma;
-
-  if (config.figma.source === "variables") {
-    return [await fetchVariables(api, fileKey, config.modeName), "variables"];
-  }
-  if (config.figma.source === "styles") {
-    return [await fetchStyles(api, fileKey, config.figma.teamId), "styles"];
-  }
-
-  const variableTokens = await fetchVariables(api, fileKey, config.modeName);
-  if (variableTokens.length > 0) return [variableTokens, "variables"];
-  return [await fetchStyles(api, fileKey, config.figma.teamId), "styles"];
 }
 
 main()

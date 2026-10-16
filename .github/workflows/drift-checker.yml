@@ -86,13 +86,19 @@ jobs:
               }
             };
 
+            // Deprecation notes (informational) also deserve a comment even
+            // when nothing counts as drift, so the list doesn't rot silently.
+            const hasNotes = Boolean(
+              status && (status.deprecatedStillInCode > 0 || status.safeToRemoveFromDeprecations > 0)
+            );
+
             if (!status) {
               await upsertComment(
                 '## Design token drift check failed\n\n' +
                 'The drift check did not produce a report — see the workflow logs for details.\n\n' +
                 marker
               );
-            } else if (status.driftFound) {
+            } else if (status.driftFound || hasNotes) {
               await upsertComment(report + '\n\n' + marker);
             } else if (botComment) {
               // Clean: remove the previous drift comment so resolved drift

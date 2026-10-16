@@ -1,5 +1,6 @@
 import { orderComponents } from "./graph.js";
 import { hashSpec, loadManifest, saveManifest } from "./manifest.js";
+import { NODE_STATE_DEPTH, nodeStateHash } from "./nodestate.js";
 import { COMPONENT_EXTENSIONS, parseComponents } from "./parser.js";
 import { loadSidecar, resolveSidecar, sidecarPathFor, validateSidecar } from "./sidecar.js";
 import { planTokens, type TokenIndex } from "./tokens.js";
@@ -283,6 +284,23 @@ function buildTokenSections(plan: TokensPlan): TokenSection[] {
 // Components phase
 // ---------------------------------------------------------------------------
 
+/**
+ * The specHash batch records for a component — the code-side half of the
+ * manifest. elf imports this so both sides always agree on what the hash
+ * covers. A sidecar that fails validation counts as null, exactly as a
+ * failed sync records it.
+ */
+export function componentSpecHash(componentsDir: string, parsed: ParsedComponent): string {
+  let sidecar: SidecarSpec | null = null;
+  try {
+    const loaded = loadSidecar(componentsDir, parsed);
+    if (loaded !== null) sidecar = validateSidecar(loaded, sidecarPathFor(componentsDir, parsed));
+  } catch {
+    sidecar = null;
+  }
+  return hashSpec({ parsed: specOf(parsed), sidecar });
+}
+
 /** Parses, validates sidecars, orders by dependency, applies --only. */
 export function planComponents(config: BatchConfig, index: TokenIndex, only?: string): PlannedComponent[] {
   const parsed = parseComponents(config.componentsDir);
@@ -400,6 +418,7 @@ async function processComponent(
       context.manifest.components[parsed.codeKey] = {
         figmaNodeId: context.manifest.components[parsed.codeKey]?.figmaNodeId ?? null,
         specHash: hashSpec({ parsed: specOf(parsed), sidecar: component.sidecar }),
+        ...keptNodeHash(context.manifest.components[parsed.codeKey]),
         status: "skipped",
         updatedAt: new Date().toISOString(),
         error: base.error,
@@ -426,6 +445,7 @@ async function processComponent(
       context.manifest.components[parsed.codeKey] = {
         figmaNodeId: known?.figmaNodeId ?? null,
         specHash,
+        ...keptNodeHash(known),
         status: "failed",
         updatedAt: new Date().toISOString(),
         error: base.error,
@@ -453,9 +473,11 @@ async function processComponent(
     base.action = "synced";
     base.created = node.created;
     base.nodeId = node.id;
+    const nodeHash = await readNodeHash(context, node.id, parsed.file);
     context.manifest.components[parsed.codeKey] = {
       figmaNodeId: node.id,
       specHash,
+      nodeHash,
       status: "synced",
       updatedAt: new Date().toISOString(),
     };
@@ -466,6 +488,7 @@ async function processComponent(
     context.manifest.components[parsed.codeKey] = {
       figmaNodeId: known?.figmaNodeId ?? null,
       specHash,
+      ...keptNodeHash(known),
       status: "failed",
       updatedAt: new Date().toISOString(),
       error: base.error,
@@ -474,6 +497,33 @@ async function processComponent(
   }
 
   return base;
+}
+
+/**
+ * Reads the node back right after an upsert so the manifest can carry the
+ * state hash elf later compares against. A failed read is not a failed sync:
+ * the component is written, the hash is simply unknown until the next run.
+ */
+async function readNodeHash(
+  context: { client: BridgeCaller | null; log: (line: string) => void },
+  nodeId: string,
+  file: string,
+): Promise<string | null> {
+  try {
+    const state = await (context.client as BridgeCaller).call<{ node: unknown }>("get_node", {
+      nodeId,
+      depth: NODE_STATE_DEPTH,
+    });
+    return nodeStateHash(state.node);
+  } catch (error) {
+    context.log(`  ! ${file} — synced, but reading the node state failed (${(error as Error).message})`);
+    return null;
+  }
+}
+
+/** Keeps an existing nodeHash when a run does not touch the node. */
+function keptNodeHash(entry: { nodeHash?: string | null } | undefined): { nodeHash?: string } {
+  return entry?.nodeHash ? { nodeHash: entry.nodeHash } : {};
 }
 
 function buildSetParams(component: PlannedComponent): Record<string, unknown> {

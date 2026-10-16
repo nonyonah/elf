@@ -7,5 +7,7 @@ compatibility_date = "2024-11-01"
 GITHUB_REPO = "nonyonah/elf"
 
 # Set these with `npx wrangler secret put`:
-#   GITHUB_TOKEN   — GitHub PAT with repo scope (used for repository_dispatch)
-#   FIGMA_PASSCODE — must match the passcode used when registering the webhook
+#   GITHUB_TOKEN      — GitHub PAT with repo scope (used for repository_dispatch; optional)
+#   FIGMA_PASSCODE    — must match the passcode used when registering the webhook
+#   SLACK_WEBHOOK_URL — optional Slack incoming webhook; pings there on every
+#                       accepted event, so alerts keep working without GitHub Actions

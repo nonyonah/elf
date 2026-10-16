@@ -1,6 +1,6 @@
 # elf-tokens
 
-**A CI-friendly CLI that compares your Figma design tokens against the tokens actually used in your codebase — and posts the differences as a PR comment, so drift gets caught before it ships.**
+**A CI-friendly CLI that compares your Figma design tokens against the tokens actually used in your codebase — and reports the differences as a PR comment, a Slack alert, or both — so drift gets caught before it ships.**
 
 [![npm version](https://img.shields.io/npm/v/elf-tokens)](https://www.npmjs.com/package/elf-tokens)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
@@ -9,7 +9,7 @@
 
 Design tokens are supposed to be the single source of truth for how a product looks. In practice they drift: a designer tweaks `primary/500` in Figma, the Tailwind config keeps the old hex, and nobody notices until the marketing site ships with two slightly different blues. This tool closes that loop — it diffs Figma's tokens against your codebase's tokens on every pull request and leaves the result as a comment on the PR.
 
-**Token-value comparison only.** No screenshots, no pixel diffing, no component checks — just names and values.
+**No screenshots, no pixel diffing.** Tokens compare by name and value; components (opt-in) compare by their parsed specs and Figma node hashes.
 
 ---
 
@@ -32,23 +32,28 @@ Design tokens are supposed to be the single source of truth for how a product lo
                               └──────────────────────────────┘
 ```
 
-1. **Fetch** — pull color, spacing, and typography tokens from your Figma file. Works with both the modern **Variables** API and the older **Styles** API (auto-detected: variables first, styles as fallback). Responses are cached in-memory for the run, so the token set is only ever fetched once.
+1. **Fetch** — pull color, spacing, typography, radius, and shadow tokens from your Figma file. Three sources: the modern **Variables** REST API, the older **Styles** REST API, or the **bridge** (the same plugin connection the MCP server uses — works on any Figma plan). `"auto"` tries variables first, falls back to styles, and drops to the bridge when REST is blocked by a plan/permission error. Responses are cached in-memory for the run.
 2. **Parse** — read the same tokens from your codebase: a Tailwind config, CSS custom properties, or a `tokens.json`.
 3. **Normalize** — both sides are reduced to the same shape: `{ name, category, value }`. Values are canonicalized so `0.75rem` and `12px` compare as equal (see [Limitations](#limitations)).
-4. **Diff** — three kinds of drift are reported:
+4. **Diff** — token drift comes in three kinds, plus four component categories when the component check is enabled:
    - **Value mismatch** — same token name on both sides, different value
    - **Missing in code** — exists in Figma, not found in the codebase
-   - **Missing in Figma** — exists in the codebase, not found in Figma
-5. **Comment** — the markdown report is written to `drift-report.md` and (in CI) posted to the PR. The same comment is **updated** on every push — never duplicated — and removed again once the drift is fixed.
+   - **Missing in Figma** — exists in the codebase, not found in Figma (new in code, or removed from Figma without being marked deprecated — see `deprecations` below)
+   - **Components out of date** — the code spec changed since the last `elf-batch` sync
+   - **Components changed in Figma** — the node changed since the last sync
+   - **Components in code, not in Figma** — never synced, or removed from Figma
+   - **Components in Figma, not in code** — a node still carries an elf codeKey but its file is gone
+5. **Comment / alert** — the markdown report is written to `drift-report.md` and (in CI) posted to the PR. The same comment is **updated** on every push — never duplicated — and removed again once the drift is fixed. With `--notify`, a summary goes to a Slack webhook instead, so the loop works with no CI at all.
 
-### Four ways it runs
+### Five ways it runs
 
 | Where | Trigger | Result |
 |---|---|---|
 | **Local** | `npx elf-tokens` | Report in the terminal + `drift-report.md` / `drift-status.json`. No GitHub or Cloudflare involved |
 | **PR check (CI)** | every push/open/reopen of a pull request | One comment on the PR — updated on every push, deleted when clean |
-| **Live webhook** | a token is edited in Figma | Figma webhook → worker (passcode check) → GitHub issue opened / updated / closed |
+| **Live webhook** | a token is edited in Figma | Figma webhook → worker (passcode check) → GitHub issue opened / updated / closed, plus a Slack ping if configured |
 | **Figma plugin** | designer clicks "Check drift" inside Figma | Panel shows drift for the file it's running in, fed by the nightly `drift-data` branch |
+| **Alert (no CI)** | `--notify` on any run — shell, git hook, cron | Slack (or webhook) message whenever the drift state changes |
 
 ---
 
@@ -83,6 +88,7 @@ In Figma: **Account settings → Security → Personal access tokens → Generat
 | `FIGMA_WEBHOOK_PASSCODE` | Auths webhook registration (designer → repo chain) | Your shell env while running `elf-tokens webhook`; must equal the worker's `FIGMA_PASSCODE` |
 | `FIGMA_PASSCODE` | Verifies webhook events at the worker | Cloudflare worker secret: `npx wrangler secret put FIGMA_PASSCODE` |
 | `GITHUB_TOKEN` | Worker → GitHub: `repository_dispatch` + drift-data reads | Cloudflare worker secret: `npx wrangler secret put GITHUB_TOKEN` — classic PAT with `repo` scope, or fine-grained with **Actions: read/write** + **Contents: read** |
+| `SLACK_WEBHOOK_URL` (or any name via `notify.webhookEnv`) | `--notify` drift alerts + worker Slack pings | Shell env for the CLI (`export SLACK_WEBHOOK_URL=…`); Cloudflare worker secret for live pings. Treat the URL like the passcode — anyone holding it can post to the channel |
 | Figma file key | Picks *which* file to check | `figma.fileKey` in `elf.config.json`, copied once from `figma.com/design/<KEY>/…`. Only the CLI/CI need it — the plugin reads its own file key automatically |
 
 **Never** put a token or passcode inside `elf.config.json` or any committed file — the config stores only the env-var *name* (`apiTokenEnv`). Committed secrets get leaked.
@@ -104,15 +110,25 @@ Copy `elf.config.json` and point it at your file and your token source:
   "figma": {
     "fileKey": "YOUR_FIGMA_FILE_KEY",        // from the file URL: figma.com/design/<FILE_KEY>/...
     "apiTokenEnv": "FIGMA_API_TOKEN",        // env var the token lives in (don't put the token here!)
-    "source": "auto",                        // "auto" | "variables" | "styles"
+    "source": "auto",                        // "auto" | "variables" | "styles" | "bridge"
     "teamId": ""                             // only needed for Styles mode
   },
   "codebase": {
     "source": "auto",                        // "auto" | "tailwind" | "css" | "tokens-json"
     "path": "./tailwind.config.js"           // path to your token source
   },
-  "modeName": null,                          // Figma variable mode; null = first mode
-  "nameMapping": {}                          // figma name → code name, see below
+  "modeName": null,                          // null = first mode | "all" | ["Light", "Dark"]
+  "modeStrategy": "modes",                   // "modes" (Light/Dark) | "collections" (one mode per collection)
+  "nameMapping": {},                         // figma name → code name, see below
+  "components": {                            // optional — the component check (needs the bridge)
+    "path": "./src/components",              // same folder elf-batch syncs
+    "manifest": "./elf.manifest.json"        // same manifest elf-batch writes
+  },
+  "deprecations": [],                        // optional — intentional divergences, see below
+  "notify": {                                // optional — where --notify posts alerts
+    "webhookEnv": "SLACK_WEBHOOK_URL",       // env var holding the URL (the URL itself never goes here)
+    "format": "slack"                        // "slack" (Block Kit) | "text" (plain body, e.g. ntfy)
+  }
 }
 ```
 
@@ -126,6 +142,21 @@ Copy `elf.config.json` and point it at your file and your token source:
   }
 }
 ```
+
+`components` turns on the component half of the check. Point `path` and `manifest` at the folder and `elf.manifest.json` that [`elf-batch`](batch/) syncs (both paths resolve relative to the config file). Figma is read through the bridge, so the `mcp` server and the Elf bridge plugin must be running — the check fails with a clear message if they aren't.
+
+`deprecations` records divergences you *meant* to make — a token that moved to code-only, a component waiting to be retired:
+
+```json
+{
+  "deprecations": [
+    { "name": "color-legacy-500", "type": "token", "reason": "replaced by color-primary-500", "since": "2026-01-01" },
+    { "name": "OldButton", "type": "component", "reason": "replaced by Button", "removeBy": "2026-09-01" }
+  ]
+}
+```
+
+A deprecated item that is missing from Figma but still in code is reported as **Deprecated (still in code)** — informational, it does not count as drift. Once `removeBy` is in the past it becomes **Deprecation overdue** and counts (with `--fail-on-drift`, it exits 2). When the item disappears from the code, the report suggests dropping its entry (**Safe to remove from the deprecations list**). `type: "component"` entries match by component name or codeKey.
 
 ### 3. Run it locally
 
@@ -159,6 +190,38 @@ git add elf.config.json
 git commit -m "Add design token drift checker"
 git push
 ```
+
+### 5. Get alerts without CI (optional)
+
+GitHub Actions is only one trigger. `--notify` posts a summary — headline, per-category counts, top 10 items — to a webhook whenever the drift state changes, and it works on any machine with Node ≥ 20:
+
+```bash
+export SLACK_WEBHOOK_URL=https://hooks.slack.com/services/…
+npx elf-tokens --notify
+```
+
+Slack incoming webhooks are free, need no Slack app, and one URL is all the setup there is. The same JSON also works with Discord (append `/slack` to the webhook URL); `"format": "text"` posts a plain body anywhere else (ntfy, etc.). The URL lives in the environment variable named by `notify.webhookEnv` — never in the config, never in the logs.
+
+Alerts are deduped: a first report with drift (or deprecation notes), any later change, and a "drift resolved" message when it clears — nothing on repeat runs with the same state. The state lives in `drift-status.json` next to the report; set `notify.stateFile` to keep it somewhere else. If a post fails, the state is not advanced, so the next run retries.
+
+Want to see the whole alert lifecycle without a Slack workspace? The bundled drill runs real checks against sample data with a local capture server standing in for the webhook:
+
+```bash
+npm run notify:drill   # posts, dedupes, re-alerts on change, retries a failed post
+```
+
+Ways to run it with no GitHub involved:
+
+```bash
+# pre-push hook (.git/hooks/pre-push, chmod +x)
+#!/bin/sh
+npx elf-tokens --notify >/dev/null 2>&1 || true
+
+# cron — one alert a morning, only when something changed
+0 9 * * * cd /path/to/repo && npx elf-tokens --notify
+```
+
+And for the design side, the [live-mode worker](#live-mode-figma-edits-notify-the-repo-optional) pings Slack directly on every accepted Figma event when `SLACK_WEBHOOK_URL` is set — no `repository_dispatch`, no Actions required.
 
 ---
 
@@ -210,9 +273,12 @@ The data it reads comes from the `drift-data` branch, refreshed daily by `.githu
 2. **Set worker secrets:**
 
    ```bash
-   npx wrangler secret put GITHUB_TOKEN    # GitHub PAT with repo scope (classic) — used for repository_dispatch
-   npx wrangler secret put FIGMA_PASSCODE  # any value ≥ 8 chars; reuse it in the next step
+   npx wrangler secret put GITHUB_TOKEN        # GitHub PAT with repo scope (classic) — used for repository_dispatch
+   npx wrangler secret put FIGMA_PASSCODE      # any value ≥ 8 chars; reuse it in the next step
+   npx wrangler secret put SLACK_WEBHOOK_URL   # optional — ping Slack on every accepted event
    ```
+
+   The worker also works in **Slack-only mode**: with `SLACK_WEBHOOK_URL` set and `GITHUB_REPO` / `GITHUB_TOKEN` absent, events are still acknowledged and ping Slack (`forwarded: false`) — handy when Actions is unavailable. `PING` events never ping Slack.
 
 3. **Register the Figma webhooks** with the same passcode in your environment:
 
@@ -281,6 +347,12 @@ The CLI reads the token from the environment of whatever process runs it, nothin
 
 **Value mismatches that look like false positives** — `rem` values assume a 16px root; if your project uses another root font size, convert or accept those entries (see Limitations).
 
+**"The Figma bridge is not connected"** — a token check configured with `"source": "bridge"` (or the component check) needs the local bridge: run `npm --prefix mcp run start:http` and open the Elf bridge plugin in the Figma file. See [`mcp/README.md`](mcp/README.md) for setup.
+
+**`--notify` fails with "Webhook URL not found"** — the URL is read from the environment variable named by `notify.webhookEnv` (e.g. `SLACK_WEBHOOK_URL`), never from the config itself. Export it locally, or add it as a repository secret in CI.
+
+**`--notify` ran but nothing was posted** — that's the dedupe: alerts fire only when the drift state changes, so `No notification sent: drift state unchanged` means the previous `drift-status.json` (or `notify.stateFile`) already describes this exact state. Delete that file to force a fresh first report.
+
 ---
 
 ## CLI reference
@@ -293,6 +365,8 @@ elf-tokens webhook [options]
   --out <path>        where to write the report (default: drift-report.md)
   --sample [format]   run against bundled sample data, no token needed
   --fail-on-drift     exit with code 2 when drift is found (off by default)
+  --notify            post a summary to notify.webhookEnv, only when the
+                      drift state changed since the last run
   --help              show usage
 
 webhook subcommand:
@@ -347,7 +421,7 @@ When everything matches, the previous drift comment (if any) is deleted and no n
 
 ## How tokens are classified
 
-Figma variables are mapped to the three supported categories heuristically:
+Figma variables are mapped to the five supported categories heuristically:
 
 | Figma type | Category |
 |---|---|
@@ -355,8 +429,11 @@ Figma variables are mapped to the three supported categories heuristically:
 | `STRING` (font family, etc.) | typography |
 | `FLOAT` with `font`/`size`/`text`/`leading`/`tracking`/`letter`/`weight` in the name | typography |
 | `FLOAT` with `space`/`spacing`/`gap`/`padding`/`margin` in the name | spacing |
+| `FLOAT` with `radius`/`corner`/`rounded` in the name | radius |
 | `FLOAT` otherwise | spacing |
-| `radius`/`border`/`shadow`/`opacity`/`easing`/`duration` | skipped |
+| Names containing `opacity`/`easing`/`duration` | skipped |
+
+Radius tokens compare as px. Shadows come from Figma effect styles and CSS/Tailwind `box-shadow` values; both sides are normalized to one canonical string (`[inset ]x y blur spread #color`), so the same shadow written two ways compares equal — unparseable values are skipped rather than guessed.
 
 Codebase tokens use the same keyword rules when the format doesn't declare a type explicitly. Values are canonicalized for comparison: colors to lowercase hex (`rgb()`/`hsl()`/hex all become `#rrggbb`, 8-digit hex when alpha < 1) and lengths to px (`rem` is converted assuming a 16px root). Names are slugified (`Color/Primary/500` → `color-primary-500`), and `nameMapping` handles the rest.
 
@@ -368,12 +445,13 @@ Every project I've worked on has had the same arc: the design system starts as a
 
 ## Limitations — what this doesn't do (yet)
 
-- **Values only.** No visual or pixel comparison against a live site, no component-level or layout diffing. A mismatch in *usage* (token exists everywhere, but a component hardcodes a color) is invisible to this tool.
-- **Heuristic classification.** Category detection is keyword-based, and out-of-scope token types (radii, shadows, opacities) are skipped. If your naming doesn't use the expected keywords, tokens can land in the wrong category or get skipped.
+- **Specs, not pixels.** The component check compares parsed component specs (`specHash`) and Figma node hashes against the `elf-batch` manifest — it catches spec and structure changes, but not rendering differences. Moving a node on the canvas is not drift (position is stripped from the hash). A mismatch in *usage* (a component hardcodes a color) is still invisible to this tool.
+- **Heuristic classification.** Category detection is keyword-based, and out-of-scope token types (opacity, easing, duration) are skipped. If your naming doesn't use the expected keywords, tokens can land in the wrong category or get skipped.
 - **`rem` assumes a 16px root** — if your project uses a different root font size, font/spacing comparisons will report false mismatches. Mapping in `nameMapping` won't fix a unit mismatch; only the root assumption is used.
 - **Tailwind configs must be plain object literals** (`module.exports` / `export default`). Function-based configs are not supported.
-- **Styles mode needs a Figma team ID** (`figma.teamId`), and only solid paint fills are read — gradients and effects are skipped.
-- **One file, one token set.** Multi-mode variable collections compare only the first mode (or `modeName` if set).
+- **Styles mode needs a Figma team ID** (`figma.teamId`), and reads solid paint fills plus drop/inner shadow effects — gradients are skipped.
+- **One file, one token set.** Multi-mode collections compare the first mode by default; set `modeName` to `"all"` or a list (mismatches are labelled with the mode), or `modeStrategy: "collections"` to treat every collection as one mode.
+- **Component checks need the bridge** (the `mcp` server + Elf bridge plugin running in the open file). Token-only checks work with REST or the bridge.
 - **Live mode needs a Cloudflare account** and runs on the repo's default branch only (`repository_dispatch` always executes the default branch's workflow).
 
 ## Decisions worth revisiting

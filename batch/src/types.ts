@@ -141,6 +141,8 @@ export type ComponentStatus = "pending" | "synced" | "failed" | "skipped";
 export interface ManifestComponent {
   figmaNodeId: string | null;
   specHash: string;
+  /** nodeStateHash of the node right after the last sync — absent in older manifests. */
+  nodeHash?: string | null;
   status: ComponentStatus;
   updatedAt: string;
   error?: string;

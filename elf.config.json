@@ -11,8 +11,12 @@
   },
   "modeName": null,
   "nameMapping": {},
+  "notify": {
+    "webhookEnv": "SLACK_WEBHOOK_URL",
+    "format": "slack"
+  },
   "webhook": {
-    "endpoint": "",
+    "endpoint": "https://elf-tokens-bridge.nonyonah.workers.dev",
     "eventTypes": [
       "FILE_VARIABLES_UPDATE",
       "FILE_VARIABLES_CREATE",

@@ -7,6 +7,26 @@ const CORS = {
 const json = (body, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...CORS, "Content-Type": "application/json" } });
 
+/** Best-effort Slack ping — a webhook URL here never blocks or fails the event. */
+async function notifySlack(env, payload) {
+  if (!env.SLACK_WEBHOOK_URL) return;
+  const file = payload.file_name || payload.file_key || "a Figma file";
+  const event = payload.event_type || "change";
+  const text = `Figma tokens changed: ${file} (${event}) — run the elf drift check.`;
+  try {
+    const response = await fetch(env.SLACK_WEBHOOK_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text }),
+    });
+    if (!response.ok) {
+      console.error(`slack notify failed: ${response.status}`);
+    }
+  } catch (error) {
+    console.error(`slack notify failed: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
 async function fetchDriftData(env) {
   const repo = env.GITHUB_REPO;
   if (!repo) {
@@ -87,37 +107,37 @@ export default {
 
     const repo = env.GITHUB_REPO;
     const token = env.GITHUB_TOKEN;
-    if (!repo || !token) {
-      return json(
-        { ok: false, error: "worker not configured: set GITHUB_REPO and GITHUB_TOKEN" },
-        500,
-      );
-    }
+    let forwarded = false;
 
-    const response = await fetch(`https://api.github.com/repos/${repo}/dispatches`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: "application/vnd.github+json",
-        "Content-Type": "application/json",
-        "User-Agent": "elf-tokens-bridge/1.0",
-      },
-      body: JSON.stringify({
-        event_type: "figma-tokens-updated",
-        client_payload: {
-          fileKey: payload.file_key ?? "",
-          fileName: payload.file_name ?? "",
-          eventType: payload.event_type ?? "",
-          passcode: payload.passcode ?? "",
+    if (repo && token) {
+      const response = await fetch(`https://api.github.com/repos/${repo}/dispatches`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/vnd.github+json",
+          "Content-Type": "application/json",
+          "User-Agent": "elf-tokens-bridge/1.0",
         },
-      }),
-    });
+        body: JSON.stringify({
+          event_type: "figma-tokens-updated",
+          client_payload: {
+            fileKey: payload.file_key ?? "",
+            fileName: payload.file_name ?? "",
+            eventType: payload.event_type ?? "",
+            passcode: payload.passcode ?? "",
+          },
+        }),
+      });
 
-    if (!response.ok) {
-      const body = await response.text().catch(() => "");
-      return json({ ok: false, error: `github: ${response.status} ${body.slice(0, 500)}` }, 502);
+      if (!response.ok) {
+        const body = await response.text().catch(() => "");
+        return json({ ok: false, error: `github: ${response.status} ${body.slice(0, 500)}` }, 502);
+      }
+      forwarded = true;
     }
 
-    return json({ ok: true, forwarded: true });
+    await notifySlack(env, payload);
+
+    return json({ ok: true, forwarded });
   },
 };

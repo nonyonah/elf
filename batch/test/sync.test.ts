@@ -3,6 +3,7 @@ import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, test } from "node:test";
 import { loadManifest } from "../src/manifest.js";
+import { NODE_STATE_DEPTH } from "../src/nodestate.js";
 import { planComponents, runSync } from "../src/sync.js";
 import { planTokens } from "../src/tokens.js";
 import { FakeBridge, scratchFixtures, type Scratch } from "./helpers.js";
@@ -331,6 +332,41 @@ describe("runSync", () => {
     const result = await runSync({ config: scratch.config, client: bridge, log: silent });
     assert.match(result.aborted ?? "", /Bridge call failed during tokens: boom/);
     assert.deepEqual(result.components, []);
+    scratch.cleanup();
+  });
+
+  test("every synced component records a nodeHash read back from Figma", async () => {
+    const scratch = scratchFixtures();
+    const bridge = new FakeBridge();
+    await fullRun(scratch, bridge);
+
+    const manifest = loadManifest(scratch.config.manifestFile);
+    const entries = Object.entries(manifest.components);
+    assert.equal(entries.length, 8);
+    for (const [codeKey, entry] of entries) {
+      assert.equal(entry.status, "synced");
+      assert.match(entry.nodeHash ?? "", /^[0-9a-f]{16}$/, `${codeKey} carries a 16-char node hash`);
+    }
+    // One read per synced component, asking for the shared depth.
+    assert.equal(bridge.callsTo("get_node").length, 8);
+    for (const call of bridge.callsTo("get_node")) {
+      assert.equal(call.params.depth, NODE_STATE_DEPTH);
+    }
+    scratch.cleanup();
+  });
+
+  test("a failed node-state read keeps the sync, leaving nodeHash null", async () => {
+    const scratch = scratchFixtures();
+    const bridge = new FakeBridge();
+    bridge.failMethods.set("get_node", "node gone");
+    const logs = await fullRun(scratch, bridge);
+
+    const manifest = loadManifest(scratch.config.manifestFile);
+    for (const entry of Object.values(manifest.components)) {
+      assert.equal(entry.status, "synced", "the component itself synced fine");
+      assert.equal(entry.nodeHash, null);
+    }
+    assert.ok(logs.some((line) => line.includes("reading the node state failed")));
     scratch.cleanup();
   });
 });

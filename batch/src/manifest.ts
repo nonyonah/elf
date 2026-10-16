@@ -79,6 +79,7 @@ function canonicalComponent(entry: ManifestComponent): ManifestComponent {
   return {
     figmaNodeId: entry.figmaNodeId,
     specHash: entry.specHash,
+    ...(entry.nodeHash === undefined ? {} : { nodeHash: entry.nodeHash }),
     status: entry.status,
     updatedAt: entry.updatedAt,
     ...(entry.error === undefined ? {} : { error: entry.error }),

@@ -1,6 +1,6 @@
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { cssColorToHex, slugify, toPx } from "../normalize.js";
+import { cssColorToHex, normalizeShadow, slugify, toPx } from "../normalize.js";
 import type { Token } from "../types.js";
 
 type ThemeSection = Record<string, unknown>;
@@ -10,6 +10,8 @@ interface TailwindTheme {
   spacing?: ThemeSection;
   fontSize?: ThemeSection;
   fontFamily?: ThemeSection;
+  borderRadius?: ThemeSection;
+  boxShadow?: ThemeSection;
   extend?: TailwindTheme;
 }
 
@@ -27,6 +29,8 @@ export async function parseTailwindConfig(configPath: string): Promise<Token[]> 
   walkSpacing(deepMerge(theme.spacing ?? {}, theme.extend?.spacing ?? {}), push);
   walkFontSizes(deepMerge(theme.fontSize ?? {}, theme.extend?.fontSize ?? {}), push);
   walkFontFamilies(deepMerge(theme.fontFamily ?? {}, theme.extend?.fontFamily ?? {}), push);
+  walkRadii(deepMerge(theme.borderRadius ?? {}, theme.extend?.borderRadius ?? {}), push);
+  walkShadows(deepMerge(theme.boxShadow ?? {}, theme.extend?.boxShadow ?? {}), push);
 
   return [...tokens.values()];
 }
@@ -77,6 +81,30 @@ function walkFontFamilies(section: ThemeSection, push: (token: Token) => void): 
     const family = Array.isArray(value) ? value[0] : value;
     if (typeof family !== "string") continue;
     push({ name: `font-family-${slugify(key)}`, category: "typography", value: family, source: "code" });
+  }
+}
+
+function walkRadii(section: ThemeSection, push: (token: Token) => void): void {
+  for (const [key, value] of Object.entries(section)) {
+    if (typeof value !== "string" && typeof value !== "number") continue;
+    const px = toPx(value);
+    if (!px) continue;
+    const name = key === "DEFAULT" || key === "default" ? "radius" : `radius-${slugify(key)}`;
+    push({ name, category: "radius", value: px, source: "code" });
+  }
+}
+
+function walkShadows(section: ThemeSection, push: (token: Token) => void): void {
+  for (const [key, value] of Object.entries(section)) {
+    // Layers may be a single string or an array of layer strings.
+    const raw = Array.isArray(value)
+      ? value.filter((layer): layer is string => typeof layer === "string").join(", ")
+      : value;
+    if (typeof raw !== "string") continue;
+    const normalized = normalizeShadow(raw);
+    if (!normalized) continue;
+    const name = key === "DEFAULT" || key === "default" ? "shadow" : `shadow-${slugify(key)}`;
+    push({ name, category: "shadow", value: normalized, source: "code" });
   }
 }
 

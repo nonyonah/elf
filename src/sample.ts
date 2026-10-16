@@ -28,7 +28,10 @@ export function buildSampleConfig(format?: SampleFormat): DriftConfig {
     },
     codebase: { path: join(FIXTURES_DIR, "tailwind.config.cjs"), source: "tailwind" },
     modeName: null,
+    modeStrategy: "modes",
     nameMapping: colorMapping,
+    deprecations: [],
+    notify: { webhookEnv: "ELF_NOTIFY_WEBHOOK", format: "slack" },
   };
 
   switch (format) {

@@ -10,8 +10,9 @@ export class FigmaClient implements FigmaApi {
   async get<T>(path: string): Promise<T> {
     if (this.cache.has(path)) return this.cache.get(path) as T;
 
+    // Personal access tokens (figd_) must go in X-Figma-Token; Authorization: Bearer is OAuth-only.
     const response = await fetch(`https://api.figma.com/v1${path}`, {
-      headers: { Authorization: `Bearer ${this.token}` },
+      headers: { "X-Figma-Token": this.token },
     });
 
     if (!response.ok) {

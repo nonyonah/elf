@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { categoryFromName, cssColorToHex, slugify, toPx } from "../normalize.js";
+import { categoryFromName, cssColorToHex, normalizeShadow, slugify, toPx } from "../normalize.js";
 import type { Category, Token } from "../types.js";
 
 const TYPE_TO_CATEGORY: Record<string, Category> = {
@@ -14,6 +14,10 @@ const TYPE_TO_CATEGORY: Record<string, Category> = {
   fontWeight: "typography",
   fontWeights: "typography",
   typography: "typography",
+  borderRadius: "radius",
+  radius: "radius",
+  boxShadow: "shadow",
+  shadow: "shadow",
 };
 
 export function parseTokensJson(jsonPath: string): Token[] {
@@ -48,12 +52,7 @@ export function parseTokensJson(jsonPath: string): Token[] {
 function toToken(name: string, rawValue: unknown, declaredType?: string): Token | null {
   if (typeof rawValue !== "string" && typeof rawValue !== "number") return null;
 
-  const category = declaredType
-    ? TYPE_TO_CATEGORY[declaredType]
-    : categoryFromName(name) !== "other"
-      ? (categoryFromName(name) as Category)
-      : inferCategory(rawValue);
-
+  const category = resolveCategory(name, declaredType, rawValue);
   if (!category) return null;
 
   if (category === "color") {
@@ -61,14 +60,34 @@ function toToken(name: string, rawValue: unknown, declaredType?: string): Token 
     return hex ? { name, category, value: hex, source: "code" } : null;
   }
 
-  if (category === "spacing") {
+  if (category === "spacing" || category === "radius") {
     const px = toPx(rawValue);
     return px ? { name, category, value: px, source: "code" } : null;
+  }
+
+  if (category === "shadow") {
+    const shadow = normalizeShadow(String(rawValue));
+    return shadow ? { name, category, value: shadow, source: "code" } : null;
   }
 
   const isFontWeight = declaredType === "fontWeight" || declaredType === "fontWeights";
   const px = isFontWeight ? null : toPx(rawValue);
   return { name, category, value: px ?? String(rawValue), source: "code" };
+}
+
+function resolveCategory(
+  name: string,
+  declaredType: string | undefined,
+  rawValue: string | number,
+): Category | null {
+  const named = categoryFromName(name);
+  // A radius/shadow name beats a generic "dimension" declaration many token
+  // files use for anything numeric.
+  if (named === "radius" || named === "shadow") return named;
+  const declared = declaredType ? TYPE_TO_CATEGORY[declaredType] : undefined;
+  if (declared) return declared;
+  if (named !== "other") return named;
+  return inferCategory(rawValue);
 }
 
 function inferCategory(value: string | number): Category | null {
