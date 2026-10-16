@@ -23,6 +23,13 @@ export const HTTP_PORT_ENV = "ELF_MCP_HTTP_PORT";
 export const NOT_CONNECTED_HINT =
   "open the Elf Bridge plugin in Figma (Plugins → Development) and keep it open";
 
+/**
+ * Path local controllers (the batch CLI) dial for direct tool calls. Same
+ * token, same loopback bind as the plugin path — just a second lane so a
+ * headless process can drive the bridge without speaking MCP.
+ */
+export const CONTROL_PATH = "/control";
+
 export interface BridgeFileInfo {
   name: string;
   key: string;
@@ -64,6 +71,24 @@ export type BridgeMessage =
   | BridgeRequestMessage
   | BridgeResponseMessage
   | BridgeStatusMessage;
+
+/** One tool call on the /control lane. */
+export interface BridgeControlCallMessage {
+  type: "call";
+  id: string;
+  method: string;
+  params?: Record<string, unknown>;
+}
+
+export interface BridgeControlResultMessage {
+  type: "result";
+  id: string;
+  ok: boolean;
+  result?: unknown;
+  error?: BridgeErrorPayload & { code?: string };
+}
+
+export type BridgeControlMessage = BridgeControlCallMessage | BridgeControlResultMessage;
 
 /** WebSocket close code sent when the handshake token is missing or wrong. */
 export const AUTH_FAILED_CODE = 4001;

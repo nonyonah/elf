@@ -183,7 +183,10 @@ plugin in Figma…"*. Plan-limit errors from Figma come back **word for word**.
 | `rename_variable` | Rename by id or name; refuses to create a duplicate name. |
 | `delete_variable` | Delete by **arrays** of ids and/or names; misses reported under `missing`. |
 | `list_components` | Components under a parent (default: current page), with `codeKey`. |
-| `upsert_component` | Create/update one component: auto layout, padding, gap, radius, fill, optional text child. |
+| `upsert_component` | Create/update one component: auto layout, padding, gap, radius, fill, optional text child, instance slot children. |
+| `upsert_component_set` | Create/update a component set from explicit variants (size × intent, …), styling the set and each variant. |
+| `upsert_text_style` | Create/update a local text style (font, size, line height, letter spacing) — a Figma style, not a variable. |
+| `upsert_effect_style` | Create/update a local effect style (shadows, blurs — e.g. elevation). |
 | `get_node` | Read a node back — layout, fills, `boundVariables` — to verify a write. |
 
 ### Writes are upserts, and everything is tagged
@@ -251,24 +254,99 @@ than stacking new ones.
 
 → `{ "ok": true, "component": { "id": "12:34", "created": true, … }, "boundVariables": { "fills": { "variableName": "color/surface/base" }, … } }`
 
+### Instance children
+
+`children` turns a component into a slot host: each entry instantiates another component **by its
+`codeKey`** (component sets instantiate their default variant). The whole slot list is rebuilt on
+every call that provides `children` — omitting it leaves existing children alone, and a rejected call
+never touches the slots. (Destructive by design: re-runs stay deterministic.)
+
+```jsonc
+{
+  "name": "Card",
+  "codeKey": "card",
+  "layoutMode": "VERTICAL",
+  "children": [
+    { "type": "instance", "component": "card-graphic" },
+    { "type": "instance", "component": "button" }
+  ]
+}
+```
+
+### `upsert_component_set`
+
+Variants each name their property values; the first variant defines the property keys every other
+variant must match (same keys, same order). Set-level styling fields apply to all variants, and a
+variant's `spec` overrides them per variant. A matching roster updates the variants **in place**;
+a changed roster rebuilds the set — Figma detaches instances of the old set when that happens.
+
+```jsonc
+{
+  "name": "Button",
+  "codeKey": "button",
+  "layoutMode": "VERTICAL",
+  "gap": 8,
+  "padding": { "all": 12 },
+  "variants": [
+    { "props": { "size": "sm", "intent": "primary" }, "spec": { "padding": { "all": 8 }, "text": { "characters": "Go" } } },
+    { "props": { "size": "sm", "intent": "secondary" }, "spec": { "padding": { "all": 8 } } },
+    { "props": { "size": "md", "intent": "primary" } },
+    { "props": { "size": "md", "intent": "secondary" } }
+  ]
+}
+```
+
+### Styles
+
+`upsert_text_style` and `upsert_effect_style` manage **local Figma styles** (they show up in the
+styles panel and can be applied to layers) — distinct from variables. Both upsert by `codeKey` first,
+then name. Fonts are loaded before anything is written, so an unavailable family fails cleanly.
+Effect style `effects` is the full list, replaced each call:
+
+```jsonc
+{
+  "name": "Elevation/1",
+  "codeKey": "elevation-1",
+  "effects": [
+    { "type": "DROP_SHADOW", "color": "#00000040", "offset": { "x": 0, "y": 2 }, "radius": 4, "spread": 0 }
+  ]
+}
+```
+
+---
+
+## The `/control` lane (local processes)
+
+There is a second local WebSocket path next to the plugin's: `/control`, same port, same token,
+loopback only. It speaks plain JSON — `{ "type": "call", "id", "method", "params" }` in,
+`{ "type": "result", "id", "ok", "result" | "error": { "message", "code" } }` back — so a script or
+CLI can drive the bridge without speaking MCP. Control connections never disturb the plugin lane: a
+client coming and going is invisible to Figma.
+
+`mcp/src/client.ts` exports `createBridgeClient()` for exactly this; the `batch/` CLI is the first
+consumer. Everything respects the same env (`ELF_MCP_PORT`, `ELF_MCP_TOKEN`, `ELF_MCP_TIMEOUT_MS`)
+and the same error codes (`not-connected`, `timeout`, `auth`, `plugin`, …).
+
 ---
 
 ## Testing
 
 ```bash
-cd mcp && npm test              # 41 unit tests: bridge, config, variable tools, component tools
+cd mcp && npm test              # 59 unit tests: bridge, config, control client, variable/component tools
 npm --prefix mcp run verify:plugin   # from the repo root
 ```
 
 `npm test` runs a mock plugin over the **real** WebSocket server: request/response round trip and id
 matching, timeout, not-connected error, bad-token rejection (close code `4001`), mid-flight
-disconnect, verbatim plugin errors, upsert idempotency, and the not-connected path for every tool.
+disconnect, verbatim plugin errors, upsert idempotency, the not-connected path for every tool, and
+the `/control` client (round trips, auth/refusal messages, timeouts, bridge shutdown).
 
 `verify:plugin` is the end-to-end check of the **real compiled plugin** (`bridge-plugin/code.js`)
 without Figma: it loads the bundle against a stub `figma` global and drives it through the real
 bridge, so requests, responses and error strings travel the production path. It proves mode
 handling, per-mode values, aliases, rename/delete, codeKey tagging, component bindings, verbatim
-plan-limit errors (`in addMode: Limited to 4 modes only`), and that a rejected upsert leaves nothing
+plan-limit errors (`in addMode: Limited to 4 modes only`), component sets (build, update in place,
+roster rebuild), instance slots, text/effect styles, and that a rejected upsert leaves nothing
 half-created. Run it after every `npm run build:bridge-plugin`.
 
 ### Manual checklist (throwaway file, non-Enterprise plan)
@@ -284,6 +362,9 @@ Run through this once on a free/Professional account:
 - [ ] **Check in Figma** — select each variable, look at its value per mode, and confirm the description/tag round trip (`codeKey` shows under *Plugins → Development → …* or via `list_variables`).
 - [ ] **Bind a component fill** — `upsert_component` with `fill: { variable: "…/Light" }`; the component appears on the page with a literal fill *linked* to the variable (change the variable value in Figma and the component updates).
 - [ ] **Re-run it** — same component id, `created: false`, and the label text updated in place.
+- [ ] **Build a variant set** — `upsert_component_set` with 4 size × intent variants; Figma shows one component set with all 4 variants and their variant properties. Re-run: same set id, `created: false`.
+- [ ] **Slot an instance** — `upsert_component` with `children: [{ "type": "instance", "component": "button" }]`; the component contains a real instance of the set (change the set and the instance follows). Re-run with an empty-ish list: no duplicated slots.
+- [ ] **Create styles** — `upsert_text_style` and `upsert_effect_style`; both appear under *Local styles* in the Figma styles panel; re-running updates the same style entry.
 - [ ] **Read back** — `get_node { nodeId }` reports the layout, the fill and `boundVariables`.
 - [ ] **Delete** — `delete_variable { names: [...] }`; confirm the ids are gone and `missing` lists anything that didn't match.
 - [ ] **Wrong token** — paste a different token, press Connect; the panel shows `auth failed` and the tools report not-connected. No token is ever printed in the panel or the server log.

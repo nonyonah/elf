@@ -1,0 +1,8 @@
+{
+  "tokens": "test/fixtures/tokens.json",
+  "components": "test/fixtures/components",
+  "manifest": "elf.manifest.json",
+  "modeStrategy": "collections",
+  "semanticModes": ["Light", "Dark"],
+  "chunkSize": 5
+}

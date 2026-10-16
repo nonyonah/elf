@@ -1,13 +1,16 @@
 import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
 import type { AddressInfo } from "node:net";
-import { WebSocketServer, type WebSocket } from "ws";
+import { WebSocket, WebSocketServer } from "ws";
 import { BridgeError } from "./errors.js";
 import { silentLogger, type Logger } from "./logger.js";
 import {
   AUTH_FAILED_CODE,
+  CONTROL_PATH,
   DEFAULT_TIMEOUT_MS,
   NOT_CONNECTED_HINT,
   REPLACED_CODE,
+  type BridgeControlCallMessage,
+  type BridgeControlResultMessage,
   type BridgeFileInfo,
   type BridgeMessage,
   type BridgePluginInfo,
@@ -57,6 +60,7 @@ export type StatusListener = (status: BridgeStatus) => void;
 export class Bridge {
   private server: WebSocketServer | null = null;
   private socket: WebSocket | null = null;
+  private readonly controls = new Set<WebSocket>();
   private keepalive: NodeJS.Timeout | null = null;
   private port: number | null = null;
   private boundAddress: string | null = null;
@@ -128,6 +132,8 @@ export class Bridge {
     this.keepalive = null;
     if (this.socket) this.socket.close(1001, "bridge shutting down");
     this.socket = null;
+    for (const control of this.controls) control.close(1001, "bridge shutting down");
+    this.controls.clear();
     this.rejectAll("bridge shut down");
     const server = this.server;
     this.server = null;
@@ -195,6 +201,11 @@ export class Bridge {
       return;
     }
 
+    if (pathFromUrl(url) === CONTROL_PATH) {
+      this.acceptControl(socket);
+      return;
+    }
+
     const previous = this.socket;
     this.socket = socket;
     if (previous) {
@@ -219,6 +230,54 @@ export class Bridge {
     socket.on("error", (error) => {
       this.logger.log(`socket error: ${error.message}`);
     });
+  }
+
+  /**
+   * The /control lane: a local process (the batch CLI) sending `{ call }`
+   * envelopes. Calls are answered per-connection and never touch the plugin
+   * socket or its status — a controller coming and going goes unnoticed by
+   * the plugin.
+   */
+  private acceptControl(socket: WebSocket): void {
+    this.controls.add(socket);
+    this.logger.log("control client connected");
+
+    socket.on("message", (data) => void this.receiveControl(socket, data.toString()));
+    socket.on("close", () => {
+      this.controls.delete(socket);
+      this.logger.log("control client disconnected");
+    });
+    socket.on("error", (error) => {
+      this.logger.log(`control socket error: ${error.message}`);
+    });
+  }
+
+  private async receiveControl(socket: WebSocket, raw: string): Promise<void> {
+    let message: BridgeControlCallMessage;
+    try {
+      message = JSON.parse(raw) as BridgeControlCallMessage;
+    } catch {
+      this.logger.log("ignoring non-JSON message from a control client");
+      return;
+    }
+    if (message.type !== "call" || typeof message.id !== "string" || typeof message.method !== "string") {
+      this.logger.log(`ignoring unexpected control message type "${String((message as { type?: string }).type)}"`);
+      return;
+    }
+
+    try {
+      const result = await this.request(message.method, message.params ?? {});
+      sendControlResult(socket, { type: "result", id: message.id, ok: true, result });
+    } catch (error) {
+      const bridgeError =
+        error instanceof BridgeError ? error : new BridgeError("plugin", (error as Error).message);
+      sendControlResult(socket, {
+        type: "result",
+        id: message.id,
+        ok: false,
+        error: { message: bridgeError.message, code: bridgeError.code },
+      });
+    }
   }
 
   private disconnect(code: number): void {
@@ -304,6 +363,14 @@ export class Bridge {
 function tokenFromUrl(url: string): string | null {
   const query = url.includes("?") ? url.slice(url.indexOf("?") + 1) : "";
   return new URLSearchParams(query).get("token");
+}
+
+function pathFromUrl(url: string): string {
+  return new URL(url, "ws://localhost").pathname;
+}
+
+function sendControlResult(socket: WebSocket, message: BridgeControlResultMessage): void {
+  if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(message));
 }
 
 function digest(value: string): Buffer {

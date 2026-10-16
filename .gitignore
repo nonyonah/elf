@@ -4,5 +4,6 @@ drift-report.md
 drift-status.json
 .env
 *.log
+batch/elf.manifest.json
 *.tgz
 .DS_Store

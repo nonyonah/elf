@@ -8,7 +8,8 @@ export type BridgeErrorCode =
   | "timeout"
   | "disconnected"
   | "plugin"
-  | "transport";
+  | "transport"
+  | "auth";
 
 export class BridgeError extends Error {
   constructor(

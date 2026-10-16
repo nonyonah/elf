@@ -1,0 +1,8 @@
+{
+  "layoutMode": "VERTICAL",
+  "gap": "space.4",
+  "padding": { "all": "space.4" },
+  "fill": "color.surface.base",
+  "cornerRadius": "radius.md",
+  "children": [{ "type": "instance", "component": "Badge.vue#Badge" }]
+}

@@ -86,6 +86,24 @@ function createFigmaStub(sendToSocket) {
       registry.set(node.id, node);
       return node;
     },
+    findOne(predicate) {
+      for (const child of this.children) {
+        if (predicate(child)) return child;
+        if (child.children) {
+          const found = child.findOne(predicate);
+          if (found) return found;
+        }
+      }
+      return null;
+    },
+    remove() {
+      const parent = registry.get(this.parentId);
+      if (parent && Array.isArray(parent.children)) {
+        const index = parent.children.indexOf(this);
+        if (index >= 0) parent.children.splice(index, 1);
+      }
+      registry.delete(this.id);
+    },
   });
 
   const page = register({ id: "0:0", name: "Page 1", type: "PAGE", ...pluginData(), ...childrenMixin() });
@@ -114,7 +132,85 @@ function createFigmaStub(sendToSocket) {
         this.width = width;
         this.height = height;
       },
+      createInstance() {
+        return register({
+          id: nextId("I"),
+          name: this.name,
+          type: "INSTANCE",
+          x: 0,
+          y: 0,
+          width: this.width,
+          height: this.height,
+          fills: [],
+          ...pluginData(),
+          ...boundVariableApi(),
+          ...childrenMixin(),
+        });
+      },
     });
+
+  const combineAsVariants = (components, parent) => {
+    const set = register({
+      id: nextId("CS"),
+      name: "Component Set",
+      type: "COMPONENT_SET",
+      x: 0,
+      y: 0,
+      width: 0,
+      height: 0,
+      fills: [],
+      layoutMode: "HORIZONTAL",
+      itemSpacing: 0,
+      cornerRadius: 0,
+      paddingTop: 0,
+      paddingRight: 0,
+      paddingBottom: 0,
+      paddingLeft: 0,
+      ...pluginData(),
+      ...childrenMixin(),
+      get defaultVariant() {
+        return this.children.find((child) => child.type === "COMPONENT") ?? null;
+      },
+    });
+    // Figma re-parents the components into the set.
+    if (parent) {
+      for (const component of components) {
+        const index = parent.children.indexOf(component);
+        if (index >= 0) parent.children.splice(index, 1);
+      }
+      set.parentId = parent.id;
+      parent.children.push(set);
+    }
+    for (const component of components) {
+      component.parentId = set.id;
+      set.children.push(component);
+    }
+    return set;
+  };
+
+  const textStyles = [];
+  const effectStyles = [];
+
+  const createTextStyle = () => {
+    const style = {
+      id: nextId("TS"),
+      name: "Text style",
+      description: "",
+      fontName: { family: "Inter", style: "Regular" },
+      fontSize: 12,
+      lineHeight: { unit: "AUTO" },
+      letterSpacing: { unit: "PERCENT", value: 0 },
+      ...pluginData(),
+    };
+    textStyles.push(style);
+    return style;
+  };
+
+  const createEffectStyle = () => {
+    const style = { id: nextId("ES"), name: "Effect style", description: "", effects: [], ...pluginData() };
+    effectStyles.push(style);
+    return style;
+  };
 
   const createText = () =>
     register({
@@ -180,6 +276,11 @@ function createFigmaStub(sendToSocket) {
     },
     createComponent,
     createText,
+    combineAsVariants,
+    createTextStyle,
+    createEffectStyle,
+    getLocalTextStylesAsync: async () => textStyles,
+    getLocalEffectStylesAsync: async () => effectStyles,
     getNodeByIdAsync: async (id) => registry.get(id) ?? null,
     loadFontAsync: async ({ family, style }) => {
       if (family !== "Inter") throw new Error(`The font "${family} ${style}" could not be loaded.`);
@@ -486,6 +587,190 @@ async function main() {
     const message = await callFail("get_node", { nodeId: "99:99" });
     errorContains(message, "not found");
     return message;
+  });
+
+  const buttonVariants = [
+    { props: { size: "sm", intent: "primary" }, spec: { padding: { all: 8 }, text: { characters: "Go" } } },
+    { props: { size: "sm", intent: "secondary" }, spec: { padding: { all: 8 } } },
+    { props: { size: "md", intent: "primary" } },
+    { props: { size: "md", intent: "secondary" } },
+  ];
+
+  let buttonSet = null;
+  await check("upsert_component_set builds a set from variant props", async () => {
+    buttonSet = await callOk("upsert_component_set", {
+      name: "Button",
+      codeKey: "button",
+      layoutMode: "VERTICAL",
+      gap: 8,
+      padding: { all: 12 },
+      variants: buttonVariants,
+    });
+    if (!buttonSet.set.created) throw new Error("expected the set to be created");
+    if (buttonSet.set.variantCount !== 4) throw new Error(`variants: ${buttonSet.set.variantCount}`);
+    const names = buttonSet.set.variants.map((entry) => entry.name).join(" | ");
+    if (!names.includes("size=sm, intent=primary")) throw new Error(names);
+    return `${buttonSet.set.id} — ${names}`;
+  });
+
+  await check("re-running the set updates variants in place", async () => {
+    const again = await callOk("upsert_component_set", {
+      name: "Button",
+      codeKey: "button",
+      layoutMode: "VERTICAL",
+      gap: 8,
+      padding: { all: 12 },
+      variants: buttonVariants,
+    });
+    if (again.set.created) throw new Error("rebuilt instead of updating");
+    if (again.set.id !== buttonSet.set.id) throw new Error(`set id changed: ${again.set.id}`);
+    if (again.set.variantCount !== 4) throw new Error(`variants: ${again.set.variantCount}`);
+    return `${again.set.id}, updated in place`;
+  });
+
+  await check("variant property mismatch is refused with the set intact", async () => {
+    const message = await callFail("upsert_component_set", {
+      name: "Button",
+      codeKey: "button",
+      variants: [{ props: { size: "sm" } }, { props: { intent: "primary" } }],
+    });
+    errorContains(message, "Every variant must declare the same variant properties");
+    const node = await callOk("get_node", { nodeId: buttonSet.set.id, depth: 1 });
+    if (node.node.children.length !== 4) throw new Error(`variants after refusal: ${node.node.children.length}`);
+    return message;
+  });
+
+  await check("duplicate variant values are refused", async () => {
+    const message = await callFail("upsert_component_set", {
+      name: "Button",
+      codeKey: "button",
+      variants: [{ props: { size: "sm" } }, { props: { size: "sm" } }],
+    });
+    errorContains(message, "Two variants share the same property values");
+    return message;
+  });
+
+  await check("a changed variant roster rebuilds the set", async () => {
+    const rebuilt = await callOk("upsert_component_set", {
+      name: "Button",
+      codeKey: "button",
+      variants: [
+        { props: { size: "sm", intent: "primary" } },
+        { props: { size: "md", intent: "primary" } },
+      ],
+    });
+    if (!rebuilt.set.created) throw new Error("expected a rebuild");
+    if (rebuilt.set.variantCount !== 2) throw new Error(`variants: ${rebuilt.set.variantCount}`);
+    return `${rebuilt.set.id}, rebuilt with 2 variants`;
+  });
+
+  let slotId = null;
+  await check("instance children point at components by codeKey", async () => {
+    const result = await callOk("upsert_component", {
+      name: "IconSlot",
+      codeKey: "icon-slot",
+      layoutMode: "HORIZONTAL",
+      children: [
+        { type: "instance", component: "button-primary" },
+        { type: "instance", component: "button" },
+      ],
+    });
+    slotId = result.component.id;
+    if (result.children.length !== 2) throw new Error(JSON.stringify(result.children));
+    if (result.children[0].type !== "INSTANCE") throw new Error(JSON.stringify(result.children[0]));
+    if (result.children[0].codeKey !== "button-primary") throw new Error(JSON.stringify(result.children[0]));
+    if (result.children[1].codeKey !== "button") throw new Error(JSON.stringify(result.children[1]));
+    return `slots → ${result.children.map((child) => child.codeKey).join(", ")}`;
+  });
+
+  await check("re-running with fewer children replaces the slots wholesale", async () => {
+    const result = await callOk("upsert_component", {
+      name: "IconSlot",
+      codeKey: "icon-slot",
+      children: [{ type: "instance", component: "button" }],
+    });
+    if (result.children.length !== 1) throw new Error(JSON.stringify(result.children));
+    if (result.component.childCount !== 1) throw new Error(`childCount: ${result.component.childCount}`);
+    return "2 slots → 1 slot, nothing stacked";
+  });
+
+  await check("a missing slot target is refused and leaves slots untouched", async () => {
+    const message = await callFail("upsert_component", {
+      name: "IconSlot",
+      codeKey: "icon-slot",
+      children: [{ type: "instance", component: "does-not-exist" }],
+    });
+    errorContains(message, "no component with that codeKey");
+    const node = await callOk("get_node", { nodeId: slotId, depth: 1 });
+    if (node.node.children.length !== 1) throw new Error(`slots after refusal: ${node.node.children.length}`);
+    return message;
+  });
+
+  await check("upsert_text_style creates, then updates the same style", async () => {
+    const created = await callOk("upsert_text_style", {
+      name: "Body/Regular",
+      codeKey: "text-body",
+      fontFamily: "Inter",
+      fontStyle: "Regular",
+      fontSize: 14,
+      lineHeight: { percent: 150 },
+      letterSpacing: { percent: 0 },
+    });
+    if (!created.style.created) throw new Error("expected created: true");
+    const again = await callOk("upsert_text_style", {
+      name: "Body/Regular",
+      codeKey: "text-body",
+      fontSize: 16,
+    });
+    if (again.style.created) throw new Error("duplicated the style");
+    if (again.style.id !== created.style.id) throw new Error(`style id changed: ${again.style.id}`);
+    if (again.style.fontSize !== 16) throw new Error(`fontSize: ${again.style.fontSize}`);
+    return `${again.style.id}, re-run updated in place`;
+  });
+
+  await check("an unavailable font fails before the style exists", async () => {
+    const message = await callFail("upsert_text_style", {
+      name: "Broken/Font",
+      codeKey: "text-broken",
+      fontFamily: "NoSuchFont",
+    });
+    errorContains(message, "could not be loaded");
+    const styles = await figma.getLocalTextStylesAsync();
+    if (styles.some((style) => style.name === "Broken/Font")) throw new Error("orphan style left behind");
+    return message;
+  });
+
+  await check("upsert_effect_style replaces the whole effect list", async () => {
+    const created = await callOk("upsert_effect_style", {
+      name: "Elevation/1",
+      codeKey: "elevation-1",
+      effects: [{ type: "DROP_SHADOW", color: "#00000040", offset: { x: 0, y: 2 }, radius: 4, spread: 0 }],
+    });
+    if (!created.style.created) throw new Error("expected created: true");
+    const again = await callOk("upsert_effect_style", {
+      name: "Elevation/1",
+      codeKey: "elevation-1",
+      effects: [
+        { type: "DROP_SHADOW", color: "#00000040", offset: { x: 0, y: 2 }, radius: 4 },
+        { type: "LAYER_BLUR", radius: 8 },
+      ],
+    });
+    if (again.style.created || again.style.id !== created.style.id) throw new Error("style identity changed");
+    if (again.style.effectCount !== 2) throw new Error(`effects: ${again.style.effectCount}`);
+    return `${again.style.id}, 1 → 2 effects`;
+  });
+
+  await check("bad effect input fails and leaves no orphan style", async () => {
+    const unsupported = await callFail("upsert_effect_style", {
+      name: "Elevation/2",
+      effects: [{ type: "GLOW" }],
+    });
+    errorContains(unsupported, "unsupported type");
+    const empty = await callFail("upsert_effect_style", { name: "Elevation/2", effects: [] });
+    errorContains(empty, "at least one effect");
+    const styles = await figma.getLocalEffectStylesAsync();
+    if (styles.some((style) => style.name === "Elevation/2")) throw new Error("orphan effect style left behind");
+    return "both refusals clean";
   });
 
   await check("unknown methods are reported", async () => {

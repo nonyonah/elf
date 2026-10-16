@@ -1,0 +1,11 @@
+{
+  "layoutMode": "VERTICAL",
+  "padding": { "all": "space.4" },
+  "gap": "space.2",
+  "fill": "color.primary.500",
+  "text": { "characters": "Something happened", "fontSize": "fontSize.body" },
+  "variants": {
+    "tone=info": { "fill": "semantic.color.surface" },
+    "tone=danger": { "fill": "color.onSurface.base" }
+  }
+}

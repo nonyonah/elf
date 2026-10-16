@@ -1,0 +1,11 @@
+{
+  "layoutMode": "HORIZONTAL",
+  "padding": { "all": "space.2" },
+  "cornerRadius": "radius.md",
+  "fill": "color.surface.base",
+  "text": { "characters": "Status", "fontSize": "fontSize.body" },
+  "variants": {
+    "tone=positive": { "fill": "color.primary.500" },
+    "tone=negative": { "fill": "color.onSurface.base" }
+  }
+}

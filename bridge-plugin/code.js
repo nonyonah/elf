@@ -15,6 +15,7 @@ const NAMESPACE = "elf";
 const CODE_KEY = "codeKey";
 const ROLE_KEY = "role";
 const LABEL_ROLE = "label";
+const SLOT_ROLE = "slot";
 const DEFAULT_HOST = "localhost:8765";
 // ---------------------------------------------------------------------------
 // Settings — kept in clientStorage, never in the document or the repo.
@@ -513,6 +514,145 @@ async function upsertLabel(component, text) {
         await applyFill(label, text.color);
     return label;
 }
+function findComponentSet(parent, name, codeKey) {
+    if (codeKey) {
+        const tagged = findDeep(parent, (node) => node.type === "COMPONENT_SET" && codeKeyOf(node) === codeKey);
+        if (tagged)
+            return tagged;
+    }
+    const direct = parent.children.find((child) => child.type === "COMPONENT_SET" && child.name === name);
+    if (direct)
+        return direct;
+    return findDeep(parent, (node) => node.type === "COMPONENT_SET" && node.name === name) ?? null;
+}
+/**
+ * Document-wide codeKey lookup — how instance children find their source
+ * component no matter which page or frame it lives on.
+ */
+function findTaggedComponent(codeKey) {
+    if (!codeKey)
+        return null;
+    for (const page of figma.root.children) {
+        const found = page.findOne((node) => {
+            if (node.type !== "COMPONENT" && node.type !== "COMPONENT_SET")
+                return false;
+            return codeKeyOf(node) === codeKey;
+        });
+        if (found)
+            return found;
+    }
+    return null;
+}
+const PADDING_FIELDS = [
+    "paddingTop",
+    "paddingRight",
+    "paddingBottom",
+    "paddingLeft",
+];
+function resolveSlot(child, index) {
+    if (child?.type !== "instance") {
+        throw new Error(`Child ${index} has unknown type "${String(child?.type)}" — only "instance" is supported.`);
+    }
+    const wanted = String(child.component ?? "").trim();
+    const target = findTaggedComponent(wanted);
+    if (!target) {
+        throw new Error(`Child ${index} points at "${wanted}", but no component with that codeKey exists in this file yet.`);
+    }
+    // Instances come from a single variant; the set's tag lives on the set itself.
+    return { source: target.type === "COMPONENT_SET" ? target.defaultVariant : target, codeKey: codeKeyOf(target) };
+}
+/**
+ * Resolves everything that can fail *before* any node is touched, so a
+ * rejected call never leaves a half-built — or empty — component behind.
+ * A reused component keeps its layout mode when the spec omits one.
+ */
+async function prepareSpec(input, currentLayout) {
+    const effective = input.layoutMode ?? currentLayout;
+    if ((input.gap !== undefined || input.padding !== undefined) && effective === "NONE") {
+        throw new Error('`gap` and `padding` need auto layout — pass layoutMode "VERTICAL" or "HORIZONTAL".');
+    }
+    const padding = [];
+    if (input.padding) {
+        const sides = ["top", "right", "bottom", "left"];
+        for (const [index, side] of sides.entries()) {
+            const value = input.padding[side] ?? input.padding.all;
+            if (value === undefined)
+                continue;
+            padding.push({ field: PADDING_FIELDS[index], value: await prepareNumber(value, PADDING_FIELDS[index]) });
+        }
+    }
+    const gap = input.gap === undefined ? null : await prepareNumber(input.gap, "itemSpacing");
+    const radius = input.cornerRadius === undefined ? null : await prepareNumber(input.cornerRadius, "cornerRadius");
+    const fill = input.fill ? await prepareFill(input.fill) : null;
+    if (input.text) {
+        const family = String(input.text.fontFamily ?? "Inter");
+        // Figma refuses font writes until the font is loaded; doing it here keeps
+        // the component itself untouched when the family is unavailable.
+        await figma.loadFontAsync({ family, style: String(input.text.fontStyle ?? "Regular") });
+    }
+    let size = null;
+    if (input.size) {
+        const width = Number(input.size.width);
+        const height = Number(input.size.height);
+        if (!Number.isFinite(width) || !Number.isFinite(height))
+            throw new Error("`size` needs finite width and height.");
+        size = { width, height };
+    }
+    const slots = input.children ? input.children.map((child, index) => resolveSlot(child, index)) : null;
+    return { layoutMode: input.layoutMode ?? null, padding, gap, radius, fill, size, text: input.text ?? null, slots };
+}
+/** Writes a prepared spec onto a component. Only called after all prep succeeded. */
+async function applySpec(component, prepared) {
+    if (prepared.layoutMode)
+        component.layoutMode = prepared.layoutMode;
+    const bound = {};
+    const write = (field, entry) => {
+        const target = component;
+        target.setBoundVariable(field, entry.variable);
+        if (entry.literal !== null)
+            target[field] = entry.literal;
+        if (entry.variable)
+            bound[field] = { variableId: entry.variable.id, variableName: entry.variable.name };
+    };
+    for (const entry of prepared.padding)
+        write(entry.field, entry.value);
+    if (prepared.gap)
+        write("itemSpacing", prepared.gap);
+    if (prepared.radius)
+        write("cornerRadius", prepared.radius);
+    if (prepared.fill) {
+        component.fills = [prepared.fill.paint];
+        if (prepared.fill.variable) {
+            bound.fills = { variableId: prepared.fill.variable.id, variableName: prepared.fill.variable.name };
+        }
+    }
+    if (prepared.size)
+        component.resize(prepared.size.width, prepared.size.height);
+    let text = null;
+    if (prepared.text)
+        text = await upsertLabel(component, prepared.text);
+    const children = prepared.slots === null ? [] : syncSlots(component, prepared.slots);
+    return { bound, text, children };
+}
+/**
+ * Slot children are replaced wholesale when a spec provides `children`.
+ * Rebuilding instances is cheap in Figma and keeps re-runs deterministic —
+ * there is no partial-update state to reconcile.
+ */
+function syncSlots(component, slots) {
+    for (const child of [...component.children]) {
+        if (child.getSharedPluginData(NAMESPACE, ROLE_KEY) === SLOT_ROLE)
+            child.remove();
+    }
+    const created = [];
+    for (const slot of slots) {
+        const instance = slot.source.createInstance();
+        component.appendChild(instance);
+        instance.setSharedPluginData(NAMESPACE, ROLE_KEY, SLOT_ROLE);
+        created.push({ id: instance.id, type: instance.type, codeKey: slot.codeKey });
+    }
+    return created;
+}
 async function upsertComponent(params) {
     const input = params;
     const name = String(input.name ?? "").trim();
@@ -521,32 +661,7 @@ async function upsertComponent(params) {
     const parent = await resolveParent(input.parentId);
     const codeKey = input.codeKey ? String(input.codeKey) : "";
     const existing = findComponent(parent, name, codeKey);
-    // Everything that can fail is resolved before a node is created, so a
-    // rejected call leaves no empty component behind.
-    const layoutMode = input.layoutMode ?? existing?.layoutMode ?? "NONE";
-    if ((input.gap !== undefined || input.padding !== undefined) && layoutMode === "NONE") {
-        throw new Error('`gap` and `padding` need auto layout — pass layoutMode "VERTICAL" or "HORIZONTAL".');
-    }
-    const fields = ["paddingTop", "paddingRight", "paddingBottom", "paddingLeft"];
-    const preparedPadding = [];
-    if (input.padding) {
-        const sides = ["top", "right", "bottom", "left"];
-        for (const [index, side] of sides.entries()) {
-            const value = input.padding[side] ?? input.padding.all;
-            if (value === undefined)
-                continue;
-            preparedPadding.push({ field: fields[index], value: await prepareNumber(value, fields[index]) });
-        }
-    }
-    const preparedGap = input.gap === undefined ? null : await prepareNumber(input.gap, "itemSpacing");
-    const preparedRadius = input.cornerRadius === undefined ? null : await prepareNumber(input.cornerRadius, "cornerRadius");
-    const preparedFill = input.fill ? await prepareFill(input.fill) : null;
-    if (input.text) {
-        const family = String(input.text.fontFamily ?? "Inter");
-        // Figma refuses font writes until the font is loaded; doing it here keeps
-        // the component itself untouched when the family is unavailable.
-        await figma.loadFontAsync({ family, style: String(input.text.fontStyle ?? "Regular") });
-    }
+    const prepared = await prepareSpec(input, existing?.layoutMode ?? "NONE");
     let component;
     let created = false;
     if (existing) {
@@ -559,39 +674,7 @@ async function upsertComponent(params) {
     }
     component.name = name;
     tagCodeKey(component, codeKey);
-    if (input.layoutMode)
-        component.layoutMode = input.layoutMode;
-    const bound = {};
-    const write = (field, prepared) => {
-        const target = component;
-        target.setBoundVariable(field, prepared.variable);
-        if (prepared.literal !== null)
-            target[field] = prepared.literal;
-        if (prepared.variable)
-            bound[field] = { variableId: prepared.variable.id, variableName: prepared.variable.name };
-    };
-    for (const entry of preparedPadding)
-        write(entry.field, entry.value);
-    if (preparedGap)
-        write("itemSpacing", preparedGap);
-    if (preparedRadius)
-        write("cornerRadius", preparedRadius);
-    if (preparedFill) {
-        component.fills = [preparedFill.paint];
-        if (preparedFill.variable) {
-            bound.fills = { variableId: preparedFill.variable.id, variableName: preparedFill.variable.name };
-        }
-    }
-    if (input.size) {
-        const width = Number(input.size.width);
-        const height = Number(input.size.height);
-        if (!Number.isFinite(width) || !Number.isFinite(height))
-            throw new Error("`size` needs finite width and height.");
-        component.resize(width, height);
-    }
-    let label = null;
-    if (input.text)
-        label = await upsertLabel(component, input.text);
+    const applied = await applySpec(component, prepared);
     return {
         component: {
             id: component.id,
@@ -604,8 +687,203 @@ async function upsertComponent(params) {
             parentId: parent.id,
             childCount: component.children.length,
         },
-        boundVariables: bound,
-        text: label ? { id: label.id, characters: label.characters } : null,
+        boundVariables: applied.bound,
+        text: applied.text ? { id: applied.text.id, characters: applied.text.characters } : null,
+        children: applied.children,
+    };
+}
+function specFields(input) {
+    return {
+        layoutMode: input.layoutMode,
+        padding: input.padding,
+        gap: input.gap,
+        cornerRadius: input.cornerRadius,
+        fill: input.fill,
+        size: input.size,
+        text: input.text,
+        children: input.children,
+    };
+}
+async function upsertComponentSet(params) {
+    const input = params;
+    const name = String(input.name ?? "").trim();
+    if (!name)
+        throw new Error("A component set name is required.");
+    const variants = Array.isArray(input.variants) ? input.variants : [];
+    if (variants.length === 0)
+        throw new Error("A component set needs at least one variant.");
+    const propKeys = Object.keys(variants[0]?.props ?? {});
+    if (propKeys.length === 0) {
+        throw new Error('Every variant needs at least one property, e.g. { props: { size: "sm" } }.');
+    }
+    for (const variant of variants) {
+        const keys = Object.keys(variant?.props ?? {});
+        if (keys.join("\n") !== propKeys.join("\n")) {
+            throw new Error("Every variant must declare the same variant properties, in the same order.");
+        }
+    }
+    const variantLabel = (props) => propKeys.map((key) => `${key}=${String(props[key])}`).join(", ");
+    const names = variants.map((variant) => variantLabel(variant?.props ?? {}));
+    if (new Set(names).size !== names.length)
+        throw new Error("Two variants share the same property values.");
+    const parent = await resolveParent(input.parentId);
+    const codeKey = input.codeKey ? String(input.codeKey) : "";
+    const existing = findComponentSet(parent, name, codeKey);
+    const existingVariants = existing
+        ? existing.children.filter((child) => child.type === "COMPONENT")
+        : [];
+    // A matching roster updates variants in place; a changed roster rebuilds
+    // the set (documented: instances of the old set detach).
+    const canUpdate = existing !== null &&
+        existingVariants.length === names.length &&
+        names.every((variantName) => existingVariants.some((child) => child.name === variantName));
+    const plans = [];
+    for (const [index, variant] of variants.entries()) {
+        const merged = { ...specFields(input), ...(variant?.spec ?? {}) };
+        const target = canUpdate ? (existingVariants.find((child) => child.name === names[index]) ?? null) : null;
+        plans.push({ name: names[index], spec: await prepareSpec(merged, target?.layoutMode ?? "NONE"), component: target });
+    }
+    let set;
+    let created = false;
+    if (existing && canUpdate) {
+        set = existing;
+    }
+    else {
+        if (existing)
+            existing.remove();
+        const components = [];
+        for (const plan of plans) {
+            const component = figma.createComponent();
+            component.name = plan.name;
+            parent.appendChild(component);
+            components.push(component);
+            plan.component = component;
+        }
+        set = figma.combineAsVariants(components, parent);
+        set.name = name;
+        created = true;
+    }
+    tagCodeKey(set, codeKey);
+    const variantPayloads = [];
+    for (const plan of plans) {
+        const component = plan.component;
+        if (canUpdate)
+            component.name = plan.name;
+        await applySpec(component, plan.spec);
+        variantPayloads.push({ id: component.id, name: component.name });
+    }
+    return {
+        set: {
+            id: set.id,
+            name: set.name,
+            codeKey: codeKeyOf(set),
+            created,
+            variantCount: variantPayloads.length,
+            variants: variantPayloads,
+            parentId: parent.id,
+        },
+    };
+}
+function toLineHeight(value) {
+    if (value === "auto")
+        return { unit: "AUTO" };
+    if (typeof value === "number") {
+        if (!Number.isFinite(value))
+            throw new Error('"lineHeight" must be a number, { percent }, or "auto".');
+        return { unit: "PIXELS", value };
+    }
+    return { unit: "PERCENT", value: Number(value.percent) };
+}
+function toLetterSpacing(value) {
+    if (typeof value === "number")
+        return { unit: "PIXELS", value };
+    return { unit: "PERCENT", value: Number(value.percent) };
+}
+function toEffect(input, index) {
+    const type = String(input?.type ?? "").toUpperCase();
+    if (type === "LAYER_BLUR" || type === "BACKGROUND_BLUR") {
+        return { type, blurType: "NORMAL", radius: Number(input?.radius ?? 0), visible: input?.visible !== false };
+    }
+    if (type !== "DROP_SHADOW" && type !== "INNER_SHADOW") {
+        throw new Error(`Effect ${index + 1}: unsupported type "${String(input?.type)}". ` +
+            "Use DROP_SHADOW, INNER_SHADOW, LAYER_BLUR or BACKGROUND_BLUR.");
+    }
+    const color = parseColor(String(input?.color ?? "#00000040"));
+    return {
+        type,
+        visible: input?.visible !== false,
+        blendMode: "NORMAL",
+        color: { r: color.r, g: color.g, b: color.b, a: color.a ?? 1 },
+        offset: { x: Number(input?.offset?.x ?? 0), y: Number(input?.offset?.y ?? 0) },
+        radius: Number(input?.radius ?? 0),
+        spread: Number(input?.spread ?? 0),
+    };
+}
+async function upsertTextStyle(params) {
+    const input = params;
+    const name = String(input.name ?? "").trim();
+    if (!name)
+        throw new Error("A style name is required.");
+    const codeKey = input.codeKey ? String(input.codeKey) : "";
+    const styles = await figma.getLocalTextStylesAsync();
+    const existing = (codeKey ? styles.find((style) => codeKeyOf(style) === codeKey) : undefined) ??
+        styles.find((style) => style.name === name);
+    const currentFont = existing ? existing.fontName : null;
+    const family = String(input.fontFamily ?? currentFont?.family ?? "Inter");
+    const fontStyle = String(input.fontStyle ?? currentFont?.style ?? "Regular");
+    // Load the font before creating anything, so an unavailable family leaves
+    // no orphan style behind — Figma throws on the first font write otherwise.
+    await figma.loadFontAsync({ family, style: fontStyle });
+    const textStyle = existing ?? figma.createTextStyle();
+    textStyle.name = name;
+    tagCodeKey(textStyle, codeKey);
+    if (input.description !== undefined)
+        textStyle.description = String(input.description);
+    textStyle.fontName = { family, style: fontStyle };
+    if (input.fontSize !== undefined)
+        textStyle.fontSize = Number(input.fontSize);
+    if (input.lineHeight !== undefined)
+        textStyle.lineHeight = toLineHeight(input.lineHeight);
+    if (input.letterSpacing !== undefined)
+        textStyle.letterSpacing = toLetterSpacing(input.letterSpacing);
+    return {
+        style: {
+            id: textStyle.id,
+            name: textStyle.name,
+            codeKey: codeKeyOf(textStyle),
+            created: !existing,
+            fontFamily: family,
+            fontStyle,
+            fontSize: textStyle.fontSize,
+        },
+    };
+}
+async function upsertEffectStyle(params) {
+    const input = params;
+    const name = String(input.name ?? "").trim();
+    if (!name)
+        throw new Error("A style name is required.");
+    const effects = (Array.isArray(input.effects) ? input.effects : []).map(toEffect);
+    if (effects.length === 0)
+        throw new Error("An effect style needs at least one effect.");
+    const codeKey = input.codeKey ? String(input.codeKey) : "";
+    const styles = await figma.getLocalEffectStylesAsync();
+    const existing = (codeKey ? styles.find((style) => codeKeyOf(style) === codeKey) : undefined) ??
+        styles.find((style) => style.name === name);
+    const effectStyle = existing ?? figma.createEffectStyle();
+    effectStyle.name = name;
+    tagCodeKey(effectStyle, codeKey);
+    if (input.description !== undefined)
+        effectStyle.description = String(input.description);
+    effectStyle.effects = effects;
+    return {
+        style: {
+            id: effectStyle.id,
+            name: effectStyle.name,
+            codeKey: codeKeyOf(effectStyle),
+            created: !existing,
+            effectCount: effects.length,
+        },
     };
 }
 async function listComponents(params) {
@@ -731,6 +1009,12 @@ async function handle(method, params) {
             return listComponents(params);
         case "upsert_component":
             return upsertComponent(params);
+        case "upsert_component_set":
+            return upsertComponentSet(params);
+        case "upsert_text_style":
+            return upsertTextStyle(params);
+        case "upsert_effect_style":
+            return upsertEffectStyle(params);
         case "get_node":
             return getNode(params);
         default:

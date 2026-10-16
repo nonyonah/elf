@@ -248,10 +248,23 @@ The CLI reads. The MCP server in [`mcp/`](mcp/) **writes** — variables and bas
 MCP client ──stdio──► mcp/ server ──ws://127.0.0.1:8765──► bridge-plugin UI ──postMessage──► Plugin API
 ```
 
-- **Tools:** `status`, `list_collections`, `list_variables`, `create_collection`, `upsert_variables` (arrays, upsert by name), `rename_variable`, `delete_variable`, `list_components`, `upsert_component`, `get_node`.
-- **Safe by construction:** every write is an upsert matched by name/`codeKey`, every touched node returns its Figma id, everything is tagged `setSharedPluginData("elf", "codeKey", …)` for the manifest to come, the socket binds to `127.0.0.1` with a shared token, and Figma's plan-limit errors come back word for word.
+- **Tools:** `status`, `list_collections`, `list_variables`, `create_collection`, `upsert_variables` (arrays, upsert by name), `rename_variable`, `delete_variable`, `list_components`, `upsert_component` (with instance children), `upsert_component_set`, `upsert_text_style`, `upsert_effect_style`, `get_node`.
+- **Safe by construction:** every write is an upsert matched by name/`codeKey`, every touched node returns its Figma id, everything is tagged `setSharedPluginData("elf", "codeKey", …)`, the socket binds to `127.0.0.1` with a shared token, and Figma's plan-limit errors come back word for word.
 
 Setup, tool reference and a manual test checklist: **[`mcp/README.md`](mcp/README.md)**.
+
+---
+
+## Push a whole library (local batch CLI)
+
+The `elf-batch` CLI in [`batch/`](batch/) drives the same bridge from a config file: primitives → semantic tokens → text/effect styles, then every component in dependency order in resumable chunks (parsed from `.tsx`/`.jsx`/`.vue`/`.svelte`/`.astro` sources plus `<Name>.figma.json` sidecars), tracking an `elf.manifest.json` so re-runs only write what changed.
+
+```
+npm --prefix batch install
+npm --prefix batch start -- --dry-run     # plan; nothing is written
+```
+
+Config, token/sidecar formats and manual checklist: **[`batch/README.md`](batch/README.md)**.
 
 ---
 

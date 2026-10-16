@@ -15,6 +15,7 @@ const NAMESPACE = "elf";
 const CODE_KEY = "codeKey";
 const ROLE_KEY = "role";
 const LABEL_ROLE = "label";
+const SLOT_ROLE = "slot";
 const DEFAULT_HOST = "localhost:8765";
 
 interface Settings {
@@ -75,10 +76,13 @@ interface TextInput {
   color?: FillInput;
 }
 
-interface ComponentInput {
-  name: string;
-  codeKey?: string;
-  parentId?: string;
+/** A child slot: an instance of another component, referenced by codeKey. */
+interface InstanceChildInput {
+  type: "instance";
+  component: string;
+}
+
+interface ComponentSpecFields {
   layoutMode?: "HORIZONTAL" | "VERTICAL" | "NONE";
   padding?: PaddingInput;
   gap?: NumberOrRef;
@@ -86,6 +90,57 @@ interface ComponentInput {
   fill?: FillInput;
   size?: { width: number; height: number };
   text?: TextInput;
+  children?: InstanceChildInput[];
+}
+
+interface ComponentInput extends ComponentSpecFields {
+  name: string;
+  codeKey?: string;
+  parentId?: string;
+}
+
+interface ComponentVariantInput {
+  /** Variant property values, e.g. `{ size: "sm", intent: "primary" }`. */
+  props: Record<string, unknown>;
+  /** Per-variant overrides on top of the set-level spec fields. */
+  spec?: ComponentSpecFields;
+}
+
+interface ComponentSetInput extends ComponentSpecFields {
+  name: string;
+  codeKey?: string;
+  parentId?: string;
+  variants: ComponentVariantInput[];
+}
+
+type LineHeightInput = number | { percent: number } | "auto";
+type LetterSpacingInput = number | { percent: number };
+
+interface TextStyleInput {
+  name: string;
+  codeKey?: string;
+  description?: string;
+  fontFamily?: string;
+  fontStyle?: string;
+  fontSize?: number;
+  lineHeight?: LineHeightInput;
+  letterSpacing?: LetterSpacingInput;
+}
+
+interface EffectInput {
+  type: string;
+  color?: string;
+  offset?: { x?: number; y?: number };
+  radius?: number;
+  spread?: number;
+  visible?: boolean;
+}
+
+interface EffectStyleInput {
+  name: string;
+  codeKey?: string;
+  description?: string;
+  effects: EffectInput[];
 }
 
 interface LayoutNode {
@@ -663,6 +718,181 @@ async function upsertLabel(component: ComponentNode, text: TextInput): Promise<T
 
   return label;
 }
+function findComponentSet(parent: ChildrenMixin, name: string, codeKey: string): ComponentSetNode | null {
+  if (codeKey) {
+    const tagged = findDeep(parent, (node) => node.type === "COMPONENT_SET" && codeKeyOf(node) === codeKey);
+    if (tagged) return tagged as ComponentSetNode;
+  }
+  const direct = parent.children.find((child) => child.type === "COMPONENT_SET" && child.name === name);
+  if (direct) return direct as ComponentSetNode;
+  return (findDeep(parent, (node) => node.type === "COMPONENT_SET" && node.name === name) as ComponentSetNode) ?? null;
+}
+
+/**
+ * Document-wide codeKey lookup — how instance children find their source
+ * component no matter which page or frame it lives on.
+ */
+function findTaggedComponent(codeKey: string): ComponentNode | ComponentSetNode | null {
+  if (!codeKey) return null;
+  for (const page of figma.root.children) {
+    const found = page.findOne((node) => {
+      if (node.type !== "COMPONENT" && node.type !== "COMPONENT_SET") return false;
+      return codeKeyOf(node) === codeKey;
+    });
+    if (found) return found as ComponentNode | ComponentSetNode;
+  }
+  return null;
+}
+
+type PaddingField = "paddingTop" | "paddingRight" | "paddingBottom" | "paddingLeft";
+
+const PADDING_FIELDS: readonly PaddingField[] = [
+  "paddingTop",
+  "paddingRight",
+  "paddingBottom",
+  "paddingLeft",
+];
+
+interface ResolvedSlot {
+  source: ComponentNode;
+  codeKey: string | null;
+}
+
+interface PreparedSpec {
+  /** null = leave the component's current layout mode alone. */
+  layoutMode: "HORIZONTAL" | "VERTICAL" | "NONE" | null;
+  padding: { field: PaddingField; value: PreparedNumber }[];
+  gap: PreparedNumber | null;
+  radius: PreparedNumber | null;
+  fill: PreparedFill | null;
+  size: { width: number; height: number } | null;
+  text: TextInput | null;
+  /** null = leave existing children alone; otherwise the slot list to sync. */
+  slots: ResolvedSlot[] | null;
+}
+
+function resolveSlot(child: InstanceChildInput, index: number): ResolvedSlot {
+  if (child?.type !== "instance") {
+    throw new Error(
+      `Child ${index} has unknown type "${String((child as { type?: unknown })?.type)}" — only "instance" is supported.`,
+    );
+  }
+  const wanted = String(child.component ?? "").trim();
+  const target = findTaggedComponent(wanted);
+  if (!target) {
+    throw new Error(`Child ${index} points at "${wanted}", but no component with that codeKey exists in this file yet.`);
+  }
+  // Instances come from a single variant; the set's tag lives on the set itself.
+  return { source: target.type === "COMPONENT_SET" ? target.defaultVariant : target, codeKey: codeKeyOf(target) };
+}
+
+/**
+ * Resolves everything that can fail *before* any node is touched, so a
+ * rejected call never leaves a half-built — or empty — component behind.
+ * A reused component keeps its layout mode when the spec omits one.
+ */
+async function prepareSpec(input: ComponentSpecFields, currentLayout: string): Promise<PreparedSpec> {
+  const effective = input.layoutMode ?? currentLayout;
+  if ((input.gap !== undefined || input.padding !== undefined) && effective === "NONE") {
+    throw new Error('`gap` and `padding` need auto layout — pass layoutMode "VERTICAL" or "HORIZONTAL".');
+  }
+
+  const padding: PreparedSpec["padding"] = [];
+  if (input.padding) {
+    const sides = ["top", "right", "bottom", "left"] as const;
+    for (const [index, side] of sides.entries()) {
+      const value = input.padding[side] ?? input.padding.all;
+      if (value === undefined) continue;
+      padding.push({ field: PADDING_FIELDS[index], value: await prepareNumber(value, PADDING_FIELDS[index]) });
+    }
+  }
+
+  const gap = input.gap === undefined ? null : await prepareNumber(input.gap, "itemSpacing");
+  const radius = input.cornerRadius === undefined ? null : await prepareNumber(input.cornerRadius, "cornerRadius");
+  const fill = input.fill ? await prepareFill(input.fill) : null;
+
+  if (input.text) {
+    const family = String(input.text.fontFamily ?? "Inter");
+    // Figma refuses font writes until the font is loaded; doing it here keeps
+    // the component itself untouched when the family is unavailable.
+    await figma.loadFontAsync({ family, style: String(input.text.fontStyle ?? "Regular") });
+  }
+
+  let size: PreparedSpec["size"] = null;
+  if (input.size) {
+    const width = Number(input.size.width);
+    const height = Number(input.size.height);
+    if (!Number.isFinite(width) || !Number.isFinite(height)) throw new Error("`size` needs finite width and height.");
+    size = { width, height };
+  }
+
+  const slots = input.children ? input.children.map((child, index) => resolveSlot(child, index)) : null;
+
+  return { layoutMode: input.layoutMode ?? null, padding, gap, radius, fill, size, text: input.text ?? null, slots };
+}
+
+/** Writes a prepared spec onto a component. Only called after all prep succeeded. */
+async function applySpec(
+  component: ComponentNode,
+  prepared: PreparedSpec,
+): Promise<{
+  bound: Record<string, { variableId: string; variableName: string }>;
+  text: TextNode | null;
+  children: { id: string; type: string; codeKey: string | null }[];
+}> {
+  if (prepared.layoutMode) component.layoutMode = prepared.layoutMode;
+
+  const bound: Record<string, { variableId: string; variableName: string }> = {};
+  const write = (field: PaddingField | "itemSpacing" | "cornerRadius", entry: PreparedNumber): void => {
+    const target = component as unknown as LayoutNode;
+    target.setBoundVariable(field, entry.variable);
+    if (entry.literal !== null) (target as unknown as Record<string, number>)[field] = entry.literal;
+    if (entry.variable) bound[field] = { variableId: entry.variable.id, variableName: entry.variable.name };
+  };
+
+  for (const entry of prepared.padding) write(entry.field, entry.value);
+  if (prepared.gap) write("itemSpacing", prepared.gap);
+  if (prepared.radius) write("cornerRadius", prepared.radius);
+
+  if (prepared.fill) {
+    component.fills = [prepared.fill.paint];
+    if (prepared.fill.variable) {
+      bound.fills = { variableId: prepared.fill.variable.id, variableName: prepared.fill.variable.name };
+    }
+  }
+
+  if (prepared.size) component.resize(prepared.size.width, prepared.size.height);
+
+  let text: TextNode | null = null;
+  if (prepared.text) text = await upsertLabel(component, prepared.text);
+
+  const children = prepared.slots === null ? [] : syncSlots(component, prepared.slots);
+
+  return { bound, text, children };
+}
+
+/**
+ * Slot children are replaced wholesale when a spec provides `children`.
+ * Rebuilding instances is cheap in Figma and keeps re-runs deterministic —
+ * there is no partial-update state to reconcile.
+ */
+function syncSlots(
+  component: ComponentNode,
+  slots: ResolvedSlot[],
+): { id: string; type: string; codeKey: string | null }[] {
+  for (const child of [...component.children]) {
+    if (child.getSharedPluginData(NAMESPACE, ROLE_KEY) === SLOT_ROLE) child.remove();
+  }
+
+  const created: { id: string; type: string; codeKey: string | null }[] = [];
+  for (const slot of slots) {
+    const instance = slot.source.createInstance();
+    component.appendChild(instance);
+    instance.setSharedPluginData(NAMESPACE, ROLE_KEY, SLOT_ROLE);
+    created.push({ id: instance.id, type: instance.type, codeKey: slot.codeKey });
+  }
+  return created;
+}
 
 async function upsertComponent(params: Record<string, unknown>): Promise<unknown> {
   const input = params as unknown as ComponentInput;
@@ -673,33 +903,7 @@ async function upsertComponent(params: Record<string, unknown>): Promise<unknown
   const codeKey = input.codeKey ? String(input.codeKey) : "";
   const existing = findComponent(parent, name, codeKey);
 
-  // Everything that can fail is resolved before a node is created, so a
-  // rejected call leaves no empty component behind.
-  const layoutMode = input.layoutMode ?? existing?.layoutMode ?? "NONE";
-  if ((input.gap !== undefined || input.padding !== undefined) && layoutMode === "NONE") {
-    throw new Error('`gap` and `padding` need auto layout — pass layoutMode "VERTICAL" or "HORIZONTAL".');
-  }
-
-  const fields = ["paddingTop", "paddingRight", "paddingBottom", "paddingLeft"] as const;
-  const preparedPadding = [];
-  if (input.padding) {
-    const sides = ["top", "right", "bottom", "left"] as const;
-    for (const [index, side] of sides.entries()) {
-      const value = input.padding[side] ?? input.padding.all;
-      if (value === undefined) continue;
-      preparedPadding.push({ field: fields[index], value: await prepareNumber(value, fields[index]) });
-    }
-  }
-  const preparedGap = input.gap === undefined ? null : await prepareNumber(input.gap, "itemSpacing");
-  const preparedRadius =
-    input.cornerRadius === undefined ? null : await prepareNumber(input.cornerRadius, "cornerRadius");
-  const preparedFill = input.fill ? await prepareFill(input.fill) : null;
-  if (input.text) {
-    const family = String(input.text.fontFamily ?? "Inter");
-    // Figma refuses font writes until the font is loaded; doing it here keeps
-    // the component itself untouched when the family is unavailable.
-    await figma.loadFontAsync({ family, style: String(input.text.fontStyle ?? "Regular") });
-  }
+  const prepared = await prepareSpec(input, existing?.layoutMode ?? "NONE");
 
   let component: ComponentNode;
   let created = false;
@@ -713,39 +917,8 @@ async function upsertComponent(params: Record<string, unknown>): Promise<unknown
 
   component.name = name;
   tagCodeKey(component, codeKey);
-  if (input.layoutMode) component.layoutMode = input.layoutMode;
 
-  const bound: Record<string, { variableId: string; variableName: string }> = {};
-  const write = (
-    field: (typeof fields)[number] | "itemSpacing" | "cornerRadius",
-    prepared: PreparedNumber,
-  ): void => {
-    const target = component as unknown as LayoutNode;
-    target.setBoundVariable(field, prepared.variable);
-    if (prepared.literal !== null) (target as unknown as Record<string, number>)[field] = prepared.literal;
-    if (prepared.variable) bound[field] = { variableId: prepared.variable.id, variableName: prepared.variable.name };
-  };
-
-  for (const entry of preparedPadding) write(entry.field, entry.value);
-  if (preparedGap) write("itemSpacing", preparedGap);
-  if (preparedRadius) write("cornerRadius", preparedRadius);
-
-  if (preparedFill) {
-    component.fills = [preparedFill.paint];
-    if (preparedFill.variable) {
-      bound.fills = { variableId: preparedFill.variable.id, variableName: preparedFill.variable.name };
-    }
-  }
-
-  if (input.size) {
-    const width = Number(input.size.width);
-    const height = Number(input.size.height);
-    if (!Number.isFinite(width) || !Number.isFinite(height)) throw new Error("`size` needs finite width and height.");
-    component.resize(width, height);
-  }
-
-  let label: TextNode | null = null;
-  if (input.text) label = await upsertLabel(component, input.text);
+  const applied = await applySpec(component, prepared);
 
   return {
     component: {
@@ -759,8 +932,217 @@ async function upsertComponent(params: Record<string, unknown>): Promise<unknown
       parentId: parent.id,
       childCount: component.children.length,
     },
-    boundVariables: bound,
-    text: label ? { id: label.id, characters: label.characters } : null,
+    boundVariables: applied.bound,
+    text: applied.text ? { id: applied.text.id, characters: applied.text.characters } : null,
+    children: applied.children,
+  };
+}
+
+function specFields(input: ComponentSpecFields): ComponentSpecFields {
+  return {
+    layoutMode: input.layoutMode,
+    padding: input.padding,
+    gap: input.gap,
+    cornerRadius: input.cornerRadius,
+    fill: input.fill,
+    size: input.size,
+    text: input.text,
+    children: input.children,
+  };
+}
+
+async function upsertComponentSet(params: Record<string, unknown>): Promise<unknown> {
+  const input = params as unknown as ComponentSetInput;
+  const name = String(input.name ?? "").trim();
+  if (!name) throw new Error("A component set name is required.");
+
+  const variants = Array.isArray(input.variants) ? input.variants : [];
+  if (variants.length === 0) throw new Error("A component set needs at least one variant.");
+
+  const propKeys = Object.keys(variants[0]?.props ?? {});
+  if (propKeys.length === 0) {
+    throw new Error('Every variant needs at least one property, e.g. { props: { size: "sm" } }.');
+  }
+  for (const variant of variants) {
+    const keys = Object.keys(variant?.props ?? {});
+    if (keys.join("\n") !== propKeys.join("\n")) {
+      throw new Error("Every variant must declare the same variant properties, in the same order.");
+    }
+  }
+
+  const variantLabel = (props: Record<string, unknown>): string =>
+    propKeys.map((key) => `${key}=${String(props[key])}`).join(", ");
+  const names = variants.map((variant) => variantLabel(variant?.props ?? {}));
+  if (new Set(names).size !== names.length) throw new Error("Two variants share the same property values.");
+
+  const parent = await resolveParent(input.parentId);
+  const codeKey = input.codeKey ? String(input.codeKey) : "";
+  const existing = findComponentSet(parent, name, codeKey);
+  const existingVariants = existing
+    ? (existing.children.filter((child) => child.type === "COMPONENT") as ComponentNode[])
+    : [];
+
+  // A matching roster updates variants in place; a changed roster rebuilds
+  // the set (documented: instances of the old set detach).
+  const canUpdate =
+    existing !== null &&
+    existingVariants.length === names.length &&
+    names.every((variantName) => existingVariants.some((child) => child.name === variantName));
+
+  const plans: { name: string; spec: PreparedSpec; component: ComponentNode | null }[] = [];
+  for (const [index, variant] of variants.entries()) {
+    const merged: ComponentSpecFields = { ...specFields(input), ...(variant?.spec ?? {}) };
+    const target = canUpdate ? (existingVariants.find((child) => child.name === names[index]) ?? null) : null;
+    plans.push({ name: names[index], spec: await prepareSpec(merged, target?.layoutMode ?? "NONE"), component: target });
+  }
+
+  let set: ComponentSetNode;
+  let created = false;
+  if (existing && canUpdate) {
+    set = existing;
+  } else {
+    if (existing) existing.remove();
+    const components: ComponentNode[] = [];
+    for (const plan of plans) {
+      const component = figma.createComponent();
+      component.name = plan.name;
+      parent.appendChild(component);
+      components.push(component);
+      plan.component = component;
+    }
+    set = figma.combineAsVariants(components, parent as unknown as BaseNode & ChildrenMixin);
+    set.name = name;
+    created = true;
+  }
+
+  tagCodeKey(set, codeKey);
+
+  const variantPayloads: { id: string; name: string }[] = [];
+  for (const plan of plans) {
+    const component = plan.component as ComponentNode;
+    if (canUpdate) component.name = plan.name;
+    await applySpec(component, plan.spec);
+    variantPayloads.push({ id: component.id, name: component.name });
+  }
+
+  return {
+    set: {
+      id: set.id,
+      name: set.name,
+      codeKey: codeKeyOf(set),
+      created,
+      variantCount: variantPayloads.length,
+      variants: variantPayloads,
+      parentId: parent.id,
+    },
+  };
+}
+
+function toLineHeight(value: LineHeightInput): LineHeight {
+  if (value === "auto") return { unit: "AUTO" };
+  if (typeof value === "number") {
+    if (!Number.isFinite(value)) throw new Error('"lineHeight" must be a number, { percent }, or "auto".');
+    return { unit: "PIXELS", value };
+  }
+  return { unit: "PERCENT", value: Number(value.percent) };
+}
+
+function toLetterSpacing(value: LetterSpacingInput): LetterSpacing {
+  if (typeof value === "number") return { unit: "PIXELS", value };
+  return { unit: "PERCENT", value: Number(value.percent) };
+}
+
+function toEffect(input: EffectInput, index: number): Effect {
+  const type = String(input?.type ?? "").toUpperCase();
+  if (type === "LAYER_BLUR" || type === "BACKGROUND_BLUR") {
+    return { type, blurType: "NORMAL", radius: Number(input?.radius ?? 0), visible: input?.visible !== false };
+  }
+  if (type !== "DROP_SHADOW" && type !== "INNER_SHADOW") {
+    throw new Error(
+      `Effect ${index + 1}: unsupported type "${String(input?.type)}". ` +
+        "Use DROP_SHADOW, INNER_SHADOW, LAYER_BLUR or BACKGROUND_BLUR.",
+    );
+  }
+  const color = parseColor(String(input?.color ?? "#00000040"));
+  return {
+    type,
+    visible: input?.visible !== false,
+    blendMode: "NORMAL",
+    color: { r: color.r, g: color.g, b: color.b, a: color.a ?? 1 },
+    offset: { x: Number(input?.offset?.x ?? 0), y: Number(input?.offset?.y ?? 0) },
+    radius: Number(input?.radius ?? 0),
+    spread: Number(input?.spread ?? 0),
+  };
+}
+
+async function upsertTextStyle(params: Record<string, unknown>): Promise<unknown> {
+  const input = params as unknown as TextStyleInput;
+  const name = String(input.name ?? "").trim();
+  if (!name) throw new Error("A style name is required.");
+
+  const codeKey = input.codeKey ? String(input.codeKey) : "";
+  const styles = await figma.getLocalTextStylesAsync();
+  const existing =
+    (codeKey ? styles.find((style) => codeKeyOf(style) === codeKey) : undefined) ??
+    styles.find((style) => style.name === name);
+
+  const currentFont = existing ? existing.fontName : null;
+  const family = String(input.fontFamily ?? currentFont?.family ?? "Inter");
+  const fontStyle = String(input.fontStyle ?? currentFont?.style ?? "Regular");
+  // Load the font before creating anything, so an unavailable family leaves
+  // no orphan style behind — Figma throws on the first font write otherwise.
+  await figma.loadFontAsync({ family, style: fontStyle });
+
+  const textStyle = existing ?? figma.createTextStyle();
+  textStyle.name = name;
+  tagCodeKey(textStyle, codeKey);
+  if (input.description !== undefined) textStyle.description = String(input.description);
+  textStyle.fontName = { family, style: fontStyle };
+  if (input.fontSize !== undefined) textStyle.fontSize = Number(input.fontSize);
+  if (input.lineHeight !== undefined) textStyle.lineHeight = toLineHeight(input.lineHeight);
+  if (input.letterSpacing !== undefined) textStyle.letterSpacing = toLetterSpacing(input.letterSpacing);
+
+  return {
+    style: {
+      id: textStyle.id,
+      name: textStyle.name,
+      codeKey: codeKeyOf(textStyle),
+      created: !existing,
+      fontFamily: family,
+      fontStyle,
+      fontSize: textStyle.fontSize,
+    },
+  };
+}
+
+async function upsertEffectStyle(params: Record<string, unknown>): Promise<unknown> {
+  const input = params as unknown as EffectStyleInput;
+  const name = String(input.name ?? "").trim();
+  if (!name) throw new Error("A style name is required.");
+
+  const effects = (Array.isArray(input.effects) ? input.effects : []).map(toEffect);
+  if (effects.length === 0) throw new Error("An effect style needs at least one effect.");
+
+  const codeKey = input.codeKey ? String(input.codeKey) : "";
+  const styles = await figma.getLocalEffectStylesAsync();
+  const existing =
+    (codeKey ? styles.find((style) => codeKeyOf(style) === codeKey) : undefined) ??
+    styles.find((style) => style.name === name);
+
+  const effectStyle = existing ?? figma.createEffectStyle();
+  effectStyle.name = name;
+  tagCodeKey(effectStyle, codeKey);
+  if (input.description !== undefined) effectStyle.description = String(input.description);
+  effectStyle.effects = effects;
+
+  return {
+    style: {
+      id: effectStyle.id,
+      name: effectStyle.name,
+      codeKey: codeKeyOf(effectStyle),
+      created: !existing,
+      effectCount: effects.length,
+    },
   };
 }
 
@@ -898,6 +1280,12 @@ async function handle(method: string, params: Record<string, unknown>): Promise<
       return listComponents(params);
     case "upsert_component":
       return upsertComponent(params);
+    case "upsert_component_set":
+      return upsertComponentSet(params);
+    case "upsert_text_style":
+      return upsertTextStyle(params);
+    case "upsert_effect_style":
+      return upsertEffectStyle(params);
     case "get_node":
       return getNode(params);
     default:

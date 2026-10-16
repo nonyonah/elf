@@ -1,0 +1,6 @@
+{
+  "layoutMode": "HORIZONTAL",
+  "gap": 0,
+  "size": { "width": 16, "height": 16 },
+  "fill": "color.onSurface.base"
+}

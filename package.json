@@ -45,7 +45,9 @@
     "prepublishOnly": "npm run typecheck",
     "mcp:test": "npm --prefix mcp test",
     "mcp:typecheck": "npm --prefix mcp run typecheck",
-    "mcp:verify-plugin": "npm --prefix mcp run verify:plugin"
+    "mcp:verify-plugin": "npm --prefix mcp run verify:plugin",
+    "batch:test": "npm --prefix batch test",
+    "batch:typecheck": "npm --prefix batch run typecheck"
   },
   "dependencies": {
     "tsx": "^4.19.2"

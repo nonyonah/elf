@@ -1,0 +1,7 @@
+{
+  "layoutMode": "VERTICAL",
+  "gap": "space.2",
+  "padding": { "all": "space.4" },
+  "fill": "color.surface.base",
+  "children": [{ "type": "instance", "component": "Divider.jsx#Divider" }]
+}
