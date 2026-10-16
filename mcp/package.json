@@ -1,0 +1,29 @@
+{
+  "name": "elf-mcp",
+  "version": "0.1.0",
+  "description": "Local MCP server that reads and writes Figma variables and basic components through the Figma Plugin API \u2014 no Enterprise REST API.",
+  "type": "module",
+  "license": "MIT",
+  "private": true,
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "start:http": "tsx src/index.ts --http",
+    "test": "node --import tsx --test test/bridge.test.ts test/config.test.ts test/tools.test.ts test/components.test.ts test/http.test.ts",
+    "typecheck": "tsc --noEmit",
+    "verify:plugin": "node --import tsx scripts/verify-plugin.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.13.0",
+    "ws": "^8.18.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@types/ws": "^8.5.12",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3"
+  }
+}

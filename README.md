@@ -240,6 +240,21 @@ The data it reads comes from the `drift-data` branch, refreshed daily by `.githu
 
 ---
 
+## Write into Figma from your AI client (local MCP)
+
+The CLI reads. The MCP server in [`mcp/`](mcp/) **writes** — variables and basic components, driven from Cursor, Claude Desktop, or the **web** versions of Claude and Grok (free plans supported, via the Streamable HTTP transport + a tunnel), all through the Figma **Plugin API**, so it works on free/Professional Figma plans (the REST Variables API is Enterprise-only and is never called).
+
+```
+MCP client ──stdio──► mcp/ server ──ws://127.0.0.1:8765──► bridge-plugin UI ──postMessage──► Plugin API
+```
+
+- **Tools:** `status`, `list_collections`, `list_variables`, `create_collection`, `upsert_variables` (arrays, upsert by name), `rename_variable`, `delete_variable`, `list_components`, `upsert_component`, `get_node`.
+- **Safe by construction:** every write is an upsert matched by name/`codeKey`, every touched node returns its Figma id, everything is tagged `setSharedPluginData("elf", "codeKey", …)` for the manifest to come, the socket binds to `127.0.0.1` with a shared token, and Figma's plan-limit errors come back word for word.
+
+Setup, tool reference and a manual test checklist: **[`mcp/README.md`](mcp/README.md)**.
+
+---
+
 ## Troubleshooting
 
 **"Figma API token not found. Set the FIGMA_API_TOKEN environment variable"**

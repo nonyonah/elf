@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <style>
+    :root {
+      --bg: var(--figma-color-bg, #1e1e1e);
+      --bg-secondary: var(--figma-color-bg-secondary, #2c2c2c);
+      --text: var(--figma-color-text, #ffffff);
+      --text-secondary: var(--figma-color-text-secondary, #b3b3b3);
+      --accent: var(--figma-color-bg-brand, #0d99ff);
+      --danger: var(--figma-color-text-danger, #f24822);
+      --success: #1fc04d;
+      --border: var(--figma-color-border, #333333);
+      --radius: 6px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 12px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      height: 100vh;
+    }
+    header { display: flex; align-items: center; justify-content: space-between; }
+    h1 { font-size: 13px; font-weight: 600; }
+    .file { color: var(--text-secondary); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .file strong { color: var(--text); font-weight: 600; }
+    .status {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: 600;
+      font-size: 11px;
+      padding: 5px 9px;
+      border-radius: 999px;
+      white-space: nowrap;
+    }
+    .status.connected { background: rgba(31, 192, 77, 0.15); color: var(--success); }
+    .status.connecting { background: rgba(13, 153, 255, 0.15); color: var(--accent); }
+    .status.disconnected { background: rgba(255, 255, 255, 0.08); color: var(--text-secondary); }
+    .status.error { background: rgba(242, 72, 34, 0.15); color: var(--danger); }
+    .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+    label { display: block; color: var(--text-secondary); margin-bottom: 4px; font-size: 11px; }
+    input {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      padding: 7px 10px;
+      font-size: 12px;
+    }
+    input:focus { outline: 1px solid var(--accent); }
+    .row { display: flex; gap: 8px; align-items: flex-end; }
+    .row > .host { flex: 1; min-width: 0; }
+    .row > .token { flex: 1.4; min-width: 0; }
+    button {
+      background: var(--accent);
+      color: #ffffff;
+      border: none;
+      border-radius: var(--radius);
+      padding: 8px 12px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    button.secondary { background: transparent; color: var(--text-secondary); border: 1px solid var(--border); }
+    button:disabled { opacity: 0.5; cursor: default; }
+    .hint { color: var(--text-secondary); font-size: 10.5px; line-height: 1.45; }
+    .log {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 8px 9px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 10px;
+      line-height: 1.55;
+      color: var(--text-secondary);
+    }
+    .log div { overflow-wrap: anywhere; }
+    .log .ok { color: var(--success); }
+    .log .err { color: var(--danger); }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>Elf Bridge</h1>
+      <div class="file" id="file">…</div>
+    </div>
+    <div class="status disconnected" id="status">
+      <span class="dot"></span>
+      <span id="statusText">disconnected</span>
+    </div>
+  </header>
+
+  <div class="row">
+    <div class="host">
+      <label for="host">Bridge host (or https://…ngrok-free.app)</label>
+      <input id="host" type="text" placeholder="localhost:8765" spellcheck="false" />
+    </div>
+    <div class="token">
+      <label for="token">Bridge token (matches ELF_MCP_TOKEN)</label>
+      <input id="token" type="password" placeholder="stored per machine, never in the file" />
+    </div>
+  </div>
+
+  <div class="row">
+    <button id="connect">Connect</button>
+    <button id="disconnect" class="secondary" disabled>Disconnect</button>
+  </div>
+
+  <div class="hint">
+    MCP client → stdio → elf-mcp → <code>ws://localhost:8765</code> (or an ngrok tunnel) → this panel → Figma Plugin API.
+  </div>
+
+  <div class="log" id="log"></div>
+
+  <script>
+    const AUTH_FAILED = 4001; // bad or missing token
+    const REPLACED = 4002;    // another plugin took over the bridge
+
+    const $ = (id) => document.getElementById(id);
+    const state = { host: "localhost:8765", token: "", autoConnect: true, socket: null, attempts: 0, manualClose: false, file: null, plugin: null };
+
+    function log(message, kind) {
+      const line = document.createElement("div");
+      if (kind) line.className = kind;
+      const time = new Date().toLocaleTimeString();
+      line.textContent = time + "  " + message;
+      const box = $("log");
+      box.appendChild(line);
+      while (box.childElementCount > 200) box.removeChild(box.firstChild);
+      box.scrollTop = box.scrollHeight;
+    }
+
+    function setStatus(kind, text) {
+      $("status").className = "status " + kind;
+      $("statusText").textContent = text;
+    }
+
+    function settings() {
+      return { type: "settings", host: state.host, token: state.token };
+    }
+
+    // Accepts "host:port", "https://…" (→ wss, e.g. an ngrok tunnel), or a
+    // full ws(s) URL. The default stays on localhost — Figma rejects raw IPs
+    // like 127.0.0.1 in manifest domains, so localhost is the local spelling.
+    function bridgeUrl() {
+      const host = state.host.trim() || "localhost:8765";
+      const withPath = (url) => (url.endsWith("/") ? url : url + "/");
+      if (/^https:\/\//i.test(host)) return withPath("wss://" + host.slice(8));
+      if (/^http:\/\//i.test(host)) return withPath("ws://" + host.slice(7));
+      if (/^wss?:\/\//i.test(host)) return withPath(host);
+      return withPath("ws://" + host);
+    }
+
+    function shortHost() {
+      const host = state.host.replace(/^wss?:\/\//i, "");
+      return host.length > 26 ? host.slice(0, 24) + "…" : host;
+    }
+
+    function saveSettings() {
+      parent.postMessage({ pluginMessage: settings() }, "*");
+    }
+
+    function connect() {
+      if (state.socket) return;
+      if (!state.token) {
+        setStatus("error", "no token");
+        log("Set the bridge token first — it must match ELF_MCP_TOKEN on the MCP server.", "err");
+        return;
+      }
+
+      state.manualClose = false;
+      setStatus("connecting", "connecting…");
+
+      const url = bridgeUrl() + "?token=" + encodeURIComponent(state.token);
+      let socket;
+      try {
+        socket = new WebSocket(url);
+      } catch (error) {
+        setStatus("error", "invalid url");
+        log(String(error), "err");
+        return;
+      }
+      state.socket = socket;
+
+      socket.onopen = () => {
+        state.attempts = 0;
+        setStatus("connected", "connected · " + shortHost());
+        $("connect").disabled = true;
+        $("disconnect").disabled = false;
+        log("connected to " + bridgeUrl(), "ok");
+        // Tell the bridge which file this plugin is attached to, so `status`
+        // can report it. No token is ever echoed back.
+        if (socket.readyState === WebSocket.OPEN) {
+          socket.send(JSON.stringify({ type: "status", file: state.file, plugin: state.plugin }));
+        }
+        parent.postMessage({ pluginMessage: { type: "context" } }, "*");
+      };
+
+      socket.onmessage = (event) => {
+        let message;
+        try {
+          message = JSON.parse(event.data);
+        } catch (error) {
+          log("ignoring non-JSON message: " + event.data, "err");
+          return;
+        }
+        if (message.type === "request") {
+          // Straight through to the plugin main thread; the answer comes back
+          // as { type: "response", id } and is forwarded to the socket.
+          parent.postMessage({ pluginMessage: message }, "*");
+          return;
+        }
+        if (message.type === "status") log("bridge status message");
+      };
+
+      socket.onerror = () => {
+        // The close event carries the real reason (auth, refused, replaced).
+      };
+
+      socket.onclose = (event) => {
+        state.socket = null;
+        $("connect").disabled = false;
+        $("disconnect").disabled = true;
+
+        if (event.code === AUTH_FAILED) {
+          setStatus("error", "auth failed");
+          log("bridge rejected the token (code 4001) — check ELF_MCP_TOKEN.", "err");
+          return;
+        }
+        if (event.code === REPLACED) {
+          setStatus("disconnected", "replaced");
+          log("another plugin connection took over the bridge (code 4002).", "err");
+          return;
+        }
+        if (state.manualClose) {
+          setStatus("disconnected", "disconnected · " + shortHost());
+          log("disconnected.");
+          return;
+        }
+
+        setStatus("error", "disconnected · " + shortHost());
+        log("connection lost (code " + event.code + ")", "err");
+        if (state.autoConnect && state.attempts < 5) {
+          const delay = Math.min(500 * Math.pow(2, state.attempts), 8000);
+          state.attempts += 1;
+          log("reconnecting in " + delay + "ms…");
+          setTimeout(() => { if (!state.socket) connect(); }, delay);
+        }
+      };
+    }
+
+    function disconnect() {
+      state.manualClose = true;
+      if (state.socket) state.socket.close(1000, "closed from the plugin panel");
+      else setStatus("disconnected", "disconnected · " + shortHost());
+    }
+
+    $("host").addEventListener("change", (event) => {
+      state.host = event.target.value.trim() || "localhost:8765";
+      event.target.value = state.host;
+      saveSettings();
+    });
+    $("token").addEventListener("change", (event) => {
+      state.token = event.target.value.trim();
+      saveSettings();
+    });
+
+    $("connect").addEventListener("click", () => {
+      state.autoConnect = true;
+      connect();
+    });
+    $("disconnect").addEventListener("click", disconnect);
+
+    window.onmessage = (event) => {
+      const message = event.data.pluginMessage;
+      if (!message) return;
+
+      if (message.type === "context") {
+        $("file").textContent = message.file.name;
+        state.file = message.file;
+        state.plugin = message.plugin || null;
+        state.host = message.settings.host || "localhost:8765";
+        state.token = message.settings.token;
+        $("host").value = state.host;
+        $("token").value = state.token;
+        log("file: " + message.file.name + " (" + message.file.key + ")");
+        if (state.token) connect();
+      } else if (message.type === "response") {
+        const short = String(message.id || "").slice(0, 8);
+        if (message.ok) {
+          log(short + " ok", "ok");
+        } else {
+          const text = (message.error && message.error.message) || "Unknown plugin error";
+          log(short + " " + text, "err");
+        }
+        if (state.socket && state.socket.readyState === WebSocket.OPEN) {
+          state.socket.send(JSON.stringify(message));
+        }
+      } else if (message.type === "saved") {
+        log("settings saved to this machine.");
+      } else if (message.type === "log") {
+        log(message.message, message.level === "error" ? "err" : "");
+      }
+    };
+
+    parent.postMessage({ pluginMessage: { type: "context" } }, "*");
+  </script>
+</body>
+</html>

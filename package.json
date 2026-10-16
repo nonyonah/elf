@@ -40,8 +40,12 @@
     "test": "node --import tsx --test test/diff.test.ts test/report.test.ts test/webhook.test.ts",
     "test:worker": "node worker/test.mjs",
     "build:plugin": "tsc -p plugin/tsconfig.json",
+    "build:bridge-plugin": "tsc -p bridge-plugin/tsconfig.json",
     "typecheck": "tsc --noEmit",
-    "prepublishOnly": "npm run typecheck"
+    "prepublishOnly": "npm run typecheck",
+    "mcp:test": "npm --prefix mcp test",
+    "mcp:typecheck": "npm --prefix mcp run typecheck",
+    "mcp:verify-plugin": "npm --prefix mcp run verify:plugin"
   },
   "dependencies": {
     "tsx": "^4.19.2"
