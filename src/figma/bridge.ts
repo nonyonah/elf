@@ -3,8 +3,8 @@ import { fileURLToPath } from "node:url";
 import { NODE_STATE_DEPTH, nodeStateHash } from "../../batch/src/nodestate.js";
 import { createBridgeClient } from "../../mcp/src/client.js";
 import { loadDotEnvFile } from "../../mcp/src/config.js";
-import { categoryFromName, cssColorToHex, slugify } from "../normalize.js";
-import type { ModeName, ModeStrategy, Token } from "../types.js";
+import { categoryFromName, cssColorToHex, slugify } from "../core/normalize.js";
+import type { ModeName, ModeStrategy, Token } from "../core/types.js";
 import { isMulti, pickTargetMode, selectModes, type ModeSelection } from "./variables.js";
 
 /** The narrow slice of the bridge client elf needs (easy to fake in tests). */

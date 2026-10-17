@@ -1,5 +1,5 @@
-import { categoryFromName, rgbToHex, slugify } from "../normalize.js";
-import type { ModeName, ModeStrategy, Token } from "../types.js";
+import { categoryFromName, rgbToHex, slugify } from "../core/normalize.js";
+import type { ModeName, ModeStrategy, Token } from "../core/types.js";
 import type { FigmaApi } from "./client.js";
 
 interface FigmaColorValue {

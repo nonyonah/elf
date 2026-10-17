@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { FigmaApi } from "./figma/client.js";
-import type { DriftConfig } from "./types.js";
+import type { DriftConfig } from "./core/types.js";
 
 const FIXTURES_DIR = fileURLToPath(new URL("../fixtures/", import.meta.url));
 

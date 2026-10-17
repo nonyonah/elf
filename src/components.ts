@@ -3,7 +3,7 @@ import { parseComponents } from "../batch/src/parser.js";
 import { componentSpecHash } from "../batch/src/sync.js";
 import type { BridgeCaller } from "./figma/bridge.js";
 import { listBridgeComponents, readNodeState } from "./figma/bridge.js";
-import type { ComponentIssue } from "./diff.js";
+import type { ComponentIssue } from "./core/diff.js";
 
 export interface ComponentDiff {
   /** Code changed since the last sync — re-run elf-batch. */

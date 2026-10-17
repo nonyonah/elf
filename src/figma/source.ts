@@ -1,4 +1,4 @@
-import type { DriftConfig, Token } from "../types.js";
+import type { DriftConfig, Token } from "../core/types.js";
 import { fetchBridgeVariables, type BridgeCaller } from "./bridge.js";
 import type { FigmaApi } from "./client.js";
 import { fetchStyles } from "./styles.js";

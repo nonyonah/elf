@@ -5,8 +5,8 @@ import { dirname, join, resolve } from "node:path";
 import { detectCodebaseSource, parseCodebaseTokens } from "./codebase/index.js";
 import { diffComponents } from "./components.js";
 import { loadConfig } from "./config.js";
-import { applyDeprecations } from "./deprecations.js";
-import { diffTokens, hasDrift } from "./diff.js";
+import { applyDeprecations } from "./core/deprecations.js";
+import { diffTokens, hasDrift } from "./core/diff.js";
 import { connectBridge, type BridgeCaller } from "./figma/bridge.js";
 import { FigmaClient, type FigmaApi } from "./figma/client.js";
 import { fetchFigmaTokens } from "./figma/source.js";
@@ -19,9 +19,9 @@ import {
   writeNotifyState,
   type NotifyState,
 } from "./notify.js";
-import { buildReport, buildStatusPayload } from "./report.js";
+import { buildReport, buildStatusPayload } from "./core/report.js";
 import { buildSampleConfig, createSampleFigmaApi, type SampleFormat } from "./sample.js";
-import type { DriftConfig } from "./types.js";
+import type { DriftConfig } from "./core/types.js";
 import {
   DEFAULT_PASSCODE_ENV,
   generatePasscode,

@@ -1,7 +1,7 @@
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { cssColorToHex, normalizeShadow, slugify, toPx } from "../normalize.js";
-import type { Token } from "../types.js";
+import { cssColorToHex, normalizeShadow, slugify, toPx } from "../core/normalize.js";
+import type { Token } from "../core/types.js";
 
 type ThemeSection = Record<string, unknown>;
 

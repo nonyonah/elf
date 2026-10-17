@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { applyDeprecations } from "../src/deprecations.js";
-import { diffTokens, type DriftResult } from "../src/diff.js";
-import type { Token } from "../src/types.js";
+import { applyDeprecations } from "../src/core/deprecations.js";
+import { diffTokens, type DriftResult } from "../src/core/diff.js";
+import type { Token } from "../src/core/types.js";
 
 const TODAY = "2026-06-01";
 

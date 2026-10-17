@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { FigmaApi } from "../src/figma/client.js";
 import { fetchVariables } from "../src/figma/variables.js";
-import type { Token } from "../src/types.js";
+import type { Token } from "../src/core/types.js";
 
 type Raw = Record<string, unknown>;
 

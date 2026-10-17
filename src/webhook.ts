@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import type { DriftConfig } from "./types.js";
+import type { DriftConfig } from "./core/types.js";
 
 export const DEFAULT_EVENT_TYPES = [
   "FILE_VARIABLES_UPDATE",

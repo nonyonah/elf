@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { diffTokens } from "../src/diff.js";
-import type { Token } from "../src/types.js";
+import { diffTokens } from "../src/core/diff.js";
+import type { Token } from "../src/core/types.js";
 
 const figma: Token = { name: "color/primary", category: "color", value: "#FF0000" };
 const code: Token = { name: "color/primary", category: "color", value: "#FF0000" };

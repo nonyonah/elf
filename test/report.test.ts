@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { diffTokens } from "../src/diff.js";
-import { buildReport, type ReportMeta } from "../src/report.js";
-import type { Token } from "../src/types.js";
+import { diffTokens } from "../src/core/diff.js";
+import { buildReport, type ReportMeta } from "../src/core/report.js";
+import type { Token } from "../src/core/types.js";
 
 const meta: ReportMeta = {
   fileKey: "abc123",

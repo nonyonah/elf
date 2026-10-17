@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { applyDeprecations } from "../src/deprecations.js";
-import { diffTokens } from "../src/diff.js";
-import { buildReport, buildStatusPayload, type ReportMeta } from "../src/report.js";
-import type { Token } from "../src/types.js";
+import { applyDeprecations } from "../src/core/deprecations.js";
+import { diffTokens } from "../src/core/diff.js";
+import { buildReport, buildStatusPayload, type ReportMeta } from "../src/core/report.js";
+import type { Token } from "../src/core/types.js";
 
 const meta: ReportMeta = {
   fileKey: "abc123",

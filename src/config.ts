@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
-import type { ComponentsConfig, Deprecation, DriftConfig, ModeStrategy, NotifyConfig } from "./types.js";
+import type { ComponentsConfig, Deprecation, DriftConfig, ModeStrategy, NotifyConfig } from "./core/types.js";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 

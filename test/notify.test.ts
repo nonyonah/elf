@@ -3,7 +3,7 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { diffTokens, type DriftResult } from "../src/diff.js";
+import { diffTokens, type DriftResult } from "../src/core/diff.js";
 import {
   buildNotifyMessage,
   decideNotification,
@@ -13,7 +13,7 @@ import {
   writeNotifyState,
   type NotifyMeta,
 } from "../src/notify.js";
-import type { Token } from "../src/types.js";
+import type { Token } from "../src/core/types.js";
 
 const meta: NotifyMeta = {
   fileKey: "abc123",

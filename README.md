@@ -334,6 +334,20 @@ Config, token/sidecar formats and manual checklist: **[`batch/README.md`](batch/
 
 ---
 
+## The pure core (`elf-tokens/core`)
+
+Everything above reads Figma and the filesystem. The comparison itself — normalize → classify → diff → deprecations → report — is pure logic and lives in `src/core/`, importable on its own:
+
+```ts
+import { diffTokens, applyDeprecations, buildReport, buildNotifyMessage } from "elf-tokens/core";
+```
+
+The core has no imports outside itself — no Node built-ins, no `process`, no `console`, no network — enforced by [`test/core-purity.test.ts`](test/core-purity.test.ts). That keeps it runnable in any JavaScript runtime: the CLI and the elf console dashboard compute drift from the same code. It exports the normalization toolkit (`slugify`, `cssColorToHex`, `normalizeShadow`, `toPx`, …), classification (`categoryFromName`), `diffTokens` / `hasDrift`, `applyDeprecations`, `buildReport` / `buildStatusPayload`, and the Slack / plain-text formatter (`decideNotification`, `driftFingerprint`, `buildNotifyMessage`). The CLI-facing halves of those flows — reading files, calling Figma, posting webhooks — stay in `src/`.
+
+The HTTP contract those pieces feed (snapshots, ingest, remote config) is **[`CONTRACT.md`](CONTRACT.md)**.
+
+---
+
 ## Troubleshooting
 
 **"Figma API token not found. Set the FIGMA_API_TOKEN environment variable"**

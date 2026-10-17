@@ -1,5 +1,5 @@
-import { figmaEffectsToShadow, rgbToHex, slugify, type FigmaEffect } from "../normalize.js";
-import type { Token } from "../types.js";
+import { figmaEffectsToShadow, rgbToHex, slugify, type FigmaEffect } from "../core/normalize.js";
+import type { Token } from "../core/types.js";
 import type { FigmaApi } from "./client.js";
 
 interface TeamStyle {

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { DriftConfig } from "../src/types.js";
+import type { DriftConfig } from "../src/core/types.js";
 import {
   DEFAULT_EVENT_TYPES,
   generatePasscode,

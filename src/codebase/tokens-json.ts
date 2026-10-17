@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
-import { categoryFromName, cssColorToHex, normalizeShadow, slugify, toPx } from "../normalize.js";
-import type { Category, Token } from "../types.js";
+import { categoryFromName, cssColorToHex, normalizeShadow, slugify, toPx } from "../core/normalize.js";
+import type { Category, Token } from "../core/types.js";
 
 const TYPE_TO_CATEGORY: Record<string, Category> = {
   color: "color",

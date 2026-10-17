@@ -1,5 +1,5 @@
 import { basename, resolve } from "node:path";
-import type { CodebaseSource, Token } from "../types.js";
+import type { CodebaseSource, Token } from "../core/types.js";
 import { parseCss } from "./css.js";
 import { parseTailwindConfig } from "./tailwind.js";
 import { parseTokensJson } from "./tokens-json.js";

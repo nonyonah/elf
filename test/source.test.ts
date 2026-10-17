@@ -3,7 +3,7 @@ import { test } from "node:test";
 import type { BridgeCaller } from "../src/figma/bridge.js";
 import type { FigmaApi } from "../src/figma/client.js";
 import { fetchFigmaTokens, isPlanOrPermissionError } from "../src/figma/source.js";
-import type { DriftConfig } from "../src/types.js";
+import type { DriftConfig } from "../src/core/types.js";
 
 const PLAN_ERROR =
   "Figma API returned 403 for /files/abc/variables/local: {\"error\":\"Variables API requires an Enterprise plan\"}";
