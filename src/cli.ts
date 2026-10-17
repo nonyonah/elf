@@ -179,7 +179,7 @@ async function main(): Promise<number> {
     return await runDriftCheck(args, config, restApi, getBridge, webhookUrl);
   } finally {
     // The bridge websocket would otherwise keep the process alive after the report.
-    bridge?.close();
+    (bridge as BridgeCaller | null)?.close();
   }
 }
 
@@ -284,10 +284,6 @@ async function runDriftCheck(
 
   if (args.failOnDrift && result.driftFound) return 2;
   return 0;
-  } finally {
-    // The bridge websocket would otherwise keep the process alive after the report.
-    bridge?.close();
-  }
 }
 
 async function runWebhookCommand(args: CliArgs): Promise<number> {
