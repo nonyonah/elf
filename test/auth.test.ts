@@ -87,3 +87,24 @@ describe("/api/me", () => {
     expect(body.error.code).toBe("not_found");
   });
 });
+
+describe("local preview bypass", () => {
+  it("signs in as DEV_ONLY_FAKE_USER only when Clerk is unwired", async () => {
+    const { clerkSessionResolver } = await import("../src/auth.js");
+    const request = new Request("http://localhost/api/me");
+
+    const bypassed = await clerkSessionResolver(request, {
+      ...env,
+      CLERK_SECRET_KEY: undefined,
+      DEV_ONLY_FAKE_USER: "user_dev_preview",
+    });
+    expect(bypassed?.userId).toBe("user_dev_preview");
+
+    const off = await clerkSessionResolver(request, {
+      ...env,
+      CLERK_SECRET_KEY: undefined,
+      DEV_ONLY_FAKE_USER: undefined,
+    });
+    expect(off).toBeNull();
+  });
+});

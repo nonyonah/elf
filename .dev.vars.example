@@ -11,3 +11,9 @@ CLERK_AUTHORIZED_PARTIES=""
 # AES-GCM key for connection secrets (Slack webhook URLs, …). Generate with:
 #   openssl rand -base64 32
 SECRETS_KEY="replace-with-openssl-rand-base64-32"
+
+# LOCAL PREVIEW ONLY — never set in a deployed environment.
+# When CLERK_SECRET_KEY is empty, every request is treated as this user, so the
+# console UI can be reviewed without a Clerk dev instance. Pair with
+# VITE_DEV_SESSION=1 in client/.env.local and run scripts/seed-local.mjs.
+# DEV_ONLY_FAKE_USER="user_dev_preview"

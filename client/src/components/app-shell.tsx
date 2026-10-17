@@ -149,17 +149,43 @@ function Breadcrumbs({
   );
 }
 
+function DevUserBlock(): React.ReactElement {
+  return (
+    <SidebarMenu>
+      <SidebarMenuItem>
+        <SidebarMenuButton
+          className="pointer-events-none"
+          size="lg"
+          tooltip="Local preview"
+        >
+          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted font-medium text-muted-foreground text-xs">
+            DV
+          </div>
+          <div className="grid flex-1 text-left leading-tight">
+            <span className="truncate font-medium text-sm">Dev preview</span>
+            <span className="truncate text-muted-foreground text-xs">
+              Clerk bypass · local only
+            </span>
+          </div>
+        </SidebarMenuButton>
+      </SidebarMenuItem>
+    </SidebarMenu>
+  );
+}
+
 export function AppShell({
   overview,
   route,
   onRefresh,
   refreshing,
+  devMode = false,
   children,
 }: {
   overview: OverviewResponse;
   route: Route;
   onRefresh: () => void;
   refreshing: boolean;
+  devMode?: boolean;
   children: React.ReactNode;
 }): React.ReactElement {
   return (
@@ -239,7 +265,7 @@ export function AppShell({
           </SidebarGroup>
         </SidebarContent>
         <SidebarFooter>
-          <UserFooter />
+          {devMode ? <DevUserBlock /> : <UserFooter />}
         </SidebarFooter>
         <SidebarRail />
       </Sidebar>

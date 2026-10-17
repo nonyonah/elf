@@ -13,7 +13,11 @@ import { ConfigNotice, LandingScreen, SplashScreen } from "@/screens/landing";
 import { OverviewScreen } from "@/screens/overview";
 import { ProjectScreen } from "@/screens/project";
 
-function Console(): React.ReactElement {
+function Console({
+  devMode = false,
+}: {
+  devMode?: boolean;
+}): React.ReactElement {
   const api = useApi();
   const route = useRoute();
   const query = useQuery<OverviewResponse>(() => api.get("/projects"), []);
@@ -41,6 +45,7 @@ function Console(): React.ReactElement {
 
   return (
     <AppShell
+      devMode={devMode}
       onRefresh={query.reload}
       overview={query.data}
       refreshing={query.loading}
@@ -71,6 +76,16 @@ export function App(): React.ReactElement {
   return (
     <ApiProvider client={api}>
       {isSignedIn ? <Console /> : <LandingScreen />}
+    </ApiProvider>
+  );
+}
+
+/** Local preview without Clerk — pairs with the worker's DEV_ONLY_FAKE_USER. */
+export function DevApp(): React.ReactElement {
+  const api = React.useMemo(() => createApi(async () => null), []);
+  return (
+    <ApiProvider client={api}>
+      <Console devMode />
     </ApiProvider>
   );
 }

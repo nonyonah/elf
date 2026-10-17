@@ -20,7 +20,11 @@ export interface Session {
 export type SessionResolver = (request: Request, env: Env) => Promise<Session | null>;
 
 export const clerkSessionResolver: SessionResolver = async (request, env) => {
-  if (!env.CLERK_SECRET_KEY) return null;
+  if (!env.CLERK_SECRET_KEY) {
+    // Local preview: without Clerk wired, an explicitly set DEV_ONLY_FAKE_USER
+    // (in .dev.vars) signs the request in as that user. Never set in production.
+    return env.DEV_ONLY_FAKE_USER ? { userId: env.DEV_ONLY_FAKE_USER } : null;
+  }
   const authorizedParties = env.CLERK_AUTHORIZED_PARTIES?.split(",")
     .map((origin) => origin.trim())
     .filter(Boolean);

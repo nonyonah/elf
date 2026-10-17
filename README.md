@@ -55,6 +55,16 @@ With `CLERK_SECRET_KEY` empty the worker still boots and `/api/health` works; ev
 
 The client needs the publishable key too: put `VITE_CLERK_PUBLISHABLE_KEY=pk_test_…` in `.env.local` (client env, not `.dev.vars`) or it renders the “Connect Clerk” notice and every request stays signed out.
 
+### Previewing the UI without Clerk
+
+To review the console with no Clerk setup, use the local-only bypass plus the demo seeder:
+
+1. `.dev.vars`: leave `CLERK_SECRET_KEY=""` and set `DEV_ONLY_FAKE_USER="user_dev_preview"`.
+2. `client/.env.local`: `VITE_DEV_SESSION=1` (the client then skips Clerk entirely and shows a “Dev preview” footer).
+3. `npm run build && npm run dev`, then `node scripts/seed-local.mjs`.
+
+Open http://127.0.0.1:8787/ — you get one demo project (“Marketing site”) in `drift` state (2 value mismatches, 1/1 missing tokens, 4 component issues, 1 overdue deprecation) with a 3-run trend. The seeder is idempotent: re-run it anytime to reset the demo data. `DEV_ONLY_FAKE_USER` must never be set in a deployed environment, and tests pin it off (`vitest.config.ts`).
+
 ## Secrets
 
 | Name | Kind | Purpose |

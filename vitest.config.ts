@@ -11,6 +11,9 @@ export default defineConfig({
         bindings: {
           TEST_MIGRATIONS: migrations,
           SECRETS_KEY: Buffer.from("elf-console-test-secrets-key-32b").toString("base64"),
+          // Never inherit the local-preview bypass from .dev.vars: signed-out
+          // tests must stay signed out.
+          DEV_ONLY_FAKE_USER: "",
         },
       },
     }),

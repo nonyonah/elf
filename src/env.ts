@@ -12,4 +12,11 @@ export interface Env {
 
   /** Base64-encoded 32-byte AES-GCM key for connection secrets (write-only at rest). */
   SECRETS_KEY?: string;
+
+  /**
+   * Local preview only. With no CLERK_SECRET_KEY configured, this var stands
+   * in for a signed-in user (e.g. `user_dev_preview`) so the console can be
+   * exercised without a Clerk instance. Never set in production.
+   */
+  DEV_ONLY_FAKE_USER?: string;
 }
