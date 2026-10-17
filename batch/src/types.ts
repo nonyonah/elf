@@ -37,6 +37,7 @@ export interface SidecarVariant {
   gap?: unknown;
   cornerRadius?: unknown;
   fill?: unknown;
+  stroke?: unknown;
   size?: { width?: number; height?: number };
   text?: Record<string, unknown>;
   children?: unknown[];
@@ -49,6 +50,7 @@ export interface SidecarSpec {
   gap?: unknown;
   cornerRadius?: unknown;
   fill?: unknown;
+  stroke?: unknown;
   size?: { width?: number; height?: number };
   text?: Record<string, unknown>;
   children?: unknown[];

@@ -248,6 +248,7 @@ than stacking new ones.
   "gap": { "variable": "space/2" },
   "cornerRadius": { "variable": "radius/md" },
   "fill": { "variable": "color/surface/base", "color": "#ffffff" },
+  "stroke": { "color": { "variable": "color/line/inputSoft" }, "weight": 1 },
   "text": { "characters": "Continue", "fontFamily": "Inter", "fontStyle": "Regular", "fontSize": 14 }
 }
 ```

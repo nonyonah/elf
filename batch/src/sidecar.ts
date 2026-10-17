@@ -15,6 +15,7 @@ import type { ParsedComponent, SidecarSpec, SidecarVariant, Variant } from "./ty
  *     "gap": "space.2",
  *     "cornerRadius": "radius.md",
  *     "fill": "color.surface.base",
+ *     "stroke": { "color": "color.line.inputSoft", "weight": 1 },
  *     "text": { "characters": "Continue", "fontSize": "fontSize.body", "color": "color.onPrimary" },
  *     "children": [ { "type": "instance", "component": "card.tsx#Card" } ],
  *     "variants": { "size=sm, intent=primary": { "padding": { "all": "space.2" } } }
@@ -27,6 +28,7 @@ const KNOWN_FIELDS = new Set([
   "gap",
   "cornerRadius",
   "fill",
+  "stroke",
   "size",
   "text",
   "children",
@@ -135,6 +137,7 @@ function translateFields(
   if (raw.gap !== undefined) out.gap = numberOrRef(raw.gap, "gap", index, label);
   if (raw.cornerRadius !== undefined) out.cornerRadius = numberOrRef(raw.cornerRadius, "cornerRadius", index, label);
   if (raw.fill !== undefined) out.fill = translateFill(raw.fill, index, label, "fill");
+  if (raw.stroke !== undefined) out.stroke = translateStroke(raw.stroke, index, label);
   if (raw.size !== undefined) out.size = translateSize(raw.size, label);
   if (raw.text !== undefined) out.text = translateText(raw.text, index, label);
   if (raw.children !== undefined) out.children = translateChildren(raw.children, label);
@@ -205,6 +208,26 @@ function colorRef(value: string, field: string, index: TokenIndex, label: string
     throw new Error(`${label}: "${field}" needs a color token, but "${normalizeRef(value)}" is ${target.type}.`);
   }
   return target.name;
+}
+
+function translateStroke(value: unknown, index: TokenIndex, label: string): Record<string, unknown> {
+  if (typeof value === "string") {
+    return { color: { variable: colorRef(value, "stroke", index, label) } };
+  }
+  if (typeof value === "object" && value !== null && !Array.isArray(value)) {
+    const object = value as Record<string, unknown>;
+    if (object.color === undefined) throw new Error(`${label}: "stroke" needs a "color" — a {token} reference.`);
+    const out: Record<string, unknown> = { color: translateFill(object.color, index, label, "stroke.color") };
+    if (object.weight !== undefined) {
+      const weight = Number(object.weight);
+      if (!Number.isFinite(weight) || weight < 0) {
+        throw new Error(`${label}: "stroke.weight" must be a non-negative number.`);
+      }
+      out.weight = weight;
+    }
+    return out;
+  }
+  throw new Error(`${label}: "stroke" must be a color token reference (or { color, weight }).`);
 }
 
 function translateSize(value: unknown, label: string): { width: number; height: number } {

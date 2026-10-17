@@ -265,6 +265,46 @@ describe("runSync", () => {
     scratch.cleanup();
   });
 
+  test("a sidecar stroke translates to a bound paint with an optional weight", async () => {
+    const scratch = scratchFixtures();
+    const sidecarPath = join(scratch.componentsDir, "Badge.figma.json");
+    const sidecar = JSON.parse(readFileSync(sidecarPath, "utf8"));
+
+    sidecar.stroke = { color: "color.surface.base", weight: 2 };
+    writeFileSync(sidecarPath, JSON.stringify(sidecar));
+
+    const withWeight = new FakeBridge();
+    await runSync({ config: scratch.config, client: withWeight, only: "Badge", log: silent });
+    assert.deepEqual(withWeight.callsTo("upsert_component")[0]?.params.stroke, {
+      color: { variable: "color/surface/base" },
+      weight: 2,
+    });
+
+    sidecar.stroke = "color.surface.base";
+    writeFileSync(sidecarPath, JSON.stringify(sidecar));
+
+    const refOnly = new FakeBridge();
+    await runSync({ config: scratch.config, client: refOnly, only: "Badge", log: silent });
+    assert.deepEqual(refOnly.callsTo("upsert_component")[0]?.params.stroke, {
+      color: { variable: "color/surface/base" },
+    });
+    scratch.cleanup();
+  });
+
+  test("a negative stroke weight fails that component", async () => {
+    const scratch = scratchFixtures();
+    const sidecarPath = join(scratch.componentsDir, "Badge.figma.json");
+    const sidecar = JSON.parse(readFileSync(sidecarPath, "utf8"));
+    sidecar.stroke = { color: "color.surface.base", weight: -1 };
+    writeFileSync(sidecarPath, JSON.stringify(sidecar));
+
+    const bridge = new FakeBridge();
+    const result = await runSync({ config: scratch.config, client: bridge, only: "Badge", log: silent });
+    assert.deepEqual(actions(result), [["Badge", "failed"]]);
+    assert.match(result.components[0]?.error ?? "", /stroke\.weight/);
+    scratch.cleanup();
+  });
+
   test("dry-run plans everything but writes nothing and calls nothing", async () => {
     const scratch = scratchFixtures();
     const logs: string[] = [];

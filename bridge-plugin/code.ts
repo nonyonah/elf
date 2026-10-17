@@ -82,12 +82,19 @@ interface InstanceChildInput {
   component: string;
 }
 
+/** A stroke: a colour to bind/render, plus an optional width (default 1). */
+interface StrokeInput {
+  color?: FillInput;
+  weight?: number;
+}
+
 interface ComponentSpecFields {
   layoutMode?: "HORIZONTAL" | "VERTICAL" | "NONE";
   padding?: PaddingInput;
   gap?: NumberOrRef;
   cornerRadius?: NumberOrRef;
   fill?: FillInput;
+  stroke?: StrokeInput;
   size?: { width: number; height: number };
   text?: TextInput;
   children?: InstanceChildInput[];
@@ -694,6 +701,15 @@ async function applyFill(target: Fillable, fill: FillInput): Promise<{ variableI
   return prepared.variable ? { variableId: prepared.variable.id, variableName: prepared.variable.name } : null;
 }
 
+type PreparedStroke = PreparedFill & { weight: number };
+
+async function prepareStroke(stroke: StrokeInput): Promise<PreparedStroke> {
+  if (!stroke.color) throw new Error("A stroke needs `color` (hex or rgb) or a COLOR `variable`.");
+  const weight = Number(stroke.weight ?? 1);
+  if (!Number.isFinite(weight) || weight < 0) throw new Error('"stroke.weight" must be a non-negative number.');
+  return { ...(await prepareFill(stroke.color)), weight };
+}
+
 async function upsertLabel(component: ComponentNode, text: TextInput): Promise<TextNode> {
   const family = String(text.fontFamily ?? "Inter");
   const style = String(text.fontStyle ?? "Regular");
@@ -717,6 +733,15 @@ async function upsertLabel(component: ComponentNode, text: TextInput): Promise<T
   if (text.color) await applyFill(label, text.color);
 
   return label;
+}
+
+/** An empty `text.characters` means "no label" — drop any label left by an earlier run. */
+function removeLabel(component: ComponentNode): void {
+  const existing =
+    component.children.find(
+      (child) => child.type === "TEXT" && child.getSharedPluginData(NAMESPACE, ROLE_KEY) === LABEL_ROLE,
+    ) ?? component.children.find((child) => child.type === "TEXT");
+  existing?.remove();
 }
 function findComponentSet(parent: ChildrenMixin, name: string, codeKey: string): ComponentSetNode | null {
   if (codeKey) {
@@ -765,6 +790,7 @@ interface PreparedSpec {
   gap: PreparedNumber | null;
   radius: PreparedNumber | null;
   fill: PreparedFill | null;
+  stroke: PreparedStroke | null;
   size: { width: number; height: number } | null;
   text: TextInput | null;
   /** null = leave existing children alone; otherwise the slot list to sync. */
@@ -810,6 +836,7 @@ async function prepareSpec(input: ComponentSpecFields, currentLayout: string): P
   const gap = input.gap === undefined ? null : await prepareNumber(input.gap, "itemSpacing");
   const radius = input.cornerRadius === undefined ? null : await prepareNumber(input.cornerRadius, "cornerRadius");
   const fill = input.fill ? await prepareFill(input.fill) : null;
+  const stroke = input.stroke ? await prepareStroke(input.stroke) : null;
 
   if (input.text) {
     const family = String(input.text.fontFamily ?? "Inter");
@@ -828,7 +855,7 @@ async function prepareSpec(input: ComponentSpecFields, currentLayout: string): P
 
   const slots = input.children ? input.children.map((child, index) => resolveSlot(child, index)) : null;
 
-  return { layoutMode: input.layoutMode ?? null, padding, gap, radius, fill, size, text: input.text ?? null, slots };
+  return { layoutMode: input.layoutMode ?? null, padding, gap, radius, fill, stroke, size, text: input.text ?? null, slots };
 }
 
 /** Writes a prepared spec onto a component. Only called after all prep succeeded. */
@@ -841,6 +868,12 @@ async function applySpec(
   children: { id: string; type: string; codeKey: string | null }[];
 }> {
   if (prepared.layoutMode) component.layoutMode = prepared.layoutMode;
+  if (component.layoutMode !== "NONE") {
+    // Auto-layout hugs its content by default; an explicit `size` (below)
+    // pins both axes instead.
+    component.primaryAxisSizingMode = "AUTO";
+    component.counterAxisSizingMode = "AUTO";
+  }
 
   const bound: Record<string, { variableId: string; variableName: string }> = {};
   const write = (field: PaddingField | "itemSpacing" | "cornerRadius", entry: PreparedNumber): void => {
@@ -861,10 +894,22 @@ async function applySpec(
     }
   }
 
+  if (prepared.stroke) {
+    component.strokes = [prepared.stroke.paint];
+    component.strokeAlign = "INSIDE";
+    component.strokeWeight = prepared.stroke.weight;
+    if (prepared.stroke.variable) {
+      bound.strokes = { variableId: prepared.stroke.variable.id, variableName: prepared.stroke.variable.name };
+    }
+  }
+
   if (prepared.size) component.resize(prepared.size.width, prepared.size.height);
 
   let text: TextNode | null = null;
-  if (prepared.text) text = await upsertLabel(component, prepared.text);
+  if (prepared.text) {
+    if (String(prepared.text.characters ?? "") === "") removeLabel(component);
+    else text = await upsertLabel(component, prepared.text);
+  }
 
   const children = prepared.slots === null ? [] : syncSlots(component, prepared.slots);
 
@@ -945,11 +990,77 @@ function specFields(input: ComponentSpecFields): ComponentSpecFields {
     gap: input.gap,
     cornerRadius: input.cornerRadius,
     fill: input.fill,
+    stroke: input.stroke,
     size: input.size,
     text: input.text,
     children: input.children,
   };
 }
+
+/**
+ * Figma never grid-arranges a component set through the API — left alone,
+ * every variant sits at (0, 0), stacked. Lay them out deterministically:
+ * the first variant property is the row, the remaining ones the columns.
+ */
+function arrangeVariants(
+  set: ComponentSetNode,
+  variants: ComponentVariantInput[],
+  labelOf: (props: Record<string, unknown>) => string,
+): void {
+  const children = set.children.filter((child): child is ComponentNode => child.type === "COMPONENT");
+  if (children.length === 0) return;
+
+  const propKeys = Object.keys(variants[0]?.props ?? {});
+  if (propKeys.length === 0) return;
+
+  const rowValues: string[] = [];
+  for (const variant of variants) {
+    const value = String(variant?.props?.[propKeys[0]]);
+    if (!rowValues.includes(value)) rowValues.push(value);
+  }
+
+  const columnOrder: string[] = [];
+  const columnOf = (props: Record<string, unknown>): number => {
+    const key = propKeys.slice(1).map((prop) => `${prop}=${String(props[prop])}`).join("|");
+    const existing = columnOrder.indexOf(key);
+    if (existing >= 0) return existing;
+    columnOrder.push(key);
+    return columnOrder.length - 1;
+  };
+
+  const placements = children.map((child) => {
+    const props = variants.find((variant) => labelOf(variant?.props ?? {}) === child.name)?.props ?? {};
+    return { child, row: Math.max(0, rowValues.indexOf(String(props[propKeys[0]]))), col: columnOf(props) };
+  });
+
+  const columnWidths: number[] = [];
+  const rowHeights: number[] = [];
+  for (const { child, row, col } of placements) {
+    columnWidths[col] = Math.max(columnWidths[col] ?? 0, child.width);
+    rowHeights[row] = Math.max(rowHeights[row] ?? 0, child.height);
+  }
+
+  const columnX: number[] = [];
+  let x = 0;
+  for (const width of columnWidths) {
+    columnX.push(x);
+    x += width + VARIANT_GAP;
+  }
+  const rowY: number[] = [];
+  let y = 0;
+  for (const height of rowHeights) {
+    rowY.push(y);
+    y += height + VARIANT_GAP;
+  }
+
+  for (const { child, row, col } of placements) {
+    child.x = columnX[col] ?? 0;
+    child.y = rowY[row] ?? 0;
+  }
+}
+
+const VARIANT_GAP = 40;
+
 
 async function upsertComponentSet(params: Record<string, unknown>): Promise<unknown> {
   const input = params as unknown as ComponentSetInput;
@@ -1024,6 +1135,9 @@ async function upsertComponentSet(params: Record<string, unknown>): Promise<unkn
     await applySpec(component, plan.spec);
     variantPayloads.push({ id: component.id, name: component.name });
   }
+
+  // A set the designer has switched to auto layout keeps its own arrangement.
+  if (set.layoutMode === "NONE") arrangeVariants(set, variants, variantLabel);
 
   return {
     set: {
@@ -1179,6 +1293,21 @@ function numberOrMixed(value: number | PluginAPI["mixed"] | undefined): number |
   return typeof value === "number" ? value : "mixed";
 }
 
+async function paintsPayload(paints: ReadonlyArray<Paint>): Promise<Record<string, unknown>[]> {
+  return Promise.all(
+    paints.map(async (paint) => {
+      const bound = (paint as SolidPaint).boundVariables?.color;
+      const target = bound ? await figma.variables.getVariableByIdAsync(bound.id) : null;
+      return {
+        type: paint.type,
+        color: paint.type === "SOLID" ? paint.color : null,
+        opacity: paint.opacity ?? 1,
+        boundVariable: bound ? { id: bound.id, name: target?.name ?? null } : null,
+      };
+    }),
+  );
+}
+
 async function nodePayload(node: SceneNode, depth: number): Promise<Record<string, unknown>> {
   const payload: Record<string, unknown> = {
     id: node.id,
@@ -1206,19 +1335,15 @@ async function nodePayload(node: SceneNode, depth: number): Promise<Record<strin
   }
 
   if ("fills" in node && node.fills !== figma.mixed) {
-    const fills = node.fills as ReadonlyArray<Paint>;
-    payload.fills = await Promise.all(
-      fills.map(async (paint) => {
-        const bound = (paint as SolidPaint).boundVariables?.color;
-        const target = bound ? await figma.variables.getVariableByIdAsync(bound.id) : null;
-        return {
-          type: paint.type,
-          color: paint.type === "SOLID" ? paint.color : null,
-          opacity: paint.opacity ?? 1,
-          boundVariable: bound ? { id: bound.id, name: target?.name ?? null } : null,
-        };
-      }),
-    );
+    payload.fills = await paintsPayload(node.fills as ReadonlyArray<Paint>);
+  }
+
+  if ("strokes" in node) {
+    payload.strokes = await paintsPayload(node.strokes);
+    if ("strokeWeight" in node) {
+      payload.strokeWeight = numberOrMixed((node as { strokeWeight: number | PluginAPI["mixed"] }).strokeWeight);
+    }
+    if ("strokeAlign" in node) payload.strokeAlign = (node as { strokeAlign: string }).strokeAlign;
   }
 
   const boundVariables = node.boundVariables ?? {};

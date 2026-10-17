@@ -495,6 +495,14 @@ async function applyFill(target, fill) {
     target.fills = [prepared.paint];
     return prepared.variable ? { variableId: prepared.variable.id, variableName: prepared.variable.name } : null;
 }
+async function prepareStroke(stroke) {
+    if (!stroke.color)
+        throw new Error("A stroke needs `color` (hex or rgb) or a COLOR `variable`.");
+    const weight = Number(stroke.weight ?? 1);
+    if (!Number.isFinite(weight) || weight < 0)
+        throw new Error('"stroke.weight" must be a non-negative number.');
+    return { ...(await prepareFill(stroke.color)), weight };
+}
 async function upsertLabel(component, text) {
     const family = String(text.fontFamily ?? "Inter");
     const style = String(text.fontStyle ?? "Regular");
@@ -513,6 +521,11 @@ async function upsertLabel(component, text) {
     if (text.color)
         await applyFill(label, text.color);
     return label;
+}
+/** An empty `text.characters` means "no label" — drop any label left by an earlier run. */
+function removeLabel(component) {
+    const existing = component.children.find((child) => child.type === "TEXT" && child.getSharedPluginData(NAMESPACE, ROLE_KEY) === LABEL_ROLE) ?? component.children.find((child) => child.type === "TEXT");
+    existing?.remove();
 }
 function findComponentSet(parent, name, codeKey) {
     if (codeKey) {
@@ -584,6 +597,7 @@ async function prepareSpec(input, currentLayout) {
     const gap = input.gap === undefined ? null : await prepareNumber(input.gap, "itemSpacing");
     const radius = input.cornerRadius === undefined ? null : await prepareNumber(input.cornerRadius, "cornerRadius");
     const fill = input.fill ? await prepareFill(input.fill) : null;
+    const stroke = input.stroke ? await prepareStroke(input.stroke) : null;
     if (input.text) {
         const family = String(input.text.fontFamily ?? "Inter");
         // Figma refuses font writes until the font is loaded; doing it here keeps
@@ -599,12 +613,18 @@ async function prepareSpec(input, currentLayout) {
         size = { width, height };
     }
     const slots = input.children ? input.children.map((child, index) => resolveSlot(child, index)) : null;
-    return { layoutMode: input.layoutMode ?? null, padding, gap, radius, fill, size, text: input.text ?? null, slots };
+    return { layoutMode: input.layoutMode ?? null, padding, gap, radius, fill, stroke, size, text: input.text ?? null, slots };
 }
 /** Writes a prepared spec onto a component. Only called after all prep succeeded. */
 async function applySpec(component, prepared) {
     if (prepared.layoutMode)
         component.layoutMode = prepared.layoutMode;
+    if (component.layoutMode !== "NONE") {
+        // Auto-layout hugs its content by default; an explicit `size` (below)
+        // pins both axes instead.
+        component.primaryAxisSizingMode = "AUTO";
+        component.counterAxisSizingMode = "AUTO";
+    }
     const bound = {};
     const write = (field, entry) => {
         const target = component;
@@ -626,11 +646,23 @@ async function applySpec(component, prepared) {
             bound.fills = { variableId: prepared.fill.variable.id, variableName: prepared.fill.variable.name };
         }
     }
+    if (prepared.stroke) {
+        component.strokes = [prepared.stroke.paint];
+        component.strokeAlign = "INSIDE";
+        component.strokeWeight = prepared.stroke.weight;
+        if (prepared.stroke.variable) {
+            bound.strokes = { variableId: prepared.stroke.variable.id, variableName: prepared.stroke.variable.name };
+        }
+    }
     if (prepared.size)
         component.resize(prepared.size.width, prepared.size.height);
     let text = null;
-    if (prepared.text)
-        text = await upsertLabel(component, prepared.text);
+    if (prepared.text) {
+        if (String(prepared.text.characters ?? "") === "")
+            removeLabel(component);
+        else
+            text = await upsertLabel(component, prepared.text);
+    }
     const children = prepared.slots === null ? [] : syncSlots(component, prepared.slots);
     return { bound, text, children };
 }
@@ -699,11 +731,67 @@ function specFields(input) {
         gap: input.gap,
         cornerRadius: input.cornerRadius,
         fill: input.fill,
+        stroke: input.stroke,
         size: input.size,
         text: input.text,
         children: input.children,
     };
 }
+/**
+ * Figma never grid-arranges a component set through the API — left alone,
+ * every variant sits at (0, 0), stacked. Lay them out deterministically:
+ * the first variant property is the row, the remaining ones the columns.
+ */
+function arrangeVariants(set, variants, labelOf) {
+    const children = set.children.filter((child) => child.type === "COMPONENT");
+    if (children.length === 0)
+        return;
+    const propKeys = Object.keys(variants[0]?.props ?? {});
+    if (propKeys.length === 0)
+        return;
+    const rowValues = [];
+    for (const variant of variants) {
+        const value = String(variant?.props?.[propKeys[0]]);
+        if (!rowValues.includes(value))
+            rowValues.push(value);
+    }
+    const columnOrder = [];
+    const columnOf = (props) => {
+        const key = propKeys.slice(1).map((prop) => `${prop}=${String(props[prop])}`).join("|");
+        const existing = columnOrder.indexOf(key);
+        if (existing >= 0)
+            return existing;
+        columnOrder.push(key);
+        return columnOrder.length - 1;
+    };
+    const placements = children.map((child) => {
+        const props = variants.find((variant) => labelOf(variant?.props ?? {}) === child.name)?.props ?? {};
+        return { child, row: Math.max(0, rowValues.indexOf(String(props[propKeys[0]]))), col: columnOf(props) };
+    });
+    const columnWidths = [];
+    const rowHeights = [];
+    for (const { child, row, col } of placements) {
+        columnWidths[col] = Math.max(columnWidths[col] ?? 0, child.width);
+        rowHeights[row] = Math.max(rowHeights[row] ?? 0, child.height);
+    }
+    const columnX = [];
+    let x = 0;
+    for (const width of columnWidths) {
+        columnX.push(x);
+        x += width + VARIANT_GAP;
+    }
+    const rowY = [];
+    let y = 0;
+    for (const height of rowHeights) {
+        rowY.push(y);
+        y += height + VARIANT_GAP;
+    }
+    for (const { child, row, col } of placements) {
+        child.x = columnX[col] ?? 0;
+        child.y = rowY[row] ?? 0;
+    }
+}
+const VARIANT_GAP = 40;
 async function upsertComponentSet(params) {
     const input = params;
     const name = String(input.name ?? "").trim();
@@ -772,6 +860,9 @@ async function upsertComponentSet(params) {
         await applySpec(component, plan.spec);
         variantPayloads.push({ id: component.id, name: component.name });
     }
+    // A set the designer has switched to auto layout keeps its own arrangement.
+    if (set.layoutMode === "NONE")
+        arrangeVariants(set, variants, variantLabel);
     return {
         set: {
             id: set.id,
@@ -918,6 +1009,18 @@ function numberOrMixed(value) {
         return null;
     return typeof value === "number" ? value : "mixed";
 }
+async function paintsPayload(paints) {
+    return Promise.all(paints.map(async (paint) => {
+        const bound = paint.boundVariables?.color;
+        const target = bound ? await figma.variables.getVariableByIdAsync(bound.id) : null;
+        return {
+            type: paint.type,
+            color: paint.type === "SOLID" ? paint.color : null,
+            opacity: paint.opacity ?? 1,
+            boundVariable: bound ? { id: bound.id, name: target?.name ?? null } : null,
+        };
+    }));
+}
 async function nodePayload(node, depth) {
     const payload = {
         id: node.id,
@@ -942,17 +1045,15 @@ async function nodePayload(node, depth) {
         payload.cornerRadius = numberOrMixed(layout.cornerRadius);
     }
     if ("fills" in node && node.fills !== figma.mixed) {
-        const fills = node.fills;
-        payload.fills = await Promise.all(fills.map(async (paint) => {
-            const bound = paint.boundVariables?.color;
-            const target = bound ? await figma.variables.getVariableByIdAsync(bound.id) : null;
-            return {
-                type: paint.type,
-                color: paint.type === "SOLID" ? paint.color : null,
-                opacity: paint.opacity ?? 1,
-                boundVariable: bound ? { id: bound.id, name: target?.name ?? null } : null,
-            };
-        }));
+        payload.fills = await paintsPayload(node.fills);
+    }
+    if ("strokes" in node) {
+        payload.strokes = await paintsPayload(node.strokes);
+        if ("strokeWeight" in node) {
+            payload.strokeWeight = numberOrMixed(node.strokeWeight);
+        }
+        if ("strokeAlign" in node)
+            payload.strokeAlign = node.strokeAlign;
     }
     const boundVariables = node.boundVariables ?? {};
     const resolved = {};

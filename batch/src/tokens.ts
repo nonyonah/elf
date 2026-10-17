@@ -239,10 +239,17 @@ function planSemantic(node: unknown, config: BatchConfig, index: TokenIndex): Se
     }
 
     // Register the semantic token so sidecars can reference it by path.
-    // It is an alias, so it has no literal value of its own.
+    // It is an alias, so it has no literal value of its own. Under the
+    // collections strategy the same name lives in every mode collection, so
+    // component bindings target the first mode's collection explicitly — a
+    // bare name would be ambiguous when the plugin resolves it.
     const created = byMode.get(config.semanticModes[0])?.find((variable) => variable.codeKey === path);
     if (created) {
-      index.set(path, { name: created.name, codeKey: path, type: created.type, literal: null });
+      const name =
+        config.modeStrategy === "collections"
+          ? `${config.collections.semantic} ${config.semanticModes[0]}/${created.name}`
+          : created.name;
+      index.set(path, { name, codeKey: path, type: created.type, literal: null });
     }
   }
 

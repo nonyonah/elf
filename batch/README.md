@@ -95,6 +95,7 @@ reference tokens by dotted path; numbers are literals.
   "gap": "space.2",
   "cornerRadius": "radius.md",
   "fill": "color.primary.500",
+  "stroke": { "color": "color.line.inputSoft", "weight": 1 },
   "size": { "width": 120, "height": 40 },
   "text": { "characters": "Continue", "fontSize": "fontSize.body", "color": "color.onSurface.base" },
   "children": [{ "type": "instance", "component": "Icon.tsx#Icon" }],

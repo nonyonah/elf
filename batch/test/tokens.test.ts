@@ -57,6 +57,12 @@ describe("token planning", () => {
     assert.deepEqual(dark?.variables[0]?.values, { Value: { variable: "color/onSurface/base" } });
   });
 
+  test("the collections strategy scopes semantic index names to the first mode", () => {
+    const { index: split } = planTokens(FIXTURE_TOKENS, fixtureConfig({ modeStrategy: "collections" }));
+    assert.equal(split.get("semantic.color.surface")?.name, "Semantic Light/color/surface");
+    assert.equal(split.get("color.surface.base")?.name, "color/surface/base");
+  });
+
   test("text and effect styles are planned from references to literals", () => {
     assert.equal(plan.textStyles.length, 1);
     assert.deepEqual(plan.textStyles[0], {
