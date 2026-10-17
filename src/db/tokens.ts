@@ -34,6 +34,8 @@ export interface IssuedToken {
   hash: string;
   last4: string;
   kind: TokenKind;
+  /** Set by createToken: the row id the token landed under. */
+  tokenId?: string;
 }
 
 export async function issueToken(kind: TokenKind): Promise<IssuedToken> {
@@ -49,11 +51,12 @@ export async function createToken(
   label?: string,
 ): Promise<IssuedToken> {
   const issued = await issueToken(kind);
+  const tokenId = crypto.randomUUID();
   await db
     .prepare("INSERT INTO tokens (id, projectId, kind, hash, last4, label, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)")
-    .bind(crypto.randomUUID(), projectId, kind, issued.hash, issued.last4, label ?? null, new Date().toISOString())
+    .bind(tokenId, projectId, kind, issued.hash, issued.last4, label ?? null, new Date().toISOString())
     .run();
-  return issued;
+  return { ...issued, tokenId };
 }
 
 export interface ResolvedToken {

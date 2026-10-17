@@ -237,7 +237,7 @@ describe("drift runs and status", () => {
       )
       .run();
 
-    const processed = await runDueJobs(env.DB, new Date(Date.now() + 20_000));
+    const processed = await runDueJobs(env, new Date(Date.now() + 20_000));
     expect(processed).toBe(1);
 
     const run = await env.DB.prepare(
@@ -280,7 +280,7 @@ describe("drift runs and status", () => {
         ],
       }),
     );
-    await runDueJobs(env.DB, new Date(Date.now() + 20_000));
+    await runDueJobs(env, new Date(Date.now() + 20_000));
 
     const okStatus = await v1("/projects/me/status", { token: project.pushToken });
     const okBody = (await okStatus.json()) as { state: string; counts: Record<string, number> };
@@ -318,7 +318,7 @@ describe("drift runs and status", () => {
       .first<{ fileName: string }>();
     expect(source?.fileName).toBe("Design System");
 
-    await runDueJobs(env.DB, new Date(Date.now() + 20_000));
+    await runDueJobs(env, new Date(Date.now() + 20_000));
     const run = await env.DB.prepare(
       "SELECT state, counts FROM drift_runs WHERE projectId = ? ORDER BY createdAt DESC LIMIT 1",
     )
@@ -375,7 +375,7 @@ describe("tenant isolation", () => {
     const bob = await seedProject();
 
     await ingestCode(alice);
-    await runDueJobs(env.DB, new Date(Date.now() + 20_000));
+    await runDueJobs(env, new Date(Date.now() + 20_000));
 
     const bobStatus = await v1("/projects/me/status", { token: bob.pushToken });
     const bobBody = (await bobStatus.json()) as { state: string; counts: Record<string, number> };

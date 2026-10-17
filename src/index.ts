@@ -5,6 +5,7 @@ import { dashboard } from "./dashboard.js";
 import { ensureWorkspace } from "./db/workspaces.js";
 import type { Env } from "./env.js";
 import { runDueJobs } from "./jobs.js";
+import { POLL_CRON, pollFigmaSources } from "./poll.js";
 
 /**
  * elf-console Worker. Serves the API under /api/* (routed here first via
@@ -49,8 +50,13 @@ const app = createApp();
 
 export default {
   fetch: app.fetch,
-  /** Once-a-minute sweep of the jobs table (drift jobs are usually kicked earlier by ingest). */
-  async scheduled(_controller: ScheduledController, env: Env): Promise<void> {
-    await runDueJobs(env.DB);
+  /**
+   * Minute cron sweeps the jobs table (drift jobs are usually kicked earlier
+   * by ingest); the 15-minute cron first polls Figma file versions so the UI
+   * can ask for a fresh snapshot when the file moved on.
+   */
+  async scheduled(controller: ScheduledController, env: Env): Promise<void> {
+    if (controller.cron === POLL_CRON) await pollFigmaSources(env);
+    await runDueJobs(env);
   },
 } satisfies ExportedHandler<Env>;

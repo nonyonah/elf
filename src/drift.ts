@@ -21,6 +21,7 @@ import {
   applyDeprecations,
   buildStatusPayload,
   diffTokens,
+  driftFingerprint,
   hasDrift,
   type Deprecation,
   type DriftResult,
@@ -161,6 +162,21 @@ export async function computeDriftDetails(db: D1Database, projectId: string): Pr
 }
 
 /**
+ * What a drift run hands to its caller: the recorded run plus everything the
+ * notify planner needs to build a message without recomputing anything.
+ */
+export interface DriftOutcome {
+  state: ProjectStatus["state"];
+  counts: DriftCounts;
+  /** Null when there was no code snapshot — nothing to compare. */
+  result: DriftResult | null;
+  fingerprint: string | null;
+  code: CodeSnapshotPayload | null;
+  runId: string;
+  createdAt: string;
+}
+
+/**
  * Recompute one project's drift and record the run. Never throws for
  * data-level problems — a failed run is recorded as `unknown` so the status
  * endpoint can say so honestly.
@@ -170,25 +186,30 @@ export async function runDrift(
   projectId: string,
   triggeredBy: string,
   now: Date = new Date(),
-): Promise<{ state: ProjectStatus["state"]; counts: DriftCounts }> {
+): Promise<DriftOutcome> {
   const createdAt = now.toISOString();
   try {
     const details = await computeDriftDetails(db, projectId);
     if (!details.result) {
       const counts = zeroCounts();
-      await recordRun(db, projectId, "unknown", counts, triggeredBy, "Waiting for the first code snapshot.", createdAt);
-      return { state: "unknown", counts };
+      const runId = await recordRun(
+        db, projectId, "unknown", counts, triggeredBy, "Waiting for the first code snapshot.", createdAt, null, null,
+      );
+      return { state: "unknown", counts, result: null, fingerprint: null, code: null, runId, createdAt };
     }
 
     const counts = countsFrom(details.result);
     const state: ProjectStatus["state"] = details.result.driftFound ? "drift" : "ok";
-    await recordRun(db, projectId, state, counts, triggeredBy, null, createdAt);
-    return { state, counts };
+    const fingerprint = driftFingerprint(details.result);
+    const runId = await recordRun(
+      db, projectId, state, counts, triggeredBy, null, createdAt, fingerprint, details.result.driftFound,
+    );
+    return { state, counts, result: details.result, fingerprint, code: details.code, runId, createdAt };
   } catch (error) {
     const counts = zeroCounts();
     const message = error instanceof Error ? error.message : String(error);
-    await recordRun(db, projectId, "unknown", counts, triggeredBy, message.slice(0, 500), createdAt);
-    return { state: "unknown", counts };
+    const runId = await recordRun(db, projectId, "unknown", counts, triggeredBy, message.slice(0, 500), createdAt, null, null);
+    return { state: "unknown", counts, result: null, fingerprint: null, code: null, runId, createdAt };
   }
 }
 
@@ -276,13 +297,28 @@ async function recordRun(
   triggeredBy: string,
   error: string | null,
   createdAt: string,
-): Promise<void> {
+  fingerprint: string | null,
+  driftFound: boolean | null,
+): Promise<string> {
+  const runId = crypto.randomUUID();
   await db
     .prepare(
-      "INSERT INTO drift_runs (id, projectId, state, counts, triggeredBy, error, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)",
+      `INSERT INTO drift_runs (id, projectId, state, counts, triggeredBy, error, createdAt, fingerprint, driftFound)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
-    .bind(crypto.randomUUID(), projectId, state, JSON.stringify(counts), triggeredBy, error, createdAt)
+    .bind(
+      runId,
+      projectId,
+      state,
+      JSON.stringify(counts),
+      triggeredBy,
+      error,
+      createdAt,
+      fingerprint,
+      driftFound === null ? null : driftFound ? 1 : 0,
+    )
     .run();
+  return runId;
 }
 
 /** What `GET /projects/me/status` reports: the latest run, aged for staleness. */
@@ -305,7 +341,24 @@ export async function readStatus(
       .prepare("SELECT receivedAt FROM snapshots WHERE projectId = ? ORDER BY receivedAt DESC LIMIT 1")
       .bind(projectId)
       .first<{ receivedAt: string }>();
-    if (newest && nowMs - Date.parse(newest.receivedAt) > STALE_AFTER_MS) state = "stale";
+    if (newest && nowMs - Date.parse(newest.receivedAt) > STALE_AFTER_MS) {
+      state = "stale";
+    } else {
+      // The 15-minute poll saw the Figma file move on since the last Figma
+      // snapshot — the data is out of date even though it isn't old yet.
+      const dirty = await db
+        .prepare(
+          `SELECT fs.figmaDirtyAt AS figmaDirtyAt,
+                  (SELECT receivedAt FROM snapshots WHERE projectId = fs.projectId AND kind = 'figma'
+                   ORDER BY receivedAt DESC, rowid DESC LIMIT 1) AS newestFigma
+           FROM figma_sources fs WHERE fs.projectId = ?`,
+        )
+        .bind(projectId)
+        .first<{ figmaDirtyAt: string | null; newestFigma: string | null }>();
+      if (dirty?.figmaDirtyAt && (!dirty.newestFigma || dirty.figmaDirtyAt > dirty.newestFigma)) {
+        state = "stale";
+      }
+    }
   }
 
   let counts = zeroCounts();

@@ -107,10 +107,13 @@ async function storeSnapshot(c: Context<ApiEnv>, options: StoreOptions): Promise
     .run();
 
   if (options.kind === "figma") {
+    // A fresh Figma snapshot clears the poll's dirty marker — the file content
+    // landed, whatever the version numbers say.
     await db
       .prepare(
         `INSERT INTO figma_sources (projectId, fileKey, fileName) VALUES (?, ?, ?)
-         ON CONFLICT(projectId) DO UPDATE SET fileKey = excluded.fileKey, fileName = excluded.fileName`,
+         ON CONFLICT(projectId) DO UPDATE SET fileKey = excluded.fileKey, fileName = excluded.fileName,
+           figmaDirtyAt = NULL`,
       )
       .bind(projectId, options.fileKey ?? "", options.fileName ?? null)
       .run();
@@ -125,7 +128,7 @@ async function storeSnapshot(c: Context<ApiEnv>, options: StoreOptions): Promise
 
   await enqueueDriftJob(db, projectId);
   try {
-    c.executionCtx.waitUntil(kickDeferredJobs(db));
+    c.executionCtx.waitUntil(kickDeferredJobs(c.env));
   } catch {
     // Unit tests and plain `app.request` have no executionCtx — the cron is the backstop.
   }

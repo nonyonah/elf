@@ -139,7 +139,7 @@ describe("dashboard API", () => {
         ],
       }),
     );
-    await runDueJobs(env.DB, new Date(Date.now() + 20_000));
+    await runDueJobs(env, new Date(Date.now() + 20_000));
 
     const list = await api("/projects", { user });
     const listed = ((await list.json()) as unknown as DashboardListBody).projects.find(

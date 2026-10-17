@@ -3,9 +3,11 @@ import {
   Box,
   ChevronRight,
   ChevronsUpDown,
+  History,
   LayoutDashboard,
   LogOut,
   RefreshCw,
+  Settings,
 } from "lucide-react";
 import type * as React from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -111,6 +113,12 @@ function Breadcrumbs({
 }): React.ReactElement {
   if (route.name === "overview") {
     return <span className="font-medium text-sm">Overview</span>;
+  }
+  if (route.name === "activity") {
+    return <span className="font-medium text-sm">Activity</span>;
+  }
+  if (route.name === "settings") {
+    return <span className="font-medium text-sm">Settings</span>;
   }
   const project =
     overview.projects.find((entry) => entry.id === route.projectId) ?? null;
@@ -260,6 +268,33 @@ export function AppShell({
                     </SidebarMenuItem>
                   );
                 })}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+          <SidebarGroup>
+            <SidebarGroupLabel>Workspace</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    isActive={route.name === "activity"}
+                    render={<a href={hrefFor({ name: "activity" })} />}
+                    tooltip="Activity"
+                  >
+                    <History />
+                    <span>Activity</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    isActive={route.name === "settings"}
+                    render={<a href={hrefFor({ name: "settings" })} />}
+                    tooltip="Settings"
+                  >
+                    <Settings />
+                    <span>Settings</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>

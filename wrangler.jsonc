@@ -18,9 +18,11 @@
       "migrations_dir": "migrations"
     }
   ],
-  "vars": {},
+  "vars": {
+    "CONSOLE_ORIGIN": "https://console.elf.dev"
+  },
   "triggers": {
-    "crons": ["* * * * *"]
+    "crons": ["* * * * *", "*/15 * * * *"]
   },
   "observability": {
     "enabled": true

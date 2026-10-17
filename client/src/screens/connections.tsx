@@ -1,6 +1,7 @@
-import { Plug } from "lucide-react";
+import { CircleAlert, Plug, Send } from "lucide-react";
 import * as React from "react";
 import { Panel } from "@/components/panel";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -15,20 +16,35 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectItem,
+  SelectPopup,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
+import { Switch } from "@/components/ui/switch";
 import { toastManager } from "@/components/ui/toast";
+import { ApiError } from "@/lib/api";
 import { useApi } from "@/lib/api-context";
-import { formatRelative } from "@/lib/format";
-import type { ConnectionType, ConnectionView } from "@/lib/types";
+import { errorMessage, formatRelative } from "@/lib/format";
+import type {
+  ConnectionType,
+  ConnectionView,
+  NotificationMode,
+  NotificationRules,
+} from "@/lib/types";
 import { useQuery } from "@/lib/use-query";
 
 const STATUS_META: Record<
   ConnectionView["status"],
-  { label: string; variant: "success" | "info" | "secondary" }
+  { label: string; variant: "success" | "info" | "secondary" | "error" }
 > = {
   configured: { label: "Configured", variant: "success" },
   bound: { label: "Bound", variant: "info" },
   unconfigured: { label: "Not connected", variant: "secondary" },
+  error: { label: "Error", variant: "error" },
 };
 
 function StatusBadge({
@@ -63,7 +79,7 @@ function useSaveConnection(
         description:
           type === "figma"
             ? "Figma binding saved."
-            : "Slack webhook saved — notifications arrive once polling ships.",
+            : "Slack webhook saved — send a test to verify it.",
         title: "Connection saved",
         type: "success",
       });
@@ -258,6 +274,117 @@ function FigmaPanel({
   );
 }
 
+function slackFailureDetail(cause: unknown): string | null {
+  if (cause instanceof ApiError && cause.details && typeof cause.details === "object") {
+    const detail = (cause.details as Record<string, unknown>).detail;
+    if (typeof detail === "string" && detail) return detail;
+  }
+  return null;
+}
+
+function NotificationRulesSection({
+  projectId,
+}: {
+  projectId: string;
+}): React.ReactElement {
+  const api = useApi();
+  const query = useQuery<{ rules: NotificationRules }>(
+    () => api.get(`/projects/${projectId}/notification-rules`),
+    [projectId],
+  );
+  const [saving, setSaving] = React.useState(false);
+
+  async function save(payload: Partial<NotificationRules>): Promise<void> {
+    if (saving) return;
+    setSaving(true);
+    try {
+      await api.put(`/projects/${projectId}/notification-rules`, payload);
+      toastManager.add({
+        description: "Future digests follow the new rules.",
+        title: "Notification rules saved",
+        type: "success",
+      });
+      query.reload();
+    } catch (cause) {
+      toastManager.add({
+        description: errorMessage(cause),
+        title: "Could not save the rules",
+        type: "error",
+      });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const rules = query.data?.rules ?? null;
+
+  return (
+    <div className="flex flex-col gap-4 border-t pt-5">
+      <div>
+        <div className="font-heading font-medium text-sm">Notifications</div>
+        <div className="mt-0.5 text-muted-foreground text-xs">
+          When the notify job posts drift digests to this webhook.
+        </div>
+      </div>
+      {rules === null ? (
+        query.error ? (
+          <div className="flex items-center gap-3 text-sm">
+            <span className="text-muted-foreground">{query.error}</span>
+            <Button onClick={query.reload} size="sm" variant="outline">
+              Retry
+            </Button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2 text-muted-foreground text-sm">
+            <Spinner className="size-4" />
+            Loading rules…
+          </div>
+        )
+      ) : (
+        <>
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-sm">Send a digest</div>
+              <div className="text-muted-foreground text-xs">
+                “Only on changes” stays quiet while everything is in sync.
+              </div>
+            </div>
+            <Select
+              disabled={saving}
+              onValueChange={(value) =>
+                void save({ mode: value as NotificationMode })
+              }
+              value={rules.mode}
+            >
+              <SelectTrigger className="w-44">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectPopup>
+                <SelectItem value="change">Only on changes</SelectItem>
+                <SelectItem value="always">Whenever checked</SelectItem>
+                <SelectItem value="never">Never</SelectItem>
+              </SelectPopup>
+            </Select>
+          </div>
+          <label className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-sm">Overdue deprecations bypass “never”</div>
+              <div className="text-muted-foreground text-xs">
+                A passed deadline always pings, even when digests are off.
+              </div>
+            </div>
+            <Switch
+              checked={rules.overdueAlways}
+              disabled={saving}
+              onCheckedChange={(checked) => void save({ overdueAlways: checked })}
+            />
+          </label>
+        </>
+      )}
+    </div>
+  );
+}
+
 function SlackPanel({
   projectId,
   connection,
@@ -267,64 +394,110 @@ function SlackPanel({
   connection: ConnectionView;
   onSaved: () => void;
 }): React.ReactElement {
+  const api = useApi();
   const [secret, setSecret] = React.useState("");
+  const [testing, setTesting] = React.useState(false);
   const { save, saving } = useSaveConnection(projectId, "slack", () => {
     setSecret("");
     onSaved();
   });
 
+  async function test(): Promise<void> {
+    if (testing) return;
+    setTesting(true);
+    try {
+      await api.post(`/projects/${projectId}/connections/slack/test`);
+      toastManager.add({
+        description: "Check the channel — the message should be there.",
+        title: "Test message sent",
+        type: "success",
+      });
+      onSaved();
+    } catch (cause) {
+      toastManager.add({
+        description: slackFailureDetail(cause) ?? errorMessage(cause),
+        title: "Slack refused the test message",
+        type: "error",
+      });
+      onSaved();
+    } finally {
+      setTesting(false);
+    }
+  }
+
   return (
     <Panel
       action={<StatusBadge status={connection.status} />}
-      description="Where drift digests will land. Notifications ship with the polling step — saving the webhook now is safe."
+      description="Where drift digests land — verify the webhook, then tune when it fires."
       title="Slack"
     >
-      <form
-        className="flex flex-col gap-5"
-        onSubmit={(event) => {
-          event.preventDefault();
-          if (!secret.trim()) return;
-          void save({ secret: secret.trim() });
-        }}
-      >
-        <Field>
-          <FieldLabel>Webhook URL</FieldLabel>
-          <Input
-            autoComplete="off"
-            onChange={(event) => setSecret(event.target.value)}
-            placeholder={
-              connection.secretTail
-                ? `Stored ${connection.secretTail} — paste to replace`
-                : "https://hooks.slack.com/services/…"
-            }
-            type="password"
-            value={secret}
-          />
-          <FieldDescription>
-            Write-only: sealed with AES-GCM, never returned by the API.
-          </FieldDescription>
-        </Field>
-        <div className="flex items-center justify-between gap-3">
-          <span className="text-muted-foreground text-xs">
-            {connection.updatedAt
-              ? `Updated ${formatRelative(connection.updatedAt)}`
-              : "No webhook stored yet"}
-          </span>
-          <div className="flex items-center gap-2">
-            {connection.status !== "unconfigured" ? (
-              <DisconnectButton
-                label="Disconnect"
-                onCleared={onSaved}
-                projectId={projectId}
-                type="slack"
-              />
-            ) : null}
-            <Button disabled={!secret.trim() || saving} type="submit">
-              {saving ? "Saving…" : "Save webhook"}
-            </Button>
+      <div className="flex flex-col gap-5">
+        {connection.status === "error" && connection.statusMessage ? (
+          <Alert variant="error">
+            <CircleAlert />
+            <AlertTitle>The last Slack delivery failed</AlertTitle>
+            <AlertDescription>{connection.statusMessage}</AlertDescription>
+          </Alert>
+        ) : null}
+        <form
+          className="flex flex-col gap-5"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (!secret.trim()) return;
+            void save({ secret: secret.trim() });
+          }}
+        >
+          <Field>
+            <FieldLabel>Webhook URL</FieldLabel>
+            <Input
+              autoComplete="off"
+              onChange={(event) => setSecret(event.target.value)}
+              placeholder={
+                connection.secretTail
+                  ? `Stored ${connection.secretTail} — paste to replace`
+                  : "https://hooks.slack.com/services/…"
+              }
+              type="password"
+              value={secret}
+            />
+            <FieldDescription>
+              Write-only: sealed with AES-GCM, never returned by the API.
+            </FieldDescription>
+          </Field>
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-muted-foreground text-xs">
+              {connection.updatedAt
+                ? `Updated ${formatRelative(connection.updatedAt)}`
+                : "No webhook stored yet"}
+            </span>
+            <div className="flex items-center gap-2">
+              {connection.status !== "unconfigured" ? (
+                <DisconnectButton
+                  label="Disconnect"
+                  onCleared={onSaved}
+                  projectId={projectId}
+                  type="slack"
+                />
+              ) : null}
+              {connection.status !== "unconfigured" ? (
+                <Button
+                  disabled={testing}
+                  onClick={() => void test()}
+                  type="button"
+                  variant="outline"
+                >
+                  <Send />
+                  {testing ? "Sending…" : "Send test"}
+                </Button>
+              ) : null}
+              <Button disabled={!secret.trim() || saving} type="submit">
+                {saving ? "Saving…" : "Save webhook"}
+              </Button>
+            </div>
           </div>
-        </div>
-      </form>
+        </form>
+        <NotificationRulesSection projectId={projectId} />
+      </div>
     </Panel>
   );
 }

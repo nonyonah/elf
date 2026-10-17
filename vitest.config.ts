@@ -14,6 +14,7 @@ export default defineConfig({
           // Never inherit the local-preview bypass from .dev.vars: signed-out
           // tests must stay signed out.
           DEV_ONLY_FAKE_USER: "",
+          CONSOLE_ORIGIN: "https://console.test",
         },
       },
     }),

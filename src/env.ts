@@ -14,6 +14,12 @@ export interface Env {
   SECRETS_KEY?: string;
 
   /**
+   * Public origin of the console (e.g. https://console.elf.dev). Slack
+   * messages link back here; when unset, links are simply omitted.
+   */
+  CONSOLE_ORIGIN?: string;
+
+  /**
    * Local preview only. With no CLERK_SECRET_KEY configured, this var stands
    * in for a signed-in user (e.g. `user_dev_preview`) so the console can be
    * exercised without a Clerk instance. Never set in production.

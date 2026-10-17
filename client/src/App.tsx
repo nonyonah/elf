@@ -10,8 +10,10 @@ import { useRoute } from "@/lib/router";
 import type { OverviewResponse } from "@/lib/types";
 import { useQuery } from "@/lib/use-query";
 import { ConfigNotice, LandingScreen, SplashScreen } from "@/screens/landing";
+import { ActivityScreen } from "@/screens/activity";
 import { OverviewScreen } from "@/screens/overview";
 import { ProjectScreen } from "@/screens/project";
+import { SettingsScreen } from "@/screens/settings";
 
 function Console({
   devMode = false,
@@ -56,6 +58,10 @@ function Console({
           overview={query.data}
           reloadOverview={query.reload}
         />
+      ) : route.name === "activity" ? (
+        <ActivityScreen />
+      ) : route.name === "settings" ? (
+        <SettingsScreen overview={query.data} />
       ) : (
         <ProjectScreen
           key={route.projectId}

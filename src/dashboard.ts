@@ -15,8 +15,16 @@ import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { getSession, workspaceNameFor, type AppEnv } from "./auth.js";
 import { logAudit } from "./audit.js";
-import { importSecretsKey, sealSecret } from "./db/crypto.js";
+import { importSecretsKey, openSecret, sealSecret } from "./db/crypto.js";
+import { createToken, type TokenKind } from "./db/tokens.js";
 import { ensureWorkspace, findWorkspaceForUser, type Workspace } from "./db/workspaces.js";
+import {
+  buildSlackTestMessage,
+  postSlackMessage,
+  readNotificationRules,
+  writeNotificationRules,
+  type NotificationMode,
+} from "./notify.js";
 import {
   computeDriftDetails,
   countsFrom,
@@ -57,12 +65,14 @@ interface ConnectionSecretRow {
   iv: string | null;
   meta: string | null;
   status: string;
+  statusMessage: string | null;
   updatedAt: string;
 }
 
 interface ConnectionView {
   type: ConnectionType;
-  status: "unconfigured" | "bound" | "configured";
+  status: "unconfigured" | "bound" | "configured" | "error";
+  statusMessage: string | null;
   secretTail: string | null;
   fileKey: string | null;
   fileName: string | null;
@@ -240,7 +250,7 @@ async function readConnection(
 ): Promise<ConnectionSecretRow | null> {
   return db
     .prepare(
-      "SELECT type, encryptedSecret, iv, meta, status, updatedAt FROM connections WHERE projectId = ? AND type = ?",
+      "SELECT type, encryptedSecret, iv, meta, status, statusMessage, updatedAt FROM connections WHERE projectId = ? AND type = ?",
     )
     .bind(projectId, type)
     .first<ConnectionSecretRow>();
@@ -258,13 +268,14 @@ async function upsertConnection(
   const now = new Date().toISOString();
   await db
     .prepare(
-      `INSERT INTO connections (id, projectId, type, encryptedSecret, iv, meta, status, createdAt, updatedAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO connections (id, projectId, type, encryptedSecret, iv, meta, status, statusMessage, createdAt, updatedAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)
        ON CONFLICT(projectId, type) DO UPDATE SET
          encryptedSecret = excluded.encryptedSecret,
          iv = excluded.iv,
          meta = excluded.meta,
          status = excluded.status,
+         statusMessage = NULL,
          updatedAt = excluded.updatedAt`,
     )
     .bind(
@@ -292,10 +303,16 @@ async function connectionViews(db: D1Database, projectId: string): Promise<Conne
   const figmaMeta = parseMeta(figma?.meta ?? null);
   const slackMeta = parseMeta(slack?.meta ?? null);
 
+  const statusOf = (row: ConnectionSecretRow | null, bound: boolean): ConnectionView["status"] => {
+    if (row?.encryptedSecret) return row.status === "error" ? "error" : "configured";
+    return bound ? "bound" : "unconfigured";
+  };
+
   return [
     {
       type: "figma",
-      status: figma?.encryptedSecret ? "configured" : source ? "bound" : "unconfigured",
+      status: statusOf(figma, source !== null),
+      statusMessage: figma?.statusMessage ?? null,
       secretTail: typeof figmaMeta.last4 === "string" ? `…${figmaMeta.last4}` : null,
       fileKey: source?.fileKey ?? null,
       fileName: source?.fileName ?? null,
@@ -303,7 +320,8 @@ async function connectionViews(db: D1Database, projectId: string): Promise<Conne
     },
     {
       type: "slack",
-      status: slack?.encryptedSecret ? "configured" : "unconfigured",
+      status: statusOf(slack, false),
+      statusMessage: slack?.statusMessage ?? null,
       secretTail: typeof slackMeta.last4 === "string" ? `…${slackMeta.last4}` : null,
       fileKey: null,
       fileName: null,
@@ -750,6 +768,224 @@ export function dashboard(): Hono<AppEnv> {
 
     const views = await connectionViews(db, project.id);
     return c.json({ connection: views.find((view) => view.type === type) });
+  });
+
+  d.post("/projects/:id/connections/slack/test", async (c) => {
+    const db = c.env.DB;
+    const workspace = await workspaceFor(c);
+    const project = await findProject(db, workspace.id, c.req.param("id"));
+    if (!project) return fail(c, 404, "not_found", "No such project.");
+
+    const conn = await readConnection(db, project.id, "slack");
+    if (!conn?.encryptedSecret || !conn.iv) {
+      return fail(c, 400, "not_configured", "Connect Slack before sending a test message.");
+    }
+    if (!c.env.SECRETS_KEY) {
+      return fail(c, 500, "server_error", "SECRETS_KEY is not configured on the server.");
+    }
+
+    let webhookUrl: string;
+    try {
+      const key = await importSecretsKey(c.env.SECRETS_KEY);
+      webhookUrl = await openSecret({ ciphertext: conn.encryptedSecret, iv: conn.iv }, key);
+    } catch {
+      return fail(c, 500, "server_error", "The stored webhook can't be decrypted — replace it in Connections.");
+    }
+
+    const origin = c.env.CONSOLE_ORIGIN;
+    const message = buildSlackTestMessage(project.name, origin ? `${origin}/#/p/${project.id}` : undefined);
+    const now = new Date().toISOString();
+    try {
+      await postSlackMessage(webhookUrl, message);
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      await db
+        .prepare("UPDATE connections SET status = 'error', statusMessage = ?, updatedAt = ? WHERE projectId = ? AND type = 'slack'")
+        .bind(reason.slice(0, 200), now, project.id)
+        .run();
+      return fail(c, 502, "slack_error", "Slack refused the test message.", { detail: reason.slice(0, 200) });
+    }
+
+    await db
+      .prepare("UPDATE connections SET status = 'configured', statusMessage = NULL, updatedAt = ? WHERE projectId = ? AND type = 'slack'")
+      .bind(now, project.id)
+      .run();
+    await logAudit(db, workspace.id, getSession(c).userId, "slack.test", { projectId: project.id });
+    return c.json({ ok: true });
+  });
+
+  d.get("/projects/:id/notification-rules", async (c) => {
+    const workspace = await workspaceFor(c);
+    const project = await findProject(c.env.DB, workspace.id, c.req.param("id"));
+    if (!project) return fail(c, 404, "not_found", "No such project.");
+    return c.json({ rules: await readNotificationRules(c.env.DB, project.id) });
+  });
+
+  d.put("/projects/:id/notification-rules", async (c) => {
+    const db = c.env.DB;
+    const workspace = await workspaceFor(c);
+    const project = await findProject(db, workspace.id, c.req.param("id"));
+    if (!project) return fail(c, 404, "not_found", "No such project.");
+    const body = await readBody(c);
+    if (!body.ok) return body.response;
+
+    const current = await readNotificationRules(db, project.id);
+    let mode = current.mode;
+    if ("mode" in body.value) {
+      const value = body.value.mode;
+      if (value !== "change" && value !== "always" && value !== "never") {
+        return fail(c, 400, "invalid_payload", "`mode` must be `change`, `always` or `never`.");
+      }
+      mode = value as NotificationMode;
+    }
+    let overdueAlways = current.overdueAlways;
+    if ("overdueAlways" in body.value) {
+      if (typeof body.value.overdueAlways !== "boolean") {
+        return fail(c, 400, "invalid_payload", "`overdueAlways` must be a boolean.");
+      }
+      overdueAlways = body.value.overdueAlways;
+    }
+    if (!("mode" in body.value) && !("overdueAlways" in body.value)) {
+      return fail(c, 400, "invalid_payload", "Provide `mode` and/or `overdueAlways`.");
+    }
+
+    await writeNotificationRules(db, project.id, { mode, overdueAlways });
+    await logAudit(db, workspace.id, getSession(c).userId, "notifications.update", { projectId: project.id, mode, overdueAlways });
+    return c.json({ rules: await readNotificationRules(db, project.id) });
+  });
+
+  d.get("/projects/:id/tokens", async (c) => {
+    const workspace = await workspaceFor(c);
+    const project = await findProject(c.env.DB, workspace.id, c.req.param("id"));
+    if (!project) return fail(c, 404, "not_found", "No such project.");
+    const rows = await c.env.DB.prepare(
+      "SELECT id, kind, label, last4, createdAt, lastUsedAt, revokedAt FROM tokens WHERE projectId = ? ORDER BY createdAt DESC",
+    )
+      .bind(project.id)
+      .all<{ id: string; kind: TokenKind; label: string | null; last4: string; createdAt: string; lastUsedAt: string | null; revokedAt: string | null }>();
+    return c.json({ tokens: rows.results });
+  });
+
+  d.post("/projects/:id/tokens", async (c) => {
+    const db = c.env.DB;
+    const workspace = await workspaceFor(c);
+    const project = await findProject(db, workspace.id, c.req.param("id"));
+    if (!project) return fail(c, 404, "not_found", "No such project.");
+    const body = await readBody(c);
+    if (!body.ok) return body.response;
+
+    const kind = body.value.kind;
+    if (kind !== "push" && kind !== "plugin") {
+      return fail(c, 400, "invalid_payload", "`kind` must be `push` or `plugin`.");
+    }
+    let label: string | null = null;
+    if ("label" in body.value) {
+      const value = readOptionalText(body.value.label, 60);
+      if (value === false) return fail(c, 400, "invalid_payload", "`label` must be at most 60 characters.");
+      label = value;
+    }
+
+    const issued = await createToken(db, project.id, kind, label ?? undefined);
+    await logAudit(db, workspace.id, getSession(c).userId, "token.issue", {
+      projectId: project.id,
+      tokenId: issued.tokenId,
+      kind,
+      last4: issued.last4,
+    });
+    return c.json(
+      {
+        /** Shown exactly once — only the hash and last4 are stored. */
+        token: issued.token,
+        tokenInfo: {
+          id: issued.tokenId,
+          kind: issued.kind,
+          label,
+          last4: issued.last4,
+          createdAt: new Date().toISOString(),
+          lastUsedAt: null,
+          revokedAt: null,
+        },
+      },
+      201,
+    );
+  });
+
+  d.post("/projects/:id/tokens/:tokenId/revoke", async (c) => {
+    const db = c.env.DB;
+    const workspace = await workspaceFor(c);
+    const project = await findProject(db, workspace.id, c.req.param("id"));
+    if (!project) return fail(c, 404, "not_found", "No such project.");
+    const tokenId = c.req.param("tokenId");
+    const result = await db
+      .prepare("UPDATE tokens SET revokedAt = ? WHERE id = ? AND projectId = ? AND revokedAt IS NULL")
+      .bind(new Date().toISOString(), tokenId, project.id)
+      .run();
+    if (result.meta.changes === 0) return fail(c, 404, "not_found", "No such active token.");
+    await logAudit(db, workspace.id, getSession(c).userId, "token.revoke", { projectId: project.id, tokenId });
+    return c.json({ ok: true });
+  });
+
+  d.get("/workspace", async (c) => {
+    const workspace = await workspaceFor(c);
+    const members = await c.env.DB.prepare(
+      "SELECT userId, role, createdAt FROM members WHERE workspaceId = ? ORDER BY createdAt",
+    )
+      .bind(workspace.id)
+      .all<{ userId: string; role: string; createdAt: string }>();
+    return c.json({ workspace, members: members.results });
+  });
+
+  d.get("/activity", async (c) => {
+    const workspace = await workspaceFor(c);
+    const limitRaw = Number(c.req.query("limit") ?? "50");
+    const limit = Number.isFinite(limitRaw) ? Math.min(Math.max(Math.trunc(limitRaw), 1), 100) : 50;
+    const before = c.req.query("before") ?? null;
+    if (before !== null && Number.isNaN(Date.parse(before))) {
+      return fail(c, 400, "invalid_payload", "`before` must be an ISO timestamp.");
+    }
+
+    const rows = await c.env.DB.prepare(
+      `SELECT id, actor, action, detail, createdAt FROM audit_log
+       WHERE workspaceId = ?${before ? " AND createdAt < ?" : ""}
+       ORDER BY createdAt DESC, rowid DESC LIMIT ?`,
+    )
+      .bind(...(before ? [workspace.id, before, limit + 1] : [workspace.id, limit + 1]))
+      .all<{ id: string; actor: string; action: string; detail: string | null; createdAt: string }>();
+
+    const hasMore = rows.results.length > limit;
+    const page = rows.results.slice(0, limit);
+
+    const projectIds = new Set<string>();
+    for (const row of page) {
+      const detail = parseMeta(row.detail);
+      if (typeof detail.projectId === "string") projectIds.add(detail.projectId);
+    }
+    const projectNames = new Map<string, string>();
+    if (projectIds.size > 0) {
+      const placeholders = [...projectIds].map(() => "?").join(", ");
+      const projects = await c.env.DB.prepare(
+        `SELECT id, name FROM projects WHERE workspaceId = ? AND id IN (${placeholders})`,
+      )
+        .bind(workspace.id, ...projectIds)
+        .all<{ id: string; name: string }>();
+      for (const project of projects.results) projectNames.set(project.id, project.name);
+    }
+
+    return c.json({
+      entries: page.map((row) => {
+        const detail = parseMeta(row.detail);
+        const projectId = typeof detail.projectId === "string" ? detail.projectId : null;
+        return {
+          id: row.id,
+          actor: row.actor,
+          action: row.action,
+          detail: row.detail === null ? null : detail,
+          createdAt: row.createdAt,
+          project: projectId && projectNames.has(projectId) ? { id: projectId, name: projectNames.get(projectId) } : null,
+        };
+      }),
+      hasMore,
+    });
   });
 
   return d;

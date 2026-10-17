@@ -150,9 +150,59 @@ export type ConnectionType = "figma" | "slack";
 
 export interface ConnectionView {
   type: ConnectionType;
-  status: "unconfigured" | "bound" | "configured";
+  status: "unconfigured" | "bound" | "configured" | "error";
+  statusMessage: string | null;
   secretTail: string | null;
   fileKey: string | null;
   fileName: string | null;
   updatedAt: string | null;
+}
+
+export type NotificationMode = "change" | "always" | "never";
+
+export interface NotificationRules {
+  mode: NotificationMode;
+  overdueAlways: boolean;
+}
+
+export type TokenKind = "push" | "plugin";
+
+export interface TokenSummary {
+  id: string;
+  kind: TokenKind;
+  label: string | null;
+  last4: string;
+  createdAt: string;
+  lastUsedAt: string | null;
+  revokedAt: string | null;
+}
+
+export interface IssuedToken {
+  token: string;
+  tokenInfo: TokenSummary;
+}
+
+export interface WorkspaceMember {
+  userId: string;
+  role: string;
+  createdAt: string;
+}
+
+export interface WorkspaceResponse {
+  workspace: Workspace;
+  members: WorkspaceMember[];
+}
+
+export interface ActivityEntry {
+  id: string;
+  actor: string;
+  action: string;
+  detail: Record<string, unknown> | null;
+  createdAt: string;
+  project: { id: string; name: string } | null;
+}
+
+export interface ActivityResponse {
+  entries: ActivityEntry[];
+  hasMore: boolean;
 }

@@ -4,6 +4,8 @@ export type ProjectView = "overview" | "deprecations" | "connections";
 
 export type Route =
   | { name: "overview" }
+  | { name: "activity" }
+  | { name: "settings" }
   | { name: "project"; projectId: string; view: ProjectView };
 
 export function parseHash(hash: string): Route {
@@ -17,11 +19,15 @@ export function parseHash(hash: string): Route {
         view === "deprecations" || view === "connections" ? view : "overview",
     };
   }
+  if (segments[0] === "activity") return { name: "activity" };
+  if (segments[0] === "settings") return { name: "settings" };
   return { name: "overview" };
 }
 
 export function hrefFor(route: Route): string {
   if (route.name === "overview") return "#/";
+  if (route.name === "activity") return "#/activity";
+  if (route.name === "settings") return "#/settings";
   const base = `#/p/${encodeURIComponent(route.projectId)}`;
   return route.view === "overview" ? base : `${base}/${route.view}`;
 }
