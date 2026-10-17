@@ -6,7 +6,7 @@ import { detectCodebaseSource, parseCodebaseTokens } from "./codebase/index.js";
 import { diffComponents } from "./components.js";
 import { loadConfig } from "./config.js";
 import { applyDeprecations } from "./core/deprecations.js";
-import { diffTokens, hasDrift } from "./core/diff.js";
+import { diffTokens, hasDrift, type DriftResult } from "./core/diff.js";
 import { connectBridge, type BridgeCaller } from "./figma/bridge.js";
 import { FigmaClient, type FigmaApi } from "./figma/client.js";
 import { fetchFigmaTokens } from "./figma/source.js";
@@ -19,9 +19,10 @@ import {
   writeNotifyState,
   type NotifyState,
 } from "./notify.js";
-import { buildReport, buildStatusPayload } from "./core/report.js";
+import { buildReport, buildStatusPayload, type ReportMeta } from "./core/report.js";
 import { buildSampleConfig, createSampleFigmaApi, type SampleFormat } from "./sample.js";
-import type { DriftConfig } from "./core/types.js";
+import type { DriftConfig, Token } from "./core/types.js";
+import { buildCodePushPayload, collectComponentSnapshot, postCodeSnapshot, readGitInfo } from "./push.js";
 import {
   DEFAULT_PASSCODE_ENV,
   generatePasscode,
@@ -36,10 +37,16 @@ reports value mismatches and missing tokens on either side.
 
 Usage:
   elf-tokens [options]
+  elf-tokens push [options]
   elf-tokens webhook [options]
   npm run check-drift [options]
 
+The npm package installs both \`elf\` and \`elf-tokens\` — same CLI, either name.
+
 Commands:
+  push                 Send a code snapshot (tokens, components, drift) to the
+                       elf console dashboard. Needs "dashboard.url" in the
+                       config (or --url) and the ELF_DASHBOARD_TOKEN variable.
   webhook              Register Figma webhooks that notify the repo
                        when tokens change in the file (see --help with
                        the webhook command for details).
@@ -54,6 +61,12 @@ Options:
                          in the config (a Slack incoming webhook by default), only
                          when the drift state changed since the last run
   --help                 Show this help
+
+Push options:
+  --dry-run              Print the exact JSON payload and exit 0 without sending
+  --url <url>            Dashboard base URL (default: dashboard.url in the config)
+                         Token: ELF_DASHBOARD_TOKEN environment variable, never
+                         stored in the config.
 
 Requires the Figma API token in the environment variable named by
 figma.apiTokenEnv in the config (default: FIGMA_API_TOKEN). The notify
@@ -94,6 +107,8 @@ interface CliArgs {
   out?: string;
   failOnDrift?: boolean;
   notify?: boolean;
+  dryRun?: boolean;
+  url?: string;
   endpoint?: string;
   list?: boolean;
   test?: boolean;
@@ -107,6 +122,8 @@ function parseArgs(argv: string[]): CliArgs {
       args.help = true;
     } else if (arg === "--fail-on-drift") {
       args.failOnDrift = true;
+    } else if (arg === "--dry-run") {
+      args.dryRun = true;
     } else if (arg === "--sample") {
       const next = argv[i + 1];
       if (next && !next.startsWith("--")) {
@@ -150,19 +167,6 @@ async function main(): Promise<number> {
     ? buildSampleConfig(typeof args.sample === "string" ? (args.sample as SampleFormat) : undefined)
     : loadConfig(args.config ?? "elf.config.json");
 
-  if (args.notify) {
-    if (!config.notify) {
-      throw new Error('--notify needs a "notify" section in the config, e.g. {"notify": {"webhookEnv": "SLACK_WEBHOOK_URL"}}.');
-    }
-    if (!process.env[config.notify.webhookEnv]) {
-      throw new Error(
-        `Webhook URL not found. Set the ${config.notify.webhookEnv} environment variable ` +
-          `(the URL itself is never stored in the config).`,
-      );
-    }
-  }
-  const webhookUrl = config.notify ? process.env[config.notify.webhookEnv] ?? "" : "";
-
   let api: FigmaApi | null = null;
   const restApi = (): FigmaApi => {
     api ??= args.sample ? createSampleFigmaApi() : createLiveApi(config);
@@ -176,6 +180,23 @@ async function main(): Promise<number> {
   };
 
   try {
+    if (command === "push") {
+      return await runPushCommand(args, config, restApi, getBridge);
+    }
+
+    if (args.notify) {
+      if (!config.notify) {
+        throw new Error('--notify needs a "notify" section in the config, e.g. {"notify": {"webhookEnv": "SLACK_WEBHOOK_URL"}}.');
+      }
+      if (!process.env[config.notify.webhookEnv]) {
+        throw new Error(
+          `Webhook URL not found. Set the ${config.notify.webhookEnv} environment variable ` +
+            `(the URL itself is never stored in the config).`,
+        );
+      }
+    }
+    const webhookUrl = config.notify ? process.env[config.notify.webhookEnv] ?? "" : "";
+
     return await runDriftCheck(args, config, restApi, getBridge, webhookUrl);
   } finally {
     // The bridge websocket would otherwise keep the process alive after the report.
@@ -183,13 +204,20 @@ async function main(): Promise<number> {
   }
 }
 
-async function runDriftCheck(
-  args: CliArgs,
+interface CheckOutput {
+  figmaTokens: Token[];
+  codeTokens: Token[];
+  result: DriftResult;
+  meta: ReportMeta;
+  report: string;
+}
+
+/** The shared spine of `check` and `push`: fetch both sides, diff, render the report. */
+async function runCheckCore(
   config: DriftConfig,
   restApi: () => FigmaApi,
   getBridge: () => Promise<BridgeCaller>,
-  webhookUrl: string,
-): Promise<number> {
+): Promise<CheckOutput> {
   const { tokens: figmaTokens, source: figmaSource } = await fetchFigmaTokens(config, restApi, getBridge);
 
   const codebaseSource =
@@ -232,6 +260,18 @@ async function runDriftCheck(
     checkedAt: new Date().toISOString(),
   };
   const report = buildReport(result, meta);
+
+  return { figmaTokens, codeTokens, result, meta, report };
+}
+
+async function runDriftCheck(
+  args: CliArgs,
+  config: DriftConfig,
+  restApi: () => FigmaApi,
+  getBridge: () => Promise<BridgeCaller>,
+  webhookUrl: string,
+): Promise<number> {
+  const { result, meta, report } = await runCheckCore(config, restApi, getBridge);
 
   const outPath = resolve(args.out ?? "drift-report.md");
   const statusPath = join(dirname(outPath), "drift-status.json");
@@ -284,6 +324,63 @@ async function runDriftCheck(
 
   if (args.failOnDrift && result.driftFound) return 2;
   return 0;
+}
+
+async function runPushCommand(
+  args: CliArgs,
+  config: DriftConfig,
+  restApi: () => FigmaApi,
+  getBridge: () => Promise<BridgeCaller>,
+): Promise<number> {
+  try {
+    const url = args.url ?? config.dashboard?.url ?? "";
+    const token = process.env.ELF_DASHBOARD_TOKEN ?? "";
+    if (!args.dryRun) {
+      if (!url) {
+        throw new Error(
+          'No dashboard URL. Add "dashboard": { "url": "https://<your-elf-console>" } to elf.config.json, or pass --url.',
+        );
+      }
+      if (!token) {
+        throw new Error(
+          "Dashboard token not found. Set the ELF_DASHBOARD_TOKEN environment variable " +
+            "(create one on the project's page in the elf console — it is never stored in the config).",
+        );
+      }
+    }
+
+    const { figmaTokens, codeTokens, result, meta, report } = await runCheckCore(config, restApi, getBridge);
+    const git = readGitInfo(process.cwd());
+    const payload = buildCodePushPayload({
+      source: "cli",
+      config,
+      meta,
+      figmaTokens,
+      codeTokens,
+      result,
+      report,
+      ...(config.components ? { components: collectComponentSnapshot(config.components) } : {}),
+      ...(git ? { git } : {}),
+    });
+
+    if (args.dryRun) {
+      console.log(JSON.stringify(payload, null, 2));
+      console.error("Dry run: nothing was sent.");
+      return 0;
+    }
+
+    const outcome = await postCodeSnapshot({ url, token, payload });
+    if (outcome.ok) {
+      const status = outcome.body?.status ?? "stored";
+      console.log(`Pushed to ${url} — ${status}, ${result.driftFound ? "drift found" : "clean"}.`);
+      return 0;
+    }
+    console.error(`Push failed after ${outcome.attempts} attempt(s): ${outcome.error}`);
+    return 1;
+  } catch (error) {
+    console.error(`Push failed: ${(error as Error).message}`);
+    return 1;
+  }
 }
 
 async function runWebhookCommand(args: CliArgs): Promise<number> {

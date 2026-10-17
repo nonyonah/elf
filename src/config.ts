@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
-import type { ComponentsConfig, Deprecation, DriftConfig, ModeStrategy, NotifyConfig } from "./core/types.js";
+import type { ComponentsConfig, DashboardConfig, Deprecation, DriftConfig, ModeStrategy, NotifyConfig } from "./core/types.js";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -39,6 +39,7 @@ export function loadConfig(configPath: string): DriftConfig {
     components: parseComponents(config.components, configDir, configPath),
     deprecations: parseDeprecations(config.deprecations, configPath),
     notify: parseNotify(config.notify, configDir, configPath),
+    dashboard: parseDashboard(config.dashboard, configPath),
     webhook: {
       endpoint: config.webhook?.endpoint ?? "",
       eventTypes: config.webhook?.eventTypes ?? [],
@@ -91,6 +92,24 @@ function parseNotify(value: unknown, configDir: string, configPath: string): Not
     webhookEnv: record.webhookEnv.trim(),
     format,
     ...(typeof record.stateFile === "string" ? { stateFile: resolve(configDir, record.stateFile) } : {}),
+  };
+}
+
+function parseDashboard(value: unknown, configPath: string): DashboardConfig | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value !== "object" || Array.isArray(value)) {
+    throw new Error(`Config "${configPath}": "dashboard" must be an object.`);
+  }
+  const record = value as Record<string, unknown>;
+  if (typeof record.url !== "string" || !record.url.trim()) {
+    throw new Error(`Config "${configPath}": "dashboard" needs a "url" (the elf console base URL).`);
+  }
+  if (record.projectId !== undefined && (typeof record.projectId !== "string" || !record.projectId.trim())) {
+    throw new Error(`Config "${configPath}": "dashboard.projectId" must be a non-empty string when set.`);
+  }
+  return {
+    url: record.url.trim().replace(/\/+$/, ""),
+    ...(typeof record.projectId === "string" ? { projectId: record.projectId.trim() } : {}),
   };
 }
 

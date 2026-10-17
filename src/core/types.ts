@@ -51,6 +51,13 @@ export interface NotifyConfig {
   stateFile?: string;
 }
 
+/** Where snapshots go: the elf console dashboard. The token lives in the ELF_DASHBOARD_TOKEN environment variable, never here. */
+export interface DashboardConfig {
+  url: string;
+  /** Optional project slug/id from the console — kept for links and future use. */
+  projectId?: string;
+}
+
 export interface DriftConfig {
   figma: {
     fileKey: string;
@@ -70,6 +77,8 @@ export interface DriftConfig {
   deprecations: Deprecation[];
   /** Opt-in drift alerts; used when the CLI runs with `--notify`. */
   notify?: NotifyConfig;
+  /** Opt-in snapshot pushes; used by `elf push`. */
+  dashboard?: DashboardConfig;
   webhook?: {
     endpoint?: string;
     eventTypes?: string[];

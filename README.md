@@ -89,6 +89,7 @@ In Figma: **Account settings → Security → Personal access tokens → Generat
 | `FIGMA_PASSCODE` | Verifies webhook events at the worker | Cloudflare worker secret: `npx wrangler secret put FIGMA_PASSCODE` |
 | `GITHUB_TOKEN` | Worker → GitHub: `repository_dispatch` + drift-data reads | Cloudflare worker secret: `npx wrangler secret put GITHUB_TOKEN` — classic PAT with `repo` scope, or fine-grained with **Actions: read/write** + **Contents: read** |
 | `SLACK_WEBHOOK_URL` (or any name via `notify.webhookEnv`) | `--notify` drift alerts + worker Slack pings | Shell env for the CLI (`export SLACK_WEBHOOK_URL=…`); Cloudflare worker secret for live pings. Treat the URL like the passcode — anyone holding it can post to the channel |
+| `ELF_DASHBOARD_TOKEN` (`elf_push_…`) | `elf push` snapshots to the elf console dashboard | Shell/CI secret only — created once on the project's page in the console. **Never** in the config (which stores just `dashboard.url`) |
 | Figma file key | Picks *which* file to check | `figma.fileKey` in `elf.config.json`, copied once from `figma.com/design/<KEY>/…`. Only the CLI/CI need it — the plugin reads its own file key automatically |
 
 **Never** put a token or passcode inside `elf.config.json` or any committed file — the config stores only the env-var *name* (`apiTokenEnv`). Committed secrets get leaked.
@@ -125,6 +126,10 @@ Copy `elf.config.json` and point it at your file and your token source:
     "manifest": "./elf.manifest.json"        // same manifest elf-batch writes
   },
   "deprecations": [],                        // optional — intentional divergences, see below
+  "dashboard": {                             // optional — `elf push` snapshots to the elf console
+    "url": "https://your-elf-console.example.com",
+    "projectId": "proj_…"                    // optional — from the console's project page
+  },
   "notify": {                                // optional — where --notify posts alerts
     "webhookEnv": "SLACK_WEBHOOK_URL",       // env var holding the URL (the URL itself never goes here)
     "format": "slack"                        // "slack" (Block Kit) | "text" (plain body, e.g. ntfy)
@@ -334,6 +339,24 @@ Config, token/sidecar formats and manual checklist: **[`batch/README.md`](batch/
 
 ---
 
+## Push snapshots to the elf console (optional)
+
+`elf push` sends a **code snapshot** — both token sides, the component manifest, the drift verdict and the report — to the [elf console dashboard](CONTRACT.md), so the whole team sees the same drift state without opening CI logs. It runs the same check internally, then POSTs to `POST /api/v1/ingest/code`:
+
+```bash
+export ELF_DASHBOARD_TOKEN=elf_push_…   # created once on the project's page in the console
+npx elf push                            # or: npx elf-tokens push
+npx elf push --dry-run                  # print the exact JSON payload, send nothing
+npx elf push --url https://…            # override dashboard.url for this run
+```
+
+- The dashboard URL comes from `dashboard.url` in `elf.config.json`; the **token only ever comes from the environment** (`ELF_DASHBOARD_TOKEN`) — never from the config.
+- Sends with retries: up to 3 attempts, backing off on network errors, `429` and `5xx`, honoring `Retry-After`. `400`/`401` are never retried.
+- Exit codes: `0` sent (or deduped), `1` failed. **A failed push never affects a normal drift check** — they are separate commands.
+- The full HTTP contract (schema 1): [`CONTRACT.md`](CONTRACT.md).
+
+---
+
 ## The pure core (`elf-tokens/core`)
 
 Everything above reads Figma and the filesystem. The comparison itself — normalize → classify → diff → deprecations → report — is pure logic and lives in `src/core/`, importable on its own:
@@ -373,6 +396,7 @@ The CLI reads the token from the environment of whatever process runs it, nothin
 
 ```
 elf-tokens [options]
+elf-tokens push [options]
 elf-tokens webhook [options]
 
   --config <path>     config file (default: elf.config.json)
@@ -383,13 +407,18 @@ elf-tokens webhook [options]
                       drift state changed since the last run
   --help              show usage
 
+push subcommand:
+  --dry-run           print the exact JSON payload and exit 0 without sending
+  --url <url>         dashboard base URL (default: dashboard.url in the config)
+                      token: ELF_DASHBOARD_TOKEN environment variable
+
 webhook subcommand:
   --endpoint <url>    worker URL (default: webhook.endpoint in the config)
   --list              list webhooks registered for the file
   --test              send a fake Figma event through the worker
 ```
 
-Exit codes: `0` — ran (drift may or may not exist), `1` — error (bad config, missing token, network), `2` — drift found with `--fail-on-drift`.
+Exit codes: `0` — ran (drift may or may not exist), `1` — error (bad config, missing token, network), `2` — drift found with `--fail-on-drift`. The npm package installs both `elf-tokens` and `elf` — same CLI, either name.
 
 ---
 
