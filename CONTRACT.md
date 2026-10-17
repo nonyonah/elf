@@ -182,6 +182,7 @@ Remote config, merged over the local `elf.config.json` by the CLI (the dashboard
 ## 5. Client behavior (normative)
 
 - **Retries**: on network errors and `429` / `5xx`, retry up to **3 attempts total** with exponential backoff, honoring `Retry-After` when present. Never retry `400` or `401`.
+- **Remote config resolution**: when `dashboard.url` is set and `ELF_DASHBOARD_TOKEN` is present, fetch `GET /projects/me/config` once per run (5 s timeout, no retries, `If-None-Match` when cached) and merge it over the local file for the four fields it provides. Cache: `.elf/config.remote.json` next to the config. Order: **remote → cache → local**; the source is logged on stderr. An unreachable or invalid response never fails the run — responses that don't match the envelope shape (`{ schema, config, … }`) are treated as unavailable. `elf status` reads `drift-status.json` (no network).
 - **Push never breaks the check**: `elf push` failing (missing token, network down, server error) never turns a normal drift check into a failing run — the check's own exit code is unchanged.
 - **Exit codes** for `elf push`: `0` — sent or deduped; `1` — failed after retries. `--dry-run` prints the payload and exits `0`.
 

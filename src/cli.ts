@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { detectCodebaseSource, parseCodebaseTokens } from "./codebase/index.js";
 import { diffComponents } from "./components.js";
@@ -23,6 +23,7 @@ import { buildReport, buildStatusPayload, type ReportMeta } from "./core/report.
 import { buildSampleConfig, createSampleFigmaApi, type SampleFormat } from "./sample.js";
 import type { DriftConfig, Token } from "./core/types.js";
 import { buildCodePushPayload, collectComponentSnapshot, postCodeSnapshot, readGitInfo } from "./push.js";
+import { applyRemoteConfig, fetchRemoteConfig } from "./remote-config.js";
 import {
   DEFAULT_PASSCODE_ENV,
   generatePasscode,
@@ -38,6 +39,7 @@ reports value mismatches and missing tokens on either side.
 Usage:
   elf-tokens [options]
   elf-tokens push [options]
+  elf-tokens status [options]
   elf-tokens webhook [options]
   npm run check-drift [options]
 
@@ -47,6 +49,8 @@ Commands:
   push                 Send a code snapshot (tokens, components, drift) to the
                        elf console dashboard. Needs "dashboard.url" in the
                        config (or --url) and the ELF_DASHBOARD_TOKEN variable.
+  status               Show the last check's result from drift-status.json
+                       (no Figma or dashboard access needed).
   webhook              Register Figma webhooks that notify the repo
                        when tokens change in the file (see --help with
                        the webhook command for details).
@@ -60,6 +64,7 @@ Options:
   --notify               Post a summary to the webhook named by "notify.webhookEnv"
                          in the config (a Slack incoming webhook by default), only
                          when the drift state changed since the last run
+  --json                 With status: print drift-status.json verbatim
   --help                 Show this help
 
 Push options:
@@ -108,6 +113,7 @@ interface CliArgs {
   failOnDrift?: boolean;
   notify?: boolean;
   dryRun?: boolean;
+  json?: boolean;
   url?: string;
   endpoint?: string;
   list?: boolean;
@@ -162,10 +168,14 @@ async function main(): Promise<number> {
   if (command === "webhook") {
     return runWebhookCommand(args);
   }
+  if (command === "status") {
+    return runStatusCommand(args);
+  }
 
-  const config: DriftConfig = args.sample
+  const baseConfig: DriftConfig = args.sample
     ? buildSampleConfig(typeof args.sample === "string" ? (args.sample as SampleFormat) : undefined)
     : loadConfig(args.config ?? "elf.config.json");
+  const config = args.sample ? baseConfig : await mergeDashboardConfig(baseConfig, args);
 
   let api: FigmaApi | null = null;
   const restApi = (): FigmaApi => {
@@ -201,6 +211,37 @@ async function main(): Promise<number> {
   } finally {
     // The bridge websocket would otherwise keep the process alive after the report.
     (bridge as BridgeCaller | null)?.close();
+  }
+}
+
+/**
+ * The dashboard can own four config fields (CONTRACT.md's config endpoint):
+ * deprecations, nameMapping, modeStrategy, modeName. Resolution order:
+ * remote → cache (`.elf/config.remote.json`) → local. The check never fails
+ * because the dashboard is unreachable; one stderr line says which was used.
+ */
+async function mergeDashboardConfig(config: DriftConfig, args: CliArgs): Promise<DriftConfig> {
+  const url = args.url ?? config.dashboard?.url ?? "";
+  const token = process.env.ELF_DASHBOARD_TOKEN ?? "";
+  if (!url || !token) return config;
+  try {
+    const configDir = dirname(resolve(args.config ?? "elf.config.json"));
+    const { config: remote, source } = await fetchRemoteConfig({
+      url,
+      token,
+      cacheFile: join(configDir, ".elf", "config.remote.json"),
+    });
+    if (source === "remote") {
+      console.error("Config: remote merge from the elf console applied over the local file.");
+    } else if (source === "cache") {
+      console.error("Config: dashboard unreachable — using the cached remote merge (last known).");
+    } else {
+      console.error("Config: local (the dashboard has no remote config yet).");
+    }
+    return applyRemoteConfig(config, remote);
+  } catch (error) {
+    console.error(`Config: local (remote merge failed: ${(error as Error).message}).`);
+    return config;
   }
 }
 
@@ -381,6 +422,68 @@ async function runPushCommand(
     console.error(`Push failed: ${(error as Error).message}`);
     return 1;
   }
+}
+
+async function runStatusCommand(args: CliArgs): Promise<number> {
+  const outPath = resolve(args.out ?? "drift-report.md");
+  const statusPath = join(dirname(outPath), "drift-status.json");
+
+  let raw: string;
+  try {
+    raw = readFileSync(statusPath, "utf8");
+  } catch {
+    console.error(`No status yet: ${statusPath} not found. Run a check first (npx elf-tokens).`);
+    return 1;
+  }
+
+  let payload: Record<string, unknown>;
+  try {
+    payload = JSON.parse(raw) as Record<string, unknown>;
+  } catch {
+    console.error(`Unreadable status file: ${statusPath}`);
+    return 1;
+  }
+
+  if (args.json) {
+    console.log(raw.trim());
+    return 0;
+  }
+
+  const driftCategories: [string, string][] = [
+    ["valueMismatches", "Value mismatches"],
+    ["missingInCode", "Missing in code"],
+    ["missingInFigma", "Missing in Figma"],
+    ["componentsOutOfDate", "Components out of date"],
+    ["componentsChangedInFigma", "Components changed in Figma"],
+    ["componentsInCodeNotInFigma", "Components in code, not in Figma"],
+    ["componentsInFigmaNotInCode", "Components in Figma, not in code"],
+    ["deprecationOverdue", "Deprecations overdue"],
+  ];
+  const noteCategories: [string, string][] = [
+    ["deprecatedStillInCode", "Deprecated (still in code)"],
+    ["safeToRemoveFromDeprecations", "Safe to remove from the deprecations list"],
+  ];
+  const count = (key: string): number => (typeof payload[key] === "number" ? (payload[key] as number) : 0);
+
+  const driftFound = payload.driftFound === true;
+  const checkedAt = typeof payload.checkedAt === "string" ? payload.checkedAt : "unknown";
+  const fingerprint = typeof payload.fingerprint === "string" ? payload.fingerprint : "";
+
+  console.log(`Drift status: ${driftFound ? "drift found" : "clean"}`);
+  console.log(`Checked ${checkedAt}${fingerprint ? ` · fingerprint ${fingerprint}` : ""}`);
+  if (driftFound) {
+    let total = 0;
+    for (const [key, label] of driftCategories) {
+      total += count(key);
+      if (count(key) > 0) console.log(`  ${label}: ${count(key)}`);
+    }
+    console.log(`  (${total} drift ${total === 1 ? "item" : "items"})`);
+  }
+  for (const [key, label] of noteCategories) {
+    if (count(key) > 0) console.log(`  Note — ${label}: ${count(key)}`);
+  }
+  console.log(`Report: ${outPath}`);
+  return 0;
 }
 
 async function runWebhookCommand(args: CliArgs): Promise<number> {

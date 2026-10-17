@@ -2,6 +2,7 @@ node_modules/
 dist/
 drift-report.md
 drift-status.json
+.elf/
 .env
 worker/.dev.vars
 *.log

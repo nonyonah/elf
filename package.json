@@ -43,7 +43,7 @@
   "scripts": {
     "check-drift": "tsx src/cli.ts",
     "check-drift:sample": "tsx src/cli.ts --sample",
-    "test": "node --import tsx --test test/diff.test.ts test/report.test.ts test/webhook.test.ts test/source.test.ts test/components.test.ts test/deprecations.test.ts test/status.test.ts test/modes.test.ts test/notify.test.ts test/core-purity.test.ts test/core-hash.test.ts test/push.test.ts",
+    "test": "node --import tsx --test test/diff.test.ts test/report.test.ts test/webhook.test.ts test/source.test.ts test/components.test.ts test/deprecations.test.ts test/status.test.ts test/modes.test.ts test/notify.test.ts test/core-purity.test.ts test/core-hash.test.ts test/push.test.ts test/remote-config.test.ts",
     "test:worker": "node worker/test.mjs",
     "notify:drill": "node test/notify-drill.mjs",
     "build:plugin": "tsc -p plugin/tsconfig.json",

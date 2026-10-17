@@ -163,6 +163,8 @@ Copy `elf.config.json` and point it at your file and your token source:
 
 A deprecated item that is missing from Figma but still in code is reported as **Deprecated (still in code)** — informational, it does not count as drift. Once `removeBy` is in the past it becomes **Deprecation overdue** and counts (with `--fail-on-drift`, it exits 2). When the item disappears from the code, the report suggests dropping its entry (**Safe to remove from the deprecations list**). `type: "component"` entries match by component name or codeKey.
 
+When `dashboard.url` is set and `ELF_DASHBOARD_TOKEN` is present, every check first asks the dashboard for team-level config (`GET /projects/me/config`): `deprecations`, `nameMapping`, `modeStrategy` and `modeName` come from there when provided — **the dashboard wins over this file**. The response is cached at `.elf/config.remote.json` and revalidated with ETags; offline, the cache is used, then the local values. One line on stderr reports which source won, and an unreachable dashboard never fails the check.
+
 ### 3. Run it locally
 
 ```bash
@@ -397,6 +399,7 @@ The CLI reads the token from the environment of whatever process runs it, nothin
 ```
 elf-tokens [options]
 elf-tokens push [options]
+elf-tokens status [options]
 elf-tokens webhook [options]
 
   --config <path>     config file (default: elf.config.json)
@@ -405,12 +408,17 @@ elf-tokens webhook [options]
   --fail-on-drift     exit with code 2 when drift is found (off by default)
   --notify            post a summary to notify.webhookEnv, only when the
                       drift state changed since the last run
+  --json              with status: print drift-status.json verbatim
   --help              show usage
 
 push subcommand:
   --dry-run           print the exact JSON payload and exit 0 without sending
   --url <url>         dashboard base URL (default: dashboard.url in the config)
                       token: ELF_DASHBOARD_TOKEN environment variable
+
+status subcommand:
+  reads drift-status.json next to the report (--out) written by the last
+  check — prints the state, counts and fingerprint; no Figma access needed.
 
 webhook subcommand:
   --endpoint <url>    worker URL (default: webhook.endpoint in the config)
