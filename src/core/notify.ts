@@ -11,6 +11,8 @@ export interface NotifyMeta {
   figmaSource: string;
   codebaseSource: string;
   checkedAt: string;
+  /** Optional link back to a report or console — appended to the context line. */
+  url?: string;
 }
 
 /** What dedupe compares between runs: the full item set plus the drift verdict. */
@@ -164,10 +166,12 @@ export function buildNotifyMessage(
     if (items.length > MAX_ITEMS) body.push(`… and ${items.length - MAX_ITEMS} more — see the full report.`);
   }
 
-  const context = `${meta.figmaSource} vs ${meta.codebaseSource} · file \`${meta.fileKey}\` · checked ${meta.checkedAt}`;
+  const contextBase = `${meta.figmaSource} vs ${meta.codebaseSource} · file \`${meta.fileKey}\` · checked ${meta.checkedAt}`;
+  const context = meta.url ? `${contextBase} · <${meta.url}|Open the report>` : contextBase;
 
   if (format === "text") {
-    return { text: [fallback, "", ...body, "", context].join("\n") };
+    const textContext = meta.url ? `${contextBase} · ${meta.url}` : contextBase;
+    return { text: [fallback, "", ...body, "", textContext].join("\n") };
   }
 
   const blocks: Record<string, unknown>[] = [

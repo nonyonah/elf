@@ -99,6 +99,17 @@ test("drift messages carry the counts and cap the item list", () => {
   assert.match(context, /variables \(bridge\) vs tailwind/);
 });
 
+test("an optional url lands in the context line — Slack link, plain text for text format", () => {
+  const withUrl: NotifyMeta = { ...meta, url: "https://console.elf.dev/#/p/prj_1" };
+  const slack = buildNotifyMessage(drifting(), withUrl, "slack", null);
+  const context = (slack.blocks?.[2] as { elements: { text: string }[] }).elements[0].text;
+  assert.match(context, /<https:\/\/console\.elf\.dev\/#\/p\/prj_1\|Open the report>/);
+
+  const text = buildNotifyMessage(drifting(), withUrl, "text", null);
+  assert.match(text.text, /· https:\/\/console\.elf\.dev\/#\/p\/prj_1$/m);
+  assert.doesNotMatch(text.text, /Open the report/);
+});
+
 test("mode labels and component keys appear in the item lines", () => {
   const result = diffTokens(
     [token("color/bg", "#FFFFFF", "Light"), token("color/bg", "#000000", "Dark")],
