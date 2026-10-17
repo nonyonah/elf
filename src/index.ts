@@ -1,0 +1,36 @@
+import { Hono } from "hono";
+import { getSession, requireSession, workspaceNameFor, type AppEnv, type SessionResolver } from "./auth.js";
+import { ensureWorkspace } from "./db/workspaces.js";
+
+/**
+ * elf-console Worker. Serves the API under /api/* (routed here first via
+ * `run_worker_first`) and the Vite build as static assets for everything else.
+ * `createApp` takes an injectable session resolver so tests can run whole
+ * request flows with fake identities.
+ */
+export function createApp(options: { sessionResolver?: SessionResolver } = {}) {
+  const app = new Hono<AppEnv>();
+
+  // Public surface. Registered before the session middleware, so it stays open.
+  app.get("/api/health", (c) => c.json({ ok: true, service: "elf-console", version: "0.1.0" }));
+
+  app.use("/api/*", requireSession(options.sessionResolver));
+
+  app.get("/api/me", async (c) => {
+    const session = getSession(c);
+    const workspace = await ensureWorkspace(
+      c.env.DB,
+      session.userId,
+      await workspaceNameFor(c.env, session.userId),
+    );
+    return c.json({ userId: session.userId, workspace });
+  });
+
+  app.all("/api/*", (c) =>
+    c.json({ error: { code: "not_found", message: "Unknown endpoint." } }, 404),
+  );
+
+  return app;
+}
+
+export default createApp();

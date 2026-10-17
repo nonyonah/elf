@@ -33,15 +33,15 @@ All tables carry `workspaceId` (directly or via `projectId`) and are queried wit
 | audit_log | who did what | id, workspaceId, actor, action, detail, createdAt |
 | jobs | deferred work | id, projectId, type (`drift`\|`poll`\|`notify`), notBefore, attempts, lastError |
 
-Better Auth owns its own tables (`user`, `session`, `account`, `verification`) in the same D1 database; its migrations run alongside ours.
+Clerk hosts all auth state; there are no auth tables in D1. `members.userId` stores the Clerk user id (`user_…`).
 
 ## Auth
 
-- **Better Auth** (Workers-native, D1 adapter): Google OAuth + email magic link.
-- Email delivery via **Resend** (API key as a Worker secret).
-- httpOnly cookie sessions; nothing in localStorage.
-- First sign-in creates a workspace + membership.
-- Local development runs with placeholder credentials; real Google OAuth client + Resend key are wired at deploy time.
+- **Clerk** (hosted): Google OAuth + email code, configured in the Clerk dashboard — no OAuth code or email delivery in this repo.
+- The Worker verifies every `/api` request with `@clerk/backend` (`authenticateRequest`, session-token JWTs/cookies). The secret key is a Worker secret; the publishable key is public.
+- First authenticated request lazily provisions a workspace + membership (signed-out traffic creates nothing).
+- Without `CLERK_SECRET_KEY` the worker still boots locally: auth-required routes answer `401`.
+- The client uses Clerk's React SDK (Sign in screen); nothing in localStorage.
 
 ## Secrets handling
 
@@ -79,7 +79,7 @@ Better Auth owns its own tables (`user`, `session`, `account`, `verification`) i
 
 | # | Screen | Contents |
 |---|---|---|
-| 1 | Sign in | Google + email magic link |
+| 1 | Sign in | Google + email code (Clerk-hosted UI) |
 | 2 | Overview | All projects: state, last activity, token/component counts, attention list |
 | 3 | Project | Drift state, trend chart, latest run: token + component tables; designer/developer toggle |
 | 4 | Deprecations | List + add/edit; **Export elf.config.json** button |
@@ -101,7 +101,7 @@ Better Auth owns its own tables (`user`, `session`, `account`, `verification`) i
 
 ## Order of work (stop for review after each step)
 
-1. Repo setup: wrangler + D1 schema & migrations, Better Auth, workspace helper, secrets (AES-GCM), token issuing
+1. Repo setup: wrangler + D1 schema & migrations, Clerk session verification, workspace helper, secrets (AES-GCM), token issuing
 2. Ingest endpoints, snapshot storage, drift runs, status + config endpoints
 3. Overview + Project screens, Connections, Deprecations
 4. Polling (15 min), Slack notifications, Activity, Settings

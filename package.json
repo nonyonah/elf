@@ -1,0 +1,34 @@
+{
+  "name": "elf-console",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "The hosted side of elf: design data, drift history and one shared truth for designers and developers.",
+  "scripts": {
+    "dev": "wrangler dev",
+    "dev:client": "vite",
+    "build": "vite build",
+    "deploy": "npm run build && wrangler deploy",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit && tsc -p client/tsconfig.json --noEmit",
+    "db:local": "wrangler d1 migrations apply elf-console --local",
+    "db:remote": "wrangler d1 migrations apply elf-console --remote"
+  },
+  "dependencies": {
+    "@clerk/backend": "^3.25.0",
+    "hono": "^4.13.13",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-plugin": "^1.4.4",
+    "@cloudflare/workers-types": "^5.20261016.1",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^5.2.0",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.7",
+    "vitest": "^4.1.12",
+    "wrangler": "^4.151.1"
+  }
+}
