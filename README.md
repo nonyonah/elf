@@ -4,13 +4,14 @@ The hosted side of [elf](../elf): receives design-system snapshots from repos an
 
 Scope and behavior: [`DASHBOARD-SCOPE.md`](./DASHBOARD-SCOPE.md). Wire protocol (`/api/v1`, schema 1): `CONTRACT.md` in the `elf` repo.
 
-> Status: **order-of-work step 2** — the `CONTRACT.md` v1 API is live: ingest (code + Figma snapshots, dedupe, 2 MB cap, 60 req/min/token rate limiting), server-side drift recompute via elf core with debounced jobs, status + remote-config endpoints with ETag. Step 1's worker shell (Clerk, D1 schema, secrets, tokens) underpins it.
+> Status: **order-of-work step 3 (awaiting review)** — the dashboard API (`/api/projects`, per-project detail live recompute, deprecations CRUD, connections with sealed secrets, audit log) and the console screens (Overview, Project, Deprecations, Connections) are built. Earlier: `CONTRACT.md` v1 ingest + drift jobs (step 2) on the Clerk/D1 shell (step 1). Notifications polling, Activity, and Settings land in step 4.
 
 ## Stack
 
 - **Cloudflare Worker** (Hono) + **D1** (`elf-console` database) + static assets from the Vite build, one Worker.
 - **Clerk** for auth (Google + email code, hosted). The Worker verifies session tokens with `@clerk/backend`; there are no auth tables in D1.
 - **Vite + React** client in `client/`, built to `dist/client/`.
+- **coss UI** for the console’s components — the shadcn CLI registry (`base-nova` style, Base UI primitives), vendored into `client/src/components/ui/`. This is the interim component layer: it will be migrated to elf-ui once its components are finished and released. Light-first; dark theme tokens exist but no toggle ships.
 - **Vitest** with `@cloudflare/vitest-plugin` — tests run against real D1 bindings in Miniflare.
 
 ## Layout
@@ -19,7 +20,7 @@ Scope and behavior: [`DASHBOARD-SCOPE.md`](./DASHBOARD-SCOPE.md). Wire protocol 
 src/            Worker: index.ts (routes + cron), api.ts (/api/v1, CONTRACT.md), contract.ts (validation),
                 drift.ts (server-side recompute via elf core), jobs.ts (debounced jobs table), ratelimit.ts,
                 auth.ts (Clerk), db/ (crypto, tokens, workspaces), env.ts
-client/         Vite + React app (screens land in step 3)
+client/         Vite + React app (Overview / Project / Deprecations / Connections); components.json holds the coss registry config
 migrations/     D1 migrations (schema 1: 0001_init.sql; rate limits: 0002)
 test/           Worker-integration tests (real D1, injected sessions)
 ```
@@ -33,12 +34,14 @@ openssl rand -base64 32          # paste into SECRETS_KEY, or generate fresh
 
 npm run db:local                 # apply migrations to the local D1
 npm run dev                      # wrangler dev — serves API + last built assets
-npm run dev:client               # optional: Vite dev server with /api proxied
+npm run dev:client               # optional: Vite dev server with /api proxied to :8787
 npm test                         # vitest (workers pool, real D1 per suite)
 npm run typecheck
 ```
 
 `npm run dev` serves `dist/client` for non-API routes — run `npm run build` once after cloning so the assets directory exists.
+
+For the client dev loop, run both: `npm run dev` (worker on `:8787`) and `npm run dev:client` (Vite on `:5173`, proxy `/api` → `:8787`). The built client is checked with `npm run build`.
 
 ### Clerk
 
@@ -49,6 +52,8 @@ Auth is entirely hosted by Clerk:
 3. Set `CLERK_AUTHORIZED_PARTIES` to your console origins in production.
 
 With `CLERK_SECRET_KEY` empty the worker still boots and `/api/health` works; every other `/api` route answers `401 unauthorized`. Tests never call Clerk — they inject fake session resolvers into `createApp()`.
+
+The client needs the publishable key too: put `VITE_CLERK_PUBLISHABLE_KEY=pk_test_…` in `.env.local` (client env, not `.dev.vars`) or it renders the “Connect Clerk” notice and every request stays signed out.
 
 ## Secrets
 

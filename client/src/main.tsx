@@ -1,35 +1,23 @@
-import { StrictMode, useEffect, useState } from "react";
+import { ClerkProvider } from "@clerk/react";
+import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import { App } from "./App";
+import { ToastProvider } from "./components/ui/toast";
+import { ConfigNotice } from "./screens/landing";
 import "./index.css";
 
-type Health = { ok: boolean; service: string; version: string };
-
-function App() {
-  const [health, setHealth] = useState<Health | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    fetch("/api/health")
-      .then((response) => (response.ok ? response.json() : Promise.reject(new Error(String(response.status)))))
-      .then((body: Health) => setHealth(body))
-      .catch((cause: Error) => setError(cause.message));
-  }, []);
-
-  return (
-    <main>
-      <h1>elf console</h1>
-      <p className="muted">The shared truth for design tokens and components — coming together.</p>
-      <p className="status">
-        {health && `API ${health.ok ? "ok" : "down"} · ${health.service} v${health.version}`}
-        {error && `API unreachable (${error})`}
-        {!health && !error && "…"}
-      </p>
-    </main>
-  );
-}
+const publishableKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <App />
+    <ToastProvider>
+      {publishableKey ? (
+        <ClerkProvider publishableKey={publishableKey}>
+          <App />
+        </ClerkProvider>
+      ) : (
+        <ConfigNotice />
+      )}
+    </ToastProvider>
   </StrictMode>,
 );

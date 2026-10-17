@@ -10,6 +10,7 @@ export default defineConfig({
       miniflare: {
         bindings: {
           TEST_MIGRATIONS: migrations,
+          SECRETS_KEY: Buffer.from("elf-console-test-secrets-key-32b").toString("base64"),
         },
       },
     }),

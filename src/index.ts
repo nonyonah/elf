@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { apiV1 } from "./api.js";
 import { getSession, requireSession, workspaceNameFor, type AppEnv, type SessionResolver } from "./auth.js";
+import { dashboard } from "./dashboard.js";
 import { ensureWorkspace } from "./db/workspaces.js";
 import type { Env } from "./env.js";
 import { runDueJobs } from "./jobs.js";
@@ -22,6 +23,10 @@ export function createApp(options: { sessionResolver?: SessionResolver } = {}) {
   app.route("/api/v1", apiV1());
 
   app.use("/api/*", requireSession(options.sessionResolver));
+
+  // Dashboard API (workspace-scoped) — registered after the gate, so every
+  // route below is Clerk-protected.
+  app.route("/api", dashboard());
 
   app.get("/api/me", async (c) => {
     const session = getSession(c);

@@ -41,10 +41,12 @@ export interface ProjectStatus {
   counts: DriftCounts;
 }
 
-interface SnapshotRow {
+export interface SnapshotRow {
   id: string;
   payload: string;
   receivedAt: string;
+  gitBranch: string | null;
+  gitCommit: string | null;
 }
 
 async function latestSnapshot(
@@ -55,7 +57,7 @@ async function latestSnapshot(
 ): Promise<SnapshotRow | null> {
   return db
     .prepare(
-      `SELECT id, payload, receivedAt FROM snapshots
+      `SELECT id, payload, receivedAt, gitBranch, gitCommit FROM snapshots
        WHERE projectId = ? AND kind = ?
        ORDER BY receivedAt DESC, rowid DESC LIMIT 1 OFFSET ?`,
     )
@@ -108,10 +110,60 @@ async function readDeprecations(db: D1Database, projectId: string): Promise<Depr
   }));
 }
 
+export interface DriftDetails {
+  /** Null when the project has no code snapshot yet — nothing to compare. */
+  result: DriftResult | null;
+  code: CodeSnapshotPayload | null;
+  figma: FigmaSnapshotPayload | null;
+  codeSnapshot: SnapshotRow | null;
+  figmaSnapshot: SnapshotRow | null;
+}
+
 /**
- * Recompute one project's drift from its stored snapshots and record the run.
- * Never throws for data-level problems — a failed run is recorded as
- * `unknown` so the status endpoint can say so honestly.
+ * The pure recompute — shared by the drift job and the dashboard detail view,
+ * so the UI and the stored run can never disagree about how drift is defined.
+ */
+export async function computeDriftDetails(db: D1Database, projectId: string): Promise<DriftDetails> {
+  const codeSnapshot = await latestSnapshot(db, projectId, "code");
+  if (!codeSnapshot) {
+    return { result: null, code: null, figma: null, codeSnapshot: null, figmaSnapshot: null };
+  }
+  const code = JSON.parse(codeSnapshot.payload) as CodeSnapshotPayload;
+  const figmaSnapshot = await latestSnapshot(db, projectId, "figma");
+  const figma = figmaSnapshot ? (JSON.parse(figmaSnapshot.payload) as FigmaSnapshotPayload) : null;
+  const previousCodeSnapshot = await latestSnapshot(db, projectId, "code", 1);
+  const previousCode = previousCodeSnapshot
+    ? (JSON.parse(previousCodeSnapshot.payload) as CodeSnapshotPayload)
+    : null;
+
+  const figmaTokens = code.figmaTokens.map((token) => toCoreToken(token, "figma"));
+  const codeTokens = code.codeTokens.map((token) => toCoreToken(token, "code"));
+
+  let result: DriftResult = diffTokens(figmaTokens, codeTokens, {});
+
+  const codeComponents = code.components ?? [];
+  if (figma) {
+    result = {
+      ...result,
+      ...componentDrift(codeComponents, figma.components ?? [], previousCode?.components ?? []),
+    };
+  }
+
+  result = applyDeprecations(
+    result,
+    await readDeprecations(db, projectId),
+    { codeTokens, codeComponents: codeComponents.map((c) => ({ name: c.name, codeKey: componentKey(c) })) },
+    new Date().toISOString().slice(0, 10),
+  );
+  result.driftFound = hasDrift(result);
+
+  return { result, code, figma, codeSnapshot, figmaSnapshot };
+}
+
+/**
+ * Recompute one project's drift and record the run. Never throws for
+ * data-level problems — a failed run is recorded as `unknown` so the status
+ * endpoint can say so honestly.
  */
 export async function runDrift(
   db: D1Database,
@@ -121,42 +173,15 @@ export async function runDrift(
 ): Promise<{ state: ProjectStatus["state"]; counts: DriftCounts }> {
   const createdAt = now.toISOString();
   try {
-    const codeRow = await latestSnapshot(db, projectId, "code");
-    if (!codeRow) {
+    const details = await computeDriftDetails(db, projectId);
+    if (!details.result) {
       const counts = zeroCounts();
       await recordRun(db, projectId, "unknown", counts, triggeredBy, "Waiting for the first code snapshot.", createdAt);
       return { state: "unknown", counts };
     }
 
-    const code = JSON.parse(codeRow.payload) as CodeSnapshotPayload;
-    const figmaRow = await latestSnapshot(db, projectId, "figma");
-    const figma = figmaRow ? (JSON.parse(figmaRow.payload) as FigmaSnapshotPayload) : null;
-    const previousCodeRow = await latestSnapshot(db, projectId, "code", 1);
-    const previousCode = previousCodeRow ? (JSON.parse(previousCodeRow.payload) as CodeSnapshotPayload) : null;
-
-    const figmaTokens = code.figmaTokens.map((token) => toCoreToken(token, "figma"));
-    const codeTokens = code.codeTokens.map((token) => toCoreToken(token, "code"));
-
-    let result: DriftResult = diffTokens(figmaTokens, codeTokens, {});
-
-    const codeComponents = code.components ?? [];
-    if (figma) {
-      result = {
-        ...result,
-        ...componentDrift(codeComponents, figma.components ?? [], previousCode?.components ?? []),
-      };
-    }
-
-    result = applyDeprecations(
-      result,
-      await readDeprecations(db, projectId),
-      { codeTokens, codeComponents: codeComponents.map((c) => ({ name: c.name, codeKey: componentKey(c) })) },
-      createdAt.slice(0, 10),
-    );
-    result.driftFound = hasDrift(result);
-
-    const counts = countsFrom(result);
-    const state: ProjectStatus["state"] = result.driftFound ? "drift" : "ok";
+    const counts = countsFrom(details.result);
+    const state: ProjectStatus["state"] = details.result.driftFound ? "drift" : "ok";
     await recordRun(db, projectId, state, counts, triggeredBy, null, createdAt);
     return { state, counts };
   } catch (error) {
@@ -237,7 +262,7 @@ function componentDrift(
   };
 }
 
-function countsFrom(result: DriftResult): DriftCounts {
+export function countsFrom(result: DriftResult): DriftCounts {
   const payload = buildStatusPayload(result);
   delete payload.driftFound;
   return payload as DriftCounts;
