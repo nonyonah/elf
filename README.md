@@ -4,7 +4,7 @@ The hosted side of [elf](../elf): receives design-system snapshots from repos an
 
 Scope and behavior: [`DASHBOARD-SCOPE.md`](./DASHBOARD-SCOPE.md). Wire protocol (`/api/v1`, schema 1): `CONTRACT.md` in the `elf` repo.
 
-> Status: **order-of-work step 1** — worker shell, D1 schema + migrations, Clerk session verification, workspace provisioning, connection-secret encryption (AES-GCM), token issuing.
+> Status: **order-of-work step 2** — the `CONTRACT.md` v1 API is live: ingest (code + Figma snapshots, dedupe, 2 MB cap, 60 req/min/token rate limiting), server-side drift recompute via elf core with debounced jobs, status + remote-config endpoints with ETag. Step 1's worker shell (Clerk, D1 schema, secrets, tokens) underpins it.
 
 ## Stack
 
@@ -16,11 +16,12 @@ Scope and behavior: [`DASHBOARD-SCOPE.md`](./DASHBOARD-SCOPE.md). Wire protocol 
 ## Layout
 
 ```
-src/            Worker: index.ts (routes), auth.ts (Clerk), db/ (crypto, tokens, workspaces), env.ts
+src/            Worker: index.ts (routes + cron), api.ts (/api/v1, CONTRACT.md), contract.ts (validation),
+                drift.ts (server-side recompute via elf core), jobs.ts (debounced jobs table), ratelimit.ts,
+                auth.ts (Clerk), db/ (crypto, tokens, workspaces), env.ts
 client/         Vite + React app (screens land in step 3)
-migrations/     D1 migrations (schema 1: 0001_init.sql)
+migrations/     D1 migrations (schema 1: 0001_init.sql; rate limits: 0002)
 test/           Worker-integration tests (real D1, injected sessions)
-scripts/        (empty — dev helpers live in package.json)
 ```
 
 ## Local development
@@ -73,4 +74,4 @@ npm run deploy
 
 ## Working with elf core
 
-Later steps import the pure core from the `elf` repo via `"elf-tokens/core"`. Locally, `npm link` (or a `file:` dependency) is documented in the elf README; the import path stays stable when the package is published.
+`src/drift.ts` imports the pure core via `"elf-tokens/core"`. Locally the dependency is `"elf-tokens": "file:../elf"` (the sibling checkout) — installed with the same `--legacy-peer-deps` flag. The import path stays stable when the package is published; a fresh clone without a sibling `../elf` needs that dependency pointed at a published version or a linked checkout.

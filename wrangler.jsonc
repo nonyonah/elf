@@ -19,6 +19,9 @@
     }
   ],
   "vars": {},
+  "triggers": {
+    "crons": ["* * * * *"]
+  },
   "observability": {
     "enabled": true
   }

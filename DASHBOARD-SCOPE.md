@@ -96,8 +96,21 @@ Clerk hosts all auth state; there are no auth tables in D1. `members.userId` sto
 
 ## Tests
 
-- Vitest + `@cloudflare/vitest-pool-workers` (Miniflare) against real D1 migrations.
+- Vitest + `@cloudflare/vitest-plugin` (Miniflare) against real D1 migrations.
 - Coverage: ingest (validation, dedupe, rate limiting, 2 MB cap, token-kind auth), drift runs, remote config ETag, **tenant isolation** (workspace A can never touch workspace B), secret redaction in logs and responses.
+
+## Implemented in step 2 (server-side drift recompute)
+
+Per CONTRACT.md the server recomputes drift from stored snapshots with elf core. Schema-1 semantics, exactly as implemented:
+
+- **Tokens**: exact — `diffTokens` + `applyDeprecations` over the latest code snapshot's `figmaTokens`/`codeTokens` (the CLI fetched Figma live at push time; a Figma snapshot alone cannot be diffed without a code side, so that project reads `unknown`).
+- **Components**: recomputed when a Figma snapshot exists — membership by `codeKey` (name fallback), `changedInFigma` by `nodeHash`, `outOfDate` by `specHash` change since the previous code snapshot while the node stayed put (approximation; the CLI manifest stays authoritative). No Figma snapshot → component sections stay empty.
+- **nameMapping**: `{}` server-side in schema 1 (not pushed, not stored) — the server's token diff can therefore report mismatches a locally name-mapped CLI run would not. The CLI's own `drift.counts` in the payload remains the reference.
+- **Remote config**: the dashboard serves `deprecations` + `nameMapping` (both from its own tables; nameMapping empty in schema 1). `modeStrategy`/`modeName` are **not** served — no console storage — so the local file keeps them (CLI merge skips absent fields).
+- **`stale`**: any project whose newest snapshot is older than 24 h reads `stale` (step 4's polling adds version-change detection on top).
+- **Job flow**: ingest → snapshot stored → one debounced drift job per project (10 s window, pushed back while pushes keep coming) → run by the once-a-minute cron, or ~10 s after ingest via `ctx.waitUntil` kick. Claiming a job is a delete, so cron and kick can never double-run.
+- **Rate limiting** is D1-backed (fixed 60 s window per token, table `rate_limits`) so all isolates share the counter.
+- `snapshotId` format: `snap_<uuid>` (the contract's `snap_01H…` example is illustrative — flagged for review).
 
 ## Order of work (stop for review after each step)
 
@@ -114,7 +127,9 @@ Clerk hosts all auth state; there are no auth tables in D1. `members.userId` sto
 
 ## Review checklist (assumptions to confirm)
 
-- `stale` threshold and semantics
+- `stale` threshold (24 h for now) and semantics
+- Server recompute uses `nameMapping: {}` — acceptable until the console stores mappings?
+- `snapshotId` format `snap_<uuid>` vs the contract's ULID-ish example
 - Designer/developer toggle: same data, different density/terminology?
 - Token UX in Settings: issue per project, show once, revoke; who can see last-used?
 - Which actions land in the audit log

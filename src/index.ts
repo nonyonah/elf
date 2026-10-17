@@ -1,6 +1,9 @@
 import { Hono } from "hono";
+import { apiV1 } from "./api.js";
 import { getSession, requireSession, workspaceNameFor, type AppEnv, type SessionResolver } from "./auth.js";
 import { ensureWorkspace } from "./db/workspaces.js";
+import type { Env } from "./env.js";
+import { runDueJobs } from "./jobs.js";
 
 /**
  * elf-console Worker. Serves the API under /api/* (routed here first via
@@ -13,6 +16,10 @@ export function createApp(options: { sessionResolver?: SessionResolver } = {}) {
 
   // Public surface. Registered before the session middleware, so it stays open.
   app.get("/api/health", (c) => c.json({ ok: true, service: "elf-console", version: "0.1.0" }));
+
+  // The client contract (token-scoped, its own auth model) — mounted before
+  // the Clerk gate, which then only sees the dashboard-UI routes.
+  app.route("/api/v1", apiV1());
 
   app.use("/api/*", requireSession(options.sessionResolver));
 
@@ -33,4 +40,12 @@ export function createApp(options: { sessionResolver?: SessionResolver } = {}) {
   return app;
 }
 
-export default createApp();
+const app = createApp();
+
+export default {
+  fetch: app.fetch,
+  /** Once-a-minute sweep of the jobs table (drift jobs are usually kicked earlier by ingest). */
+  async scheduled(_controller: ScheduledController, env: Env): Promise<void> {
+    await runDueJobs(env.DB);
+  },
+} satisfies ExportedHandler<Env>;
