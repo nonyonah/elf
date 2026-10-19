@@ -307,6 +307,22 @@ function ProjectOverview({
         </Alert>
       ) : null}
 
+      {detail.state === "stale" ? (
+        <Alert variant="warning">
+          <TriangleAlert />
+          <AlertTitle>
+            {detail.staleReason === "figma"
+              ? "The Figma file changed since the last snapshot"
+              : "This project's data is over 24 hours old"}
+          </AlertTitle>
+          <AlertDescription>
+            {detail.staleReason === "figma"
+              ? "Open the file with the Elf Bridge plugin to push a fresh Figma snapshot."
+              : "Run `elf push` from the repo, or open the file with the Elf Bridge plugin, to refresh."}
+          </AlertDescription>
+        </Alert>
+      ) : null}
+
       {overdue > 0 ? (
         <Alert variant="error">
           <CircleAlert />

@@ -4,7 +4,7 @@ The hosted side of [elf](../elf): receives design-system snapshots from repos an
 
 Scope and behavior: [`DASHBOARD-SCOPE.md`](./DASHBOARD-SCOPE.md). Wire protocol (`/api/v1`, schema 1): `CONTRACT.md` in the `elf` repo.
 
-> Status: **order-of-work step 3 (awaiting review)** — the dashboard API (`/api/projects`, per-project detail live recompute, deprecations CRUD, connections with sealed secrets, audit log) and the console screens (Overview, Project, Deprecations, Connections) are built. Earlier: `CONTRACT.md` v1 ingest + drift jobs (step 2) on the Clerk/D1 shell (step 1). Notifications polling, Activity, and Settings land in step 4.
+> Status: **order-of-work step 4 (awaiting review)** — 15-minute Figma version polling, Slack notifications with per-project rules, the Activity feed and Settings (workspace, members, token issue/revoke) are built, next to the step-3 dashboard API (`/api/projects`, per-project detail live recompute, deprecations CRUD, connections with sealed secrets) and console screens (Overview, Project, Deprecations, Connections). Earlier: `CONTRACT.md` v1 ingest + drift jobs (step 2) on the Clerk/D1 shell (step 1).
 
 ## Stack
 
@@ -18,10 +18,12 @@ Scope and behavior: [`DASHBOARD-SCOPE.md`](./DASHBOARD-SCOPE.md). Wire protocol 
 
 ```
 src/            Worker: index.ts (routes + cron), api.ts (/api/v1, CONTRACT.md), contract.ts (validation),
-                drift.ts (server-side recompute via elf core), jobs.ts (debounced jobs table), ratelimit.ts,
-                auth.ts (Clerk), db/ (crypto, tokens, workspaces), env.ts
-client/         Vite + React app (Overview / Project / Deprecations / Connections); components.json holds the coss registry config
-migrations/     D1 migrations (schema 1: 0001_init.sql; rate limits: 0002)
+                drift.ts (server-side recompute via elf core), jobs.ts (debounced jobs table), poll.ts
+                (15-min Figma version sweep), notify.ts (Slack digests), ratelimit.ts, auth.ts (Clerk),
+                db/ (crypto, tokens, workspaces), env.ts
+client/         Vite + React app (Overview / Project / Deprecations / Connections / Activity / Settings);
+                components.json holds the coss registry config
+migrations/     D1 migrations (schema 1: 0001_init.sql; rate limits: 0002; notify/poll: 0003)
 test/           Worker-integration tests (real D1, injected sessions)
 ```
 
@@ -72,6 +74,7 @@ Open http://127.0.0.1:8787/ — you get one demo project (“Marketing site”) 
 | `CLERK_SECRET_KEY` | secret | Clerk session-token verification |
 | `CLERK_PUBLISHABLE_KEY` | var | Public Clerk instance key |
 | `CLERK_AUTHORIZED_PARTIES` | var | Comma-separated allowed origins |
+| `CONSOLE_ORIGIN` | var | Public console origin; Slack messages link back to it |
 | `SECRETS_KEY` | secret | AES-GCM key (base64, 32 bytes) for connection secrets |
 
 Tokens minted for repos/plugin (`elf_push_…`, `elf_plugin_…`) are stored as SHA-256 + last4 only and shown once.

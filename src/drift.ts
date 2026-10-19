@@ -40,6 +40,8 @@ export interface ProjectStatus {
   state: "ok" | "drift" | "stale" | "unknown";
   checkedAt: string;
   counts: DriftCounts;
+  /** Why a project reads `stale`: old data, or a Figma file that moved on. */
+  staleReason: "age" | "figma" | null;
 }
 
 export interface SnapshotRow {
@@ -333,9 +335,17 @@ export async function readStatus(
     )
     .bind(projectId)
     .first<{ state: ProjectStatus["state"]; counts: string | null; createdAt: string }>();
-  if (!run) return { state: "unknown", checkedAt: new Date(nowMs).toISOString(), counts: zeroCounts() };
+  if (!run) {
+    return {
+      state: "unknown",
+      checkedAt: new Date(nowMs).toISOString(),
+      counts: zeroCounts(),
+      staleReason: null,
+    };
+  }
 
   let state = run.state;
+  let staleReason: ProjectStatus["staleReason"] = null;
   if (state !== "unknown") {
     const newest = await db
       .prepare("SELECT receivedAt FROM snapshots WHERE projectId = ? ORDER BY receivedAt DESC LIMIT 1")
@@ -343,6 +353,7 @@ export async function readStatus(
       .first<{ receivedAt: string }>();
     if (newest && nowMs - Date.parse(newest.receivedAt) > STALE_AFTER_MS) {
       state = "stale";
+      staleReason = "age";
     } else {
       // The 15-minute poll saw the Figma file move on since the last Figma
       // snapshot — the data is out of date even though it isn't old yet.
@@ -357,6 +368,7 @@ export async function readStatus(
         .first<{ figmaDirtyAt: string | null; newestFigma: string | null }>();
       if (dirty?.figmaDirtyAt && (!dirty.newestFigma || dirty.figmaDirtyAt > dirty.newestFigma)) {
         state = "stale";
+        staleReason = "figma";
       }
     }
   }
@@ -369,5 +381,5 @@ export async function readStatus(
       // A corrupted counts blob reads as zeros rather than failing the status call.
     }
   }
-  return { state, checkedAt: run.createdAt, counts };
+  return { state, checkedAt: run.createdAt, counts, staleReason };
 }

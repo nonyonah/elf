@@ -185,6 +185,7 @@ describe("pollFigmaSources", () => {
       .run();
     const status = await readStatus(env.DB, projectId);
     expect(status.state).toBe("stale");
+    expect(status.staleReason).toBe("figma");
 
     // The plugin lands a fresh Figma snapshot — the dirty marker clears.
     const plugin = await createToken(env.DB, projectId, "plugin");
@@ -208,6 +209,27 @@ describe("pollFigmaSources", () => {
       .first<{ figmaDirtyAt: string | null }>();
     expect(cleared?.figmaDirtyAt).toBeNull();
     expect((await readStatus(env.DB, projectId)).state).not.toBe("stale");
+    expect((await readStatus(env.DB, projectId)).staleReason).toBeNull();
+  });
+
+  it("reports age staleness separately from Figma changes", async () => {
+    const projectId = await seedProjectRow();
+    const old = new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString();
+    await env.DB.prepare(
+      `INSERT INTO snapshots (id, projectId, kind, source, contentHash, payload, receivedAt)
+       VALUES (?, ?, 'code', 'cli', ?, ?, ?)`,
+    )
+      .bind(`snap_${crypto.randomUUID()}`, projectId, crypto.randomUUID(), codeSnapshotJson(), old)
+      .run();
+    await env.DB.prepare(
+      "INSERT INTO drift_runs (id, projectId, state, counts, triggeredBy, createdAt) VALUES (?, ?, 'ok', '{}', 'test', ?)",
+    )
+      .bind(crypto.randomUUID(), projectId, old)
+      .run();
+
+    const status = await readStatus(env.DB, projectId);
+    expect(status.state).toBe("stale");
+    expect(status.staleReason).toBe("age");
   });
 
   it("permission errors land on the connection and a good poll clears them", async () => {

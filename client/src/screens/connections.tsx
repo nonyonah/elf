@@ -196,7 +196,7 @@ function FigmaPanel({
   return (
     <Panel
       action={<StatusBadge status={connection.status} />}
-      description="Where the Figma side of the truth lives. The token lets the console poll the file later."
+      description="Where the Figma side of the truth lives. The console polls the file every 15 minutes for version changes."
       title="Figma"
     >
       <form

@@ -115,6 +115,7 @@ export interface OverviewResponse {
 export interface ProjectDetailResponse {
   project: { id: string; name: string; slug: string; createdAt: string };
   state: DriftState;
+  staleReason: "age" | "figma" | null;
   checkedAt: string;
   counts: Partial<DriftCounts>;
   details: DriftResult | null;

@@ -493,6 +493,7 @@ export function dashboard(): Hono<AppEnv> {
     return c.json({
       project,
       state: status.state,
+      staleReason: status.staleReason,
       checkedAt: status.checkedAt,
       counts,
       details,

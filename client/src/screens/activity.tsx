@@ -33,10 +33,6 @@ const ACTION_META: Record<string, ActionMeta> = {
     icon: Box,
     sentence: (detail) => `created the project “${text(detail, "name") ?? "—"}”`,
   },
-  "project.update": {
-    icon: Box,
-    sentence: () => "updated a project",
-  },
   "deprecation.create": {
     icon: Archive,
     sentence: (detail) =>
