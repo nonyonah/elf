@@ -19,8 +19,10 @@
     }
   ],
   "vars": {
-    "CONSOLE_ORIGIN": "https://console.elf.dev"
+    "CONSOLE_ORIGIN": "https://console.elf.dev",
+    "CLERK_AUTHORIZED_PARTIES": "https://console.elf.dev"
   },
+  "workers_dev": true,
   "triggers": {
     "crons": ["* * * * *", "*/15 * * * *"]
   },
