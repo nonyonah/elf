@@ -1,6 +1,18 @@
 import { Check, Copy, KeyRound, Plus, Users } from "@/components/icons";
 import * as React from "react";
-import { Panel } from "@/components/panel";
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardFrame,
+  CardFrameAction,
+  CardFrameDescription,
+  CardFrameHeader,
+  CardFrameTitle,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import {
   AlertDialog,
   AlertDialogClose,
@@ -81,7 +93,7 @@ function TokenResultDialog({
           </DialogDescription>
         </DialogHeader>
         <DialogPanel>
-          <code className="block break-all rounded-lg bg-muted p-3 font-mono text-xs">
+          <code className="block break-all rounded-lg bg-muted p-3 font-mono text-[13px]">
             {issued?.token}
           </code>
         </DialogPanel>
@@ -274,17 +286,24 @@ function ProjectTokensPanel({
   const [issued, setIssued] = React.useState<IssuedToken | null>(null);
 
   return (
-    <Panel
-      action={
-        <Button onClick={() => setIssueOpen(true)} size="sm" variant="outline">
-          <Plus />
-          Issue token
-        </Button>
-      }
-      description="Shown once at issue time; the API keeps only a hash and the last four characters."
-      flush
-      title={projectName}
-    >
+    <CardFrame>
+      <CardFrameHeader>
+        <CardFrameTitle>{projectName}</CardFrameTitle>
+        <CardFrameDescription>
+          Shown once at issue time; the API keeps only a hash and the last four
+          characters.
+        </CardFrameDescription>
+        <CardFrameAction>
+          <Button
+            onClick={() => setIssueOpen(true)}
+            size="sm"
+            variant="outline"
+          >
+            <Plus />
+            Issue token
+          </Button>
+        </CardFrameAction>
+      </CardFrameHeader>
       {query.loading && !query.data ? (
         <div className="flex items-center gap-2 px-4 py-6 text-muted-foreground text-sm">
           <Spinner className="size-4" />
@@ -302,7 +321,7 @@ function ProjectTokensPanel({
           No tokens yet. Issue one for the CLI or the Figma bridge.
         </p>
       ) : (
-        <Table>
+        <Table variant="card">
           <TableHeader>
             <TableRow>
               <TableHead>Token</TableHead>
@@ -324,13 +343,13 @@ function ProjectTokensPanel({
                     <span className="text-sm">{token.label ?? "No label"}</span>
                   </div>
                 </TableCell>
-                <TableCell className="font-mono text-muted-foreground text-xs">
+                <TableCell className="font-mono text-muted-foreground text-[13px]">
                   …{token.last4}
                 </TableCell>
-                <TableCell className="text-muted-foreground text-xs">
+                <TableCell className="text-muted-foreground text-[13px]">
                   {formatDateTime(token.createdAt)}
                 </TableCell>
-                <TableCell className="text-muted-foreground text-xs">
+                <TableCell className="text-muted-foreground text-[13px]">
                   {token.lastUsedAt ? formatRelative(token.lastUsedAt) : "never"}
                 </TableCell>
                 <TableCell>
@@ -365,7 +384,7 @@ function ProjectTokensPanel({
         projectId={projectId}
       />
       <TokenResultDialog issued={issued} onDone={() => setIssued(null)} />
-    </Panel>
+    </CardFrame>
   );
 }
 
@@ -386,18 +405,27 @@ export function SettingsScreen({
         </p>
       </div>
 
-      <Panel
-        action={<Badge variant="secondary">{overview.projects.length} project{overview.projects.length === 1 ? "" : "s"}</Badge>}
-        description="One workspace per user in this version — created on first sign-in."
-        title="Workspace"
-      >
+      <Card>
+        <CardHeader>
+          <CardTitle>Workspace</CardTitle>
+          <CardDescription>
+            One workspace per user in this version — created on first sign-in.
+          </CardDescription>
+          <CardAction>
+            <Badge variant="secondary">
+              {overview.projects.length} project
+              {overview.projects.length === 1 ? "" : "s"}
+            </Badge>
+          </CardAction>
+        </CardHeader>
+        <CardContent>
         <div className="flex flex-col gap-4">
           <div className="grid gap-1 text-sm">
             <span className="font-medium">{query.data?.workspace.name ?? overview.workspace.name}</span>
-            <span className="font-mono text-muted-foreground text-xs">{overview.workspace.id}</span>
+            <span className="font-mono text-muted-foreground text-[13px]">{overview.workspace.id}</span>
           </div>
           <div className="flex flex-col gap-2">
-            <span className="flex items-center gap-2 text-muted-foreground text-xs uppercase tracking-wide">
+            <span className="flex items-center gap-2 text-muted-foreground text-[13px] uppercase tracking-wide">
               <Users className="size-3.5" />
               Members
             </span>
@@ -407,11 +435,11 @@ export function SettingsScreen({
               <ul className="flex flex-col gap-2">
                 {(query.data?.members ?? []).map((member) => (
                   <li className="flex items-center gap-2 text-sm" key={member.userId}>
-                    <span className="truncate font-mono text-xs">{member.userId}</span>
+                    <span className="truncate font-mono text-[13px]">{member.userId}</span>
                     <Badge size="sm" variant="secondary">
                       {member.role}
                     </Badge>
-                    <span className="text-muted-foreground text-xs">
+                    <span className="text-muted-foreground text-[13px]">
                       joined {formatRelative(member.createdAt)}
                     </span>
                   </li>
@@ -420,7 +448,8 @@ export function SettingsScreen({
             )}
           </div>
         </div>
-      </Panel>
+      </CardContent>
+    </Card>
 
       <div className="flex items-center gap-2">
         <KeyRound className="size-4 text-muted-foreground" />

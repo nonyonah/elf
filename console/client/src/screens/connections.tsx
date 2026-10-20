@@ -1,6 +1,13 @@
 import { CircleAlert, Plug, Send } from "@/components/icons";
 import * as React from "react";
-import { Panel } from "@/components/panel";
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -194,11 +201,18 @@ function FigmaPanel({
     secret.trim() !== "";
 
   return (
-    <Panel
-      action={<StatusBadge status={connection.status} />}
-      description="Where the Figma side of the truth lives. The console polls the file every 15 minutes for version changes."
-      title="Figma"
-    >
+    <Card>
+      <CardHeader>
+        <CardTitle>Figma</CardTitle>
+        <CardDescription>
+          Where the Figma side of the truth lives. The console polls the file
+          every 15 minutes for version changes.
+        </CardDescription>
+        <CardAction>
+          <StatusBadge status={connection.status} />
+        </CardAction>
+      </CardHeader>
+      <CardContent>
       <form
         className="flex flex-col gap-5"
         onSubmit={(event) => {
@@ -250,7 +264,7 @@ function FigmaPanel({
           </FieldDescription>
         </Field>
         <div className="flex items-center justify-between gap-3">
-          <span className="text-muted-foreground text-xs">
+          <span className="text-muted-foreground text-[13px]">
             {connection.updatedAt
               ? `Updated ${formatRelative(connection.updatedAt)}`
               : "No secret stored yet"}
@@ -270,7 +284,8 @@ function FigmaPanel({
           </div>
         </div>
       </form>
-    </Panel>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -322,7 +337,7 @@ function NotificationRulesSection({
     <div className="flex flex-col gap-4 border-t pt-5">
       <div>
         <div className="font-heading font-medium text-sm">Notifications</div>
-        <div className="mt-0.5 text-muted-foreground text-xs">
+        <div className="mt-0.5 text-muted-foreground text-[13px]">
           When the notify job posts drift digests to this webhook.
         </div>
       </div>
@@ -345,7 +360,7 @@ function NotificationRulesSection({
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
               <div className="text-sm">Send a digest</div>
-              <div className="text-muted-foreground text-xs">
+              <div className="text-muted-foreground text-[13px]">
                 “Only on changes” stays quiet while everything is in sync.
               </div>
             </div>
@@ -369,7 +384,7 @@ function NotificationRulesSection({
           <label className="flex items-center justify-between gap-3">
             <div className="min-w-0">
               <div className="text-sm">Overdue deprecations bypass “never”</div>
-              <div className="text-muted-foreground text-xs">
+              <div className="text-muted-foreground text-[13px]">
                 A passed deadline always pings, even when digests are off.
               </div>
             </div>
@@ -426,11 +441,18 @@ function SlackPanel({
   }
 
   return (
-    <Panel
-      action={<StatusBadge status={connection.status} />}
-      description="Where drift digests land — verify the webhook, then tune when it fires."
-      title="Slack"
-    >
+    <Card>
+      <CardHeader>
+        <CardTitle>Slack</CardTitle>
+        <CardDescription>
+          Where drift digests land — verify the webhook, then tune when it
+          fires.
+        </CardDescription>
+        <CardAction>
+          <StatusBadge status={connection.status} />
+        </CardAction>
+      </CardHeader>
+      <CardContent>
       <div className="flex flex-col gap-5">
         {connection.status === "error" && connection.statusMessage ? (
           <Alert variant="error">
@@ -465,7 +487,7 @@ function SlackPanel({
             </FieldDescription>
           </Field>
           <div className="flex items-center justify-between gap-3">
-            <span className="text-muted-foreground text-xs">
+            <span className="text-muted-foreground text-[13px]">
               {connection.updatedAt
                 ? `Updated ${formatRelative(connection.updatedAt)}`
                 : "No webhook stored yet"}
@@ -498,7 +520,8 @@ function SlackPanel({
         </form>
         <NotificationRulesSection projectId={projectId} />
       </div>
-    </Panel>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -524,14 +547,19 @@ export function ConnectionsScreen({
 
   if (query.error || !query.data) {
     return (
-      <Panel title="Could not load connections">
-        <div className="flex items-center gap-3 text-sm">
-          <span className="text-muted-foreground">{query.error}</span>
-          <Button onClick={query.reload} size="sm" variant="outline">
-            Retry
-          </Button>
-        </div>
-      </Panel>
+      <Card>
+        <CardHeader>
+          <CardTitle>Could not load connections</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center gap-3 text-sm">
+            <span className="text-muted-foreground">{query.error}</span>
+            <Button onClick={query.reload} size="sm" variant="outline">
+              Retry
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
     );
   }
 

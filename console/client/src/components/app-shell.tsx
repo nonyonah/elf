@@ -6,13 +6,12 @@ import {
   History,
   LayoutDashboard,
   LogOut,
-  RefreshCw,
   Settings,
 } from "@/components/icons";
 import type * as React from "react";
 import { useEffect, useRef } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
+import { CommandMenu } from "@/components/command-menu";
 import {
   Menu,
   MenuItem,
@@ -37,16 +36,16 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
-import { formatRelative, totalDriftCounts } from "@/lib/format";
+import { totalDriftCounts } from "@/lib/format";
 import type { Route } from "@/lib/router";
-import { hrefFor } from "@/lib/router";
+import { hrefFor, navigate } from "@/lib/router";
 import type { OverviewResponse } from "@/lib/types";
 
 const PRODUCT_NAME = "elf console";
 
 function BrandMark(): React.ReactElement {
   return (
-    <div className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-primary font-heading font-semibold text-[13px] text-primary-foreground">
+    <div className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-muted font-heading font-semibold text-[13px] text-muted-foreground">
       e
     </div>
   );
@@ -184,20 +183,48 @@ function DevUserBlock(): React.ReactElement {
 export function AppShell({
   overview,
   route,
-  onRefresh,
-  refreshing,
   devMode = false,
   children,
 }: {
   overview: OverviewResponse;
   route: Route;
-  onRefresh: () => void;
-  refreshing: boolean;
   devMode?: boolean;
   children: React.ReactNode;
 }): React.ReactElement {
   const scrollRef = useRef<HTMLDivElement>(null);
   const routeKey = hrefFor(route);
+  const commandItems = [
+    ...overview.projects.map((project) => ({
+      group: "Projects",
+      hint: project.slug,
+      id: project.id,
+      label: project.name,
+      onSelect: () =>
+        navigate({
+          name: "project",
+          projectId: project.id,
+          view: "overview",
+        }),
+    })),
+    {
+      group: "Workspace",
+      id: "overview",
+      label: "Overview",
+      onSelect: () => navigate({ name: "overview" }),
+    },
+    {
+      group: "Workspace",
+      id: "activity",
+      label: "Activity",
+      onSelect: () => navigate({ name: "activity" }),
+    },
+    {
+      group: "Workspace",
+      id: "settings",
+      label: "Settings",
+      onSelect: () => navigate({ name: "settings" }),
+    },
+  ];
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: 0 });
@@ -319,18 +346,7 @@ export function AppShell({
           <Separator className="me-1 data-[orientation=vertical]:h-4" orientation="vertical" />
           <Breadcrumbs overview={overview} route={route} />
           <div className="ms-auto flex items-center gap-2">
-            <span className="hidden text-muted-foreground text-[13px] sm:block">
-              Checked {formatRelative(overview.summary.lastCheckedAt)}
-            </span>
-            <Button
-              aria-label="Refresh"
-              disabled={refreshing}
-              onClick={onRefresh}
-              size="icon-sm"
-              variant="ghost"
-            >
-              <RefreshCw className={refreshing ? "animate-spin" : undefined} />
-            </Button>
+            <CommandMenu items={commandItems} />
           </div>
         </header>
         <div

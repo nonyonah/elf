@@ -1,6 +1,16 @@
 import { CircleAlert, GitBranch, TriangleAlert } from "@/components/icons";
 import * as React from "react";
-import { Panel } from "@/components/panel";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFrame,
+  CardFrameDescription,
+  CardFrameHeader,
+  CardFrameTitle,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { StatCard } from "@/components/stat-card";
 import { stateLabel, StatusPill } from "@/components/status-pill";
 import { TrendChart } from "@/components/trend-chart";
@@ -64,7 +74,7 @@ function ColorValue({ value }: { value: string }): React.ReactElement {
           style={{ backgroundColor: value }}
         />
       ) : null}
-      <code className="font-mono text-xs">{value}</code>
+      <code className="font-mono text-[13px]">{value}</code>
     </span>
   );
 }
@@ -99,7 +109,7 @@ function ValueMismatchTable({
   details: DriftResult;
 }): React.ReactElement {
   return (
-    <Table>
+    <Table variant="card">
       <TableHeader>
         <TableRow>
           <TableHead>Token</TableHead>
@@ -117,7 +127,7 @@ function ValueMismatchTable({
             <TableCell>
               <span className="font-medium">{mismatch.name}</span>
               {mismatch.mode ? (
-                <span className="ms-1.5 text-muted-foreground text-xs">
+                <span className="ms-1.5 text-muted-foreground text-[13px]">
                   {mismatch.mode}
                 </span>
               ) : null}
@@ -153,7 +163,7 @@ function MissingTokensTable({
     ...details.missingInFigma.map((token): MissingEntry => ({ token, side: "Not in Figma" })),
   ];
   return (
-    <Table>
+    <Table variant="card">
       <TableHeader>
         <TableRow>
           <TableHead>Token</TableHead>
@@ -171,7 +181,7 @@ function MissingTokensTable({
             <TableCell>
               <span className="font-medium">{token.name}</span>
               {token.mode ? (
-                <span className="ms-1.5 text-muted-foreground text-xs">
+                <span className="ms-1.5 text-muted-foreground text-[13px]">
                   {token.mode}
                 </span>
               ) : null}
@@ -230,7 +240,7 @@ function ComponentIssuesTable({
     })),
   ];
   return (
-    <Table>
+    <Table variant="card">
       <TableHeader>
         <TableRow>
           <TableHead>Component</TableHead>
@@ -252,7 +262,7 @@ function ComponentIssuesTable({
             </TableCell>
             {mode === "developer" ? (
               <TableCell>
-                <code className="font-mono text-xs">
+                <code className="font-mono text-[13px]">
                   {issue.codeKey ?? issue.name}
                 </code>
               </TableCell>
@@ -370,7 +380,7 @@ function ProjectOverview({
         </Alert>
       ) : null}
 
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-muted-foreground text-xs">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-muted-foreground text-[13px]">
         <span>
           Code snapshot{" "}
           {detail.latestCode
@@ -432,50 +442,64 @@ function ProjectOverview({
         />
       </div>
 
-      <Panel
-        description="Drift items recomputed per stored run — newest on the right."
-        title="Drift per run"
-      >
-        <TrendChart
-          emptyText="No runs yet — push a snapshot with elf push to get started."
-          points={trendPoints}
-        />
-      </Panel>
+      <Card>
+        <CardHeader>
+          <CardTitle>Drift per run</CardTitle>
+          <CardDescription>
+            Drift items recomputed per stored run — newest on the right.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <TrendChart
+            emptyText="No runs yet — push a snapshot with elf push to get started."
+            points={trendPoints}
+          />
+        </CardContent>
+      </Card>
 
       {details ? (
         <>
-          <Panel
-            description="The same token name with a different value on each side."
-            flush
-            title="Value mismatches"
-          >
+          <CardFrame>
+            <CardFrameHeader>
+              <CardFrameTitle>Value mismatches</CardFrameTitle>
+              <CardFrameDescription>
+                The same token name with a different value on each side.
+              </CardFrameDescription>
+            </CardFrameHeader>
             <ValueMismatchTable details={details} />
-          </Panel>
-          <Panel
-            description="Present on one side only."
-            flush
-            title="Missing tokens"
-          >
+          </CardFrame>
+          <CardFrame>
+            <CardFrameHeader>
+              <CardFrameTitle>Missing tokens</CardFrameTitle>
+              <CardFrameDescription>Present on one side only.</CardFrameDescription>
+            </CardFrameHeader>
             <MissingTokensTable details={details} />
-          </Panel>
-          <Panel
-            description="Components that need attention."
-            flush
-            title="Components"
-          >
+          </CardFrame>
+          <CardFrame>
+            <CardFrameHeader>
+              <CardFrameTitle>Components</CardFrameTitle>
+              <CardFrameDescription>
+                Components that need attention.
+              </CardFrameDescription>
+            </CardFrameHeader>
             <ComponentIssuesTable details={details} mode={mode} />
-          </Panel>
+          </CardFrame>
         </>
       ) : (
-        <Panel
-          description="A code snapshot is required before drift can be computed."
-          title="No snapshot to compare"
-        >
-          <div className="flex items-center gap-2 text-muted-foreground text-sm">
-            <Spinner className="size-4" />
-            Waiting for the first elf push from this project.
-          </div>
-        </Panel>
+        <Card>
+          <CardHeader>
+            <CardTitle>No snapshot to compare</CardTitle>
+            <CardDescription>
+              A code snapshot is required before drift can be computed.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-2 text-muted-foreground text-sm">
+              <Spinner className="size-4" />
+              Waiting for the first elf push from this project.
+            </div>
+          </CardContent>
+        </Card>
       )}
     </div>
   );

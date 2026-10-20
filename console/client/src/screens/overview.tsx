@@ -1,9 +1,16 @@
-import { Boxes, Plus, Search } from "@/components/icons";
+import { Boxes, Plus } from "@/components/icons";
 import * as React from "react";
-import { Panel } from "@/components/panel";
 import { StatCard } from "@/components/stat-card";
 import { StatusPill } from "@/components/status-pill";
 import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFrame,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import {
   Dialog,
   DialogClose,
@@ -24,11 +31,6 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { Input } from "@/components/ui/input";
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupInput,
-} from "@/components/ui/input-group";
 import {
   Select,
   SelectItem,
@@ -155,17 +157,11 @@ export function OverviewScreen({
   reloadOverview: () => void;
 }): React.ReactElement {
   const [createOpen, setCreateOpen] = React.useState(false);
-  const [search, setSearch] = React.useState("");
   const [stateFilter, setStateFilter] = React.useState<StateFilter>("all");
 
   const projects = overview.projects.filter((project) => {
     if (stateFilter !== "all" && project.state !== stateFilter) return false;
-    if (!search.trim()) return true;
-    const needle = search.trim().toLowerCase();
-    return (
-      project.name.toLowerCase().includes(needle) ||
-      project.slug.toLowerCase().includes(needle)
-    );
+    return true;
   });
 
   const trendPoints = overview.trend.map((point) => ({
@@ -218,18 +214,24 @@ export function OverviewScreen({
         />
       </div>
 
-      <Panel
-        description="Drift items across all projects — the last run of each project per day."
-        title="Drift over time"
-      >
-        <TrendChart
-          emptyText="No drift runs yet — push a snapshot with elf push to get started."
-          points={trendPoints}
-        />
-      </Panel>
+      <Card>
+        <CardHeader>
+          <CardTitle>Drift over time</CardTitle>
+          <CardDescription>
+            Drift items across all projects — the last run of each project per
+            day.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <TrendChart
+            emptyText="No drift runs yet — push a snapshot with elf push to get started."
+            points={trendPoints}
+          />
+        </CardContent>
+      </Card>
 
       {overview.projects.length === 0 ? (
-        <Panel flush>
+        <Card>
           <Empty>
             <EmptyHeader>
               <EmptyMedia variant="icon">
@@ -247,50 +249,35 @@ export function OverviewScreen({
               </Button>
             </EmptyContent>
           </Empty>
-        </Panel>
+        </Card>
       ) : (
-        <Panel
-          action={
-            <>
-              <InputGroup className="w-52">
-                <InputGroupAddon>
-                  <Search />
-                </InputGroupAddon>
-                <InputGroupInput
-                  aria-label="Search projects"
-                  onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Search projects"
-                  value={search}
-                />
-              </InputGroup>
-              <Select
-                items={{
-                  all: "All states",
-                  ok: "In sync",
-                  drift: "Drift",
-                  stale: "Stale",
-                  unknown: "Awaiting data",
-                }}
-                onValueChange={(value) => setStateFilter(value as StateFilter)}
-                value={stateFilter}
-              >
-                <SelectTrigger className="w-40">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectPopup>
-                  <SelectItem value="all">All states</SelectItem>
-                  <SelectItem value="ok">In sync</SelectItem>
-                  <SelectItem value="drift">Drift</SelectItem>
-                  <SelectItem value="stale">Stale</SelectItem>
-                  <SelectItem value="unknown">Awaiting data</SelectItem>
-                </SelectPopup>
-              </Select>
-            </>
-          }
-          flush
-          title="Projects"
-        >
-          <Table>
+        <>
+          <div className="flex items-center justify-end gap-3">
+            <Select
+              items={{
+                all: "All states",
+                ok: "In sync",
+                drift: "Drift",
+                stale: "Stale",
+                unknown: "Awaiting data",
+              }}
+              onValueChange={(value) => setStateFilter(value as StateFilter)}
+              value={stateFilter}
+            >
+              <SelectTrigger className="w-40">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectPopup>
+                <SelectItem value="all">All states</SelectItem>
+                <SelectItem value="ok">In sync</SelectItem>
+                <SelectItem value="drift">Drift</SelectItem>
+                <SelectItem value="stale">Stale</SelectItem>
+                <SelectItem value="unknown">Awaiting data</SelectItem>
+              </SelectPopup>
+            </Select>
+          </div>
+          <CardFrame>
+          <Table variant="card">
             <TableHeader>
               <TableRow>
                 <TableHead>Project</TableHead>
@@ -361,7 +348,8 @@ export function OverviewScreen({
               })}
             </TableBody>
           </Table>
-        </Panel>
+          </CardFrame>
+        </>
       )}
 
       <CreateProjectDialog

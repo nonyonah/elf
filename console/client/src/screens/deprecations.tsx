@@ -1,6 +1,14 @@
 import { Download, MoreHorizontal, Pencil, Plus, Trash2 } from "@/components/icons";
 import * as React from "react";
-import { Panel } from "@/components/panel";
+import {
+  Card,
+  CardContent,
+  CardFrame,
+  CardFrameHeader,
+  CardFrameTitle,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import {
   AlertDialog,
   AlertDialogClose,
@@ -414,16 +422,21 @@ export function DeprecationsScreen({
           Loading deprecations…
         </div>
       ) : query.error ? (
-        <Panel title="Could not load deprecations">
-          <div className="flex items-center gap-3 text-sm">
-            <span className="text-muted-foreground">{query.error}</span>
-            <Button onClick={query.reload} size="sm" variant="outline">
-              Retry
-            </Button>
-          </div>
-        </Panel>
+        <Card>
+          <CardHeader>
+            <CardTitle>Could not load deprecations</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-3 text-sm">
+              <span className="text-muted-foreground">{query.error}</span>
+              <Button onClick={query.reload} size="sm" variant="outline">
+                Retry
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       ) : deprecations.length === 0 ? (
-        <Panel flush>
+        <Card>
           <Empty>
             <EmptyHeader>
               <EmptyTitle>No deprecations yet</EmptyTitle>
@@ -445,10 +458,13 @@ export function DeprecationsScreen({
               </Button>
             </EmptyContent>
           </Empty>
-        </Panel>
+        </Card>
       ) : (
-        <Panel flush title={`${deprecations.length} deprecations`}>
-          <Table>
+        <CardFrame>
+          <CardFrameHeader>
+            <CardFrameTitle>{deprecations.length} deprecations</CardFrameTitle>
+          </CardFrameHeader>
+          <Table variant="card">
             <TableHeader>
               <TableRow>
                 <TableHead>Name</TableHead>
@@ -526,10 +542,10 @@ export function DeprecationsScreen({
               })}
             </TableBody>
           </Table>
-        </Panel>
+        </CardFrame>
       )}
 
-      <p className="text-muted-foreground text-xs">
+      <p className="text-muted-foreground text-[13px]">
         Last checked {formatRelative(detail.checkedAt)}. Overdue deprecations
         count as drift.
       </p>

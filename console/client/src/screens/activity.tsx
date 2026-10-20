@@ -8,7 +8,12 @@ import {
   Sparkles,
 } from "@/components/icons";
 import * as React from "react";
-import { Panel } from "@/components/panel";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { Spinner } from "@/components/ui/spinner";
@@ -103,7 +108,7 @@ function ActivityRow({ entry }: { entry: ActivityEntry }): React.ReactElement {
             </>
           ) : null}
         </p>
-        <p className="mt-0.5 text-muted-foreground text-xs">
+        <p className="mt-0.5 text-muted-foreground text-[13px]">
           {formatRelative(entry.createdAt)}
         </p>
       </div>
@@ -150,14 +155,19 @@ export function ActivityScreen(): React.ReactElement {
 
   if (entries === null) {
     return (
-      <Panel title="Could not load activity">
-        <div className="flex items-center gap-3 text-sm">
-          <span className="text-muted-foreground">{error}</span>
-          <Button onClick={() => void load()} size="sm" variant="outline">
-            Retry
-          </Button>
-        </div>
-      </Panel>
+      <Card>
+        <CardHeader>
+          <CardTitle>Could not load activity</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center gap-3 text-sm">
+            <span className="text-muted-foreground">{error}</span>
+            <Button onClick={() => void load()} size="sm" variant="outline">
+              Retry
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
     );
   }
 
@@ -169,7 +179,7 @@ export function ActivityScreen(): React.ReactElement {
           Who changed what in this workspace — secrets never land here.
         </p>
       </div>
-      <Panel flush>
+      <Card>
         {entries.length === 0 ? (
           <Empty>
             <EmptyHeader>
@@ -189,7 +199,7 @@ export function ActivityScreen(): React.ReactElement {
             ))}
           </ul>
         )}
-      </Panel>
+      </Card>
       {hasMore ? (
         <div className="flex justify-center">
           <Button

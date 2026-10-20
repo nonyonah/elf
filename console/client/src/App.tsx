@@ -48,9 +48,7 @@ function Console({
   return (
     <AppShell
       devMode={devMode}
-      onRefresh={query.reload}
       overview={query.data}
-      refreshing={query.loading}
       route={route}
     >
       {route.name === "overview" ? (
