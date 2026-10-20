@@ -23,13 +23,13 @@ export function Panel({
   return (
     <Card className={cn("gap-0 overflow-hidden", className)}>
       {hasHeader ? (
-        <div className="flex flex-wrap items-start justify-between gap-3 border-b px-5 py-4">
+        <div className="flex flex-wrap items-start justify-between gap-3 border-b px-4 py-3">
           <div className="min-w-0">
             {title === undefined ? null : (
               <div className="font-heading font-semibold text-sm">{title}</div>
             )}
             {description === undefined ? null : (
-              <div className="mt-0.5 text-muted-foreground text-xs">
+              <div className="mt-0.5 text-[13px] text-muted-foreground">
                 {description}
               </div>
             )}
@@ -42,7 +42,7 @@ export function Panel({
       {flush ? (
         children
       ) : (
-        <div className={cn("p-5", contentClassName)}>{children}</div>
+        <div className={cn("p-4", contentClassName)}>{children}</div>
       )}
     </Card>
   );

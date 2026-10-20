@@ -14,11 +14,11 @@ export function StatCard({
   tone?: "default" | "error" | "warning" | "success";
 }): React.ReactElement {
   return (
-    <Card className="gap-1.5 p-5">
-      <div className="text-muted-foreground text-sm">{label}</div>
+    <Card className="gap-1 p-4">
+      <div className="leading-tight text-[13px] text-muted-foreground">{label}</div>
       <div
         className={cn(
-          "font-heading text-3xl font-semibold tabular-nums tracking-tight",
+          "font-heading font-semibold text-2xl leading-none tabular-nums tracking-tight",
           tone === "error" && "text-destructive-foreground",
           tone === "warning" && "text-warning-foreground",
           tone === "success" && "text-success-foreground",
@@ -27,7 +27,7 @@ export function StatCard({
         {value}
       </div>
       {hint === undefined ? null : (
-        <div className="text-muted-foreground text-xs">{hint}</div>
+        <div className="leading-tight text-[13px] text-muted-foreground">{hint}</div>
       )}
     </Card>
   );

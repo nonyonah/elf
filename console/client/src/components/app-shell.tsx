@@ -8,7 +8,7 @@ import {
   LogOut,
   RefreshCw,
   Settings,
-} from "lucide-react";
+} from "@/components/icons";
 import type * as React from "react";
 import { useEffect, useRef } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -35,7 +35,6 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarProvider,
-  SidebarRail,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { formatRelative, totalDriftCounts } from "@/lib/format";
@@ -47,7 +46,7 @@ const PRODUCT_NAME = "elf console";
 
 function BrandMark(): React.ReactElement {
   return (
-    <div className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-primary font-heading font-semibold text-primary-foreground text-sm">
+    <div className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-primary font-heading font-semibold text-[13px] text-primary-foreground">
       e
     </div>
   );
@@ -81,13 +80,13 @@ function UserFooter(): React.ReactElement {
           >
             <Avatar className="size-8 rounded-lg">
               <AvatarImage alt={name} src={user.imageUrl} />
-              <AvatarFallback className="rounded-lg text-xs">
+              <AvatarFallback className="rounded-lg text-[13px]">
                 {initials || "?"}
               </AvatarFallback>
             </Avatar>
             <div className="grid flex-1 text-left leading-tight">
-              <span className="truncate font-medium text-sm">{name}</span>
-              <span className="truncate text-muted-foreground text-xs">
+              <span className="truncate font-medium text-[13px]">{name}</span>
+              <span className="truncate text-muted-foreground text-[13px]">
                 {email}
               </span>
             </div>
@@ -113,13 +112,13 @@ function Breadcrumbs({
   route: Route;
 }): React.ReactElement {
   if (route.name === "overview") {
-    return <span className="font-medium text-sm">Overview</span>;
+    return <span className="font-medium text-[13px]">Overview</span>;
   }
   if (route.name === "activity") {
-    return <span className="font-medium text-sm">Activity</span>;
+    return <span className="font-medium text-[13px]">Activity</span>;
   }
   if (route.name === "settings") {
-    return <span className="font-medium text-sm">Settings</span>;
+    return <span className="font-medium text-[13px]">Settings</span>;
   }
   const project =
     overview.projects.find((entry) => entry.id === route.projectId) ?? null;
@@ -132,7 +131,7 @@ function Breadcrumbs({
   return (
     <div className="flex min-w-0 items-center gap-1.5">
       <a
-        className="text-muted-foreground text-sm hover:text-foreground"
+        className="text-muted-foreground text-[13px] hover:text-foreground"
         href="#/"
       >
         Projects
@@ -141,8 +140,8 @@ function Breadcrumbs({
       <a
         className={
           viewLabel
-            ? "truncate text-muted-foreground text-sm hover:text-foreground"
-            : "truncate font-medium text-sm"
+            ? "truncate text-muted-foreground text-[13px] hover:text-foreground"
+            : "truncate font-medium text-[13px]"
         }
         href={hrefFor({ name: "project", projectId: route.projectId, view: "overview" })}
       >
@@ -151,7 +150,7 @@ function Breadcrumbs({
       {viewLabel ? (
         <>
           <ChevronRight className="size-3.5 shrink-0 text-muted-foreground/60" />
-          <span className="truncate font-medium text-sm">{viewLabel}</span>
+          <span className="truncate font-medium text-[13px]">{viewLabel}</span>
         </>
       ) : null}
     </div>
@@ -167,12 +166,12 @@ function DevUserBlock(): React.ReactElement {
           size="lg"
           tooltip="Local preview"
         >
-          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted font-medium text-muted-foreground text-xs">
+          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted font-medium text-muted-foreground text-[13px]">
             DV
           </div>
           <div className="grid flex-1 text-left leading-tight">
-            <span className="truncate font-medium text-sm">Dev preview</span>
-            <span className="truncate text-muted-foreground text-xs">
+            <span className="truncate font-medium text-[13px]">Dev preview</span>
+            <span className="truncate text-muted-foreground text-[13px]">
               Clerk bypass · local only
             </span>
           </div>
@@ -208,16 +207,16 @@ export function AppShell({
     <SidebarProvider className="h-svh overflow-hidden bg-background">
       <Sidebar
         className="group-data-[side=left]:border-r-0 [&_[data-slot=sidebar-inner]]:bg-transparent"
-        collapsible="icon"
+        collapsible="offcanvas"
       >
         <SidebarHeader>
           <div className="flex items-center gap-2.5 px-1 py-1.5">
             <BrandMark />
-            <div className="grid min-w-0 flex-1 leading-tight group-data-[collapsible=icon]:hidden">
-              <span className="truncate font-heading font-semibold text-sm">
+            <div className="grid min-w-0 flex-1 leading-tight">
+              <span className="truncate font-heading font-semibold text-[13px]">
                 {PRODUCT_NAME}
               </span>
-              <span className="truncate text-muted-foreground text-xs">
+              <span className="truncate text-muted-foreground text-[13px]">
                 {overview.workspace.name}
               </span>
             </div>
@@ -245,7 +244,7 @@ export function AppShell({
             <SidebarGroupContent>
               <SidebarMenu>
                 {overview.projects.length === 0 ? (
-                  <div className="px-2 py-1 text-muted-foreground text-xs group-data-[collapsible=icon]:hidden">
+                  <div className="px-2 py-1 text-muted-foreground text-[13px]">
                     No projects yet
                   </div>
                 ) : null}
@@ -313,7 +312,6 @@ export function AppShell({
         <SidebarFooter>
           {devMode ? <DevUserBlock /> : <UserFooter />}
         </SidebarFooter>
-        <SidebarRail />
       </Sidebar>
       <SidebarInset className="m-2 min-h-0 min-w-0 overflow-hidden rounded-[12px] border bg-card shadow-shell">
         <header className="z-20 flex h-12 shrink-0 items-center gap-2 border-b bg-card px-3">
@@ -321,7 +319,7 @@ export function AppShell({
           <Separator className="me-1 data-[orientation=vertical]:h-4" orientation="vertical" />
           <Breadcrumbs overview={overview} route={route} />
           <div className="ms-auto flex items-center gap-2">
-            <span className="hidden text-muted-foreground text-xs sm:block">
+            <span className="hidden text-muted-foreground text-[13px] sm:block">
               Checked {formatRelative(overview.summary.lastCheckedAt)}
             </span>
             <Button

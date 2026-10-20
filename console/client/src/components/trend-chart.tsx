@@ -29,7 +29,7 @@ function ChartTooltip({
   if (!active || !payload?.length) return null;
   const point = payload[0].payload;
   return (
-    <div className="rounded-lg border bg-popover px-3 py-2 text-xs shadow-md">
+    <div className="rounded-lg border bg-popover px-3 py-2 text-[13px] shadow-md">
       <div className="text-muted-foreground">
         {point.tooltip ?? point.label}
       </div>
@@ -42,7 +42,7 @@ function ChartTooltip({
 
 export function TrendChart({
   points,
-  height = 224,
+  height = 200,
   emptyText = "Nothing to chart yet.",
 }: {
   points: TrendChartPoint[];
@@ -90,7 +90,7 @@ export function TrendChart({
           <XAxis
             axisLine={false}
             dataKey="label"
-            fontSize={11}
+            fontSize={12}
             interval="preserveStartEnd"
             minTickGap={28}
             stroke="var(--muted-foreground)"
@@ -100,7 +100,7 @@ export function TrendChart({
           <YAxis
             allowDecimals={false}
             axisLine={false}
-            fontSize={11}
+            fontSize={12}
             stroke="var(--muted-foreground)"
             tickLine={false}
             width={32}
