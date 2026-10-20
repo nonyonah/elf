@@ -81,14 +81,18 @@ Tokens minted for repos/plugin (`elf_push_…`, `elf_plugin_…`) are stored as 
 
 ## Deploy
 
+The `elf-console` D1 database already exists and its `database_id` is committed in `wrangler.jsonc`; migrations are applied. A first deploy from a fresh account looks like this:
+
 ```sh
-wrangler d1 create elf-console        # once; paste the real database_id into wrangler.jsonc
+wrangler d1 create elf-console        # once; paste the returned database_id into wrangler.jsonc
 npm run build
 npm run db:remote                     # apply migrations
-wrangler secret put CLERK_SECRET_KEY
+wrangler secret put CLERK_SECRET_KEY  # required before sign-in works
 wrangler secret put SECRETS_KEY
 npm run deploy
 ```
+
+The worker currently serves on workers.dev (`https://elf-console.nonyonah.workers.dev`) while the `console.elf.dev` custom domain is unresolved — the `elf.dev` zone is not in this Cloudflare account. Point a proxied CNAME at the workers.dev host from wherever the zone is hosted, or move the zone into this account, then add the `routes` entry back. Update `CONSOLE_ORIGIN` and `CLERK_AUTHORIZED_PARTIES` to whichever origin is live. Two cron triggers run in production: every minute for due jobs and every fifteen minutes for Figma polling.
 
 ## Working with elf core
 
