@@ -231,12 +231,13 @@ export function AppShell({
   }, [routeKey]);
 
   return (
-    <SidebarProvider className="h-svh overflow-hidden bg-background">
-      <Sidebar
-        className="group-data-[side=left]:border-r-0 [&_[data-slot=sidebar-inner]]:bg-transparent"
-        collapsible="offcanvas"
-      >
-        <SidebarHeader>
+    <SidebarProvider className="h-svh overflow-hidden bg-background p-2">
+      <div className="flex h-full min-h-0 w-full overflow-hidden rounded-[12px] border bg-card shadow-shell [&>[data-slot=sidebar]]:min-w-0">
+        <Sidebar
+          className="static! h-full! min-w-0 overflow-hidden border-r border-sidebar-border [&_[data-slot=sidebar-gap]]:hidden group-data-[state=collapsed]:w-0 group-data-[state=collapsed]:border-r-0"
+          collapsible="offcanvas"
+        >
+          <SidebarHeader>
           <div className="flex items-center gap-2.5 px-1 py-1.5">
             <BrandMark />
             <div className="grid min-w-0 flex-1 leading-tight">
@@ -339,23 +340,24 @@ export function AppShell({
         <SidebarFooter>
           {devMode ? <DevUserBlock /> : <UserFooter />}
         </SidebarFooter>
-      </Sidebar>
-      <SidebarInset className="m-2 min-h-0 min-w-0 overflow-hidden rounded-[12px] border bg-card shadow-shell">
-        <header className="z-20 flex h-12 shrink-0 items-center gap-2 border-b bg-card px-3">
-          <SidebarTrigger />
-          <Separator className="me-1 data-[orientation=vertical]:h-4" orientation="vertical" />
-          <Breadcrumbs overview={overview} route={route} />
-          <div className="ms-auto flex items-center gap-2">
-            <CommandMenu items={commandItems} />
+        </Sidebar>
+        <SidebarInset className="min-h-0 min-w-0 flex-1 bg-card">
+          <header className="z-20 flex h-12 shrink-0 items-center gap-2 border-b bg-card px-3">
+            <SidebarTrigger />
+            <Separator className="me-1 data-[orientation=vertical]:h-4" orientation="vertical" />
+            <Breadcrumbs overview={overview} route={route} />
+            <div className="ms-auto flex items-center gap-2">
+              <CommandMenu items={commandItems} />
+            </div>
+          </header>
+          <div
+            className="min-h-0 flex-1 overflow-y-auto px-4 py-6 sm:px-6 lg:px-8"
+            ref={scrollRef}
+          >
+            <div className="mx-auto w-full max-w-6xl">{children}</div>
           </div>
-        </header>
-        <div
-          className="min-h-0 flex-1 overflow-y-auto px-4 py-6 sm:px-6 lg:px-8"
-          ref={scrollRef}
-        >
-          <div className="mx-auto w-full max-w-6xl">{children}</div>
-        </div>
-      </SidebarInset>
+        </SidebarInset>
+      </div>
     </SidebarProvider>
   );
 }
