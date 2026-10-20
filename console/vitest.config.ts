@@ -21,5 +21,7 @@ export default defineConfig({
   ],
   test: {
     setupFiles: ["./test/apply-migrations.ts"],
+    // D1-backed tests are slower than the 5s default on a busy machine.
+    testTimeout: 30_000,
   },
 });

@@ -9,6 +9,7 @@ const app = createApp();
 interface SeededProject {
   projectId: string;
   pushToken: string;
+  pushTokenId: string;
   pluginToken: string;
 }
 
@@ -24,7 +25,12 @@ async function seedProject(): Promise<SeededProject> {
     .run();
   const push = await createToken(env.DB, projectId, "push");
   const plugin = await createToken(env.DB, projectId, "plugin");
-  return { projectId, pushToken: push.token, pluginToken: plugin.token };
+  return {
+    projectId,
+    pushToken: push.token,
+    pushTokenId: push.tokenId ?? "",
+    pluginToken: plugin.token,
+  };
 }
 
 interface V1Init {
@@ -183,28 +189,38 @@ describe("contract v1 surface", () => {
     const project = await seedProject();
     const other = await seedProject();
 
-    // Windows are wall-clock aligned: starting near a boundary lets the batch
-    // straddle two windows, so wait for a fresh one before spending the limit.
-    const untilNextWindow = 60_000 - (Date.now() % 60_000);
-    if (untilNextWindow < 15_000) {
-      await new Promise((resolve) => setTimeout(resolve, untilNextWindow + 50));
-    }
-
-    for (let i = 0; i < 60; i += 1) {
+    // Windows are wall-clock aligned, so a batch can straddle two of them.
+    // Keep sending until the limiter answers 429 — the counter for that
+    // window is what proves the 60/minute threshold.
+    let limited: Response | null = null;
+    let sent = 0;
+    while (limited === null && sent < 200) {
       const response = await v1("/projects/me/status", { token: project.pushToken });
+      sent += 1;
+      if (response.status === 429) {
+        limited = response;
+        break;
+      }
       expect(response.status).toBe(200);
     }
 
-    const limited = await v1("/projects/me/status", { token: project.pushToken });
-    expect(limited.status).toBe(429);
-    expect(((await limited.json()) as { error: { code: string } }).error.code).toBe("rate_limited");
-    const retryAfter = Number(limited.headers.get("Retry-After"));
+    expect(limited).not.toBeNull();
+    expect(((await limited!.json()) as { error: { code: string } }).error.code).toBe("rate_limited");
+    const retryAfter = Number(limited!.headers.get("Retry-After"));
     expect(retryAfter).toBeGreaterThanOrEqual(1);
     expect(retryAfter).toBeLessThanOrEqual(60);
 
+    // 60 allowed plus the blocked request, all inside the same window.
+    const window = await env.DB
+      .prepare("SELECT windowStart, count FROM rate_limits WHERE scope = ?")
+      .bind(project.pushTokenId)
+      .first<{ windowStart: number; count: number }>();
+    expect(window?.count).toBe(61);
+    expect(window?.windowStart).toBe(Math.floor(Date.now() / 1000) - (Math.floor(Date.now() / 1000) % 60));
+
     const unaffected = await v1("/projects/me/status", { token: other.pushToken });
     expect(unaffected.status).toBe(200);
-  });
+  }, 30_000);
 });
 
 describe("drift runs and status", () => {
