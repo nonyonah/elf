@@ -342,11 +342,11 @@ export function AppShell({
         </SidebarFooter>
         </Sidebar>
         <SidebarInset className="min-h-0 min-w-0 flex-1 bg-card">
-          <header className="z-20 flex h-12 shrink-0 items-center gap-2 border-b bg-card px-3">
+          <header className="relative z-20 flex h-12 shrink-0 items-center gap-2 border-b bg-card px-3">
             <SidebarTrigger />
             <Separator className="me-1 data-[orientation=vertical]:h-4" orientation="vertical" />
             <Breadcrumbs overview={overview} route={route} />
-            <div className="ms-auto flex items-center gap-2">
+            <div className="ms-auto flex items-center gap-2 sm:absolute sm:left-1/2 sm:top-1/2 sm:ms-0 sm:-translate-x-1/2 sm:-translate-y-1/2">
               <CommandMenu items={commandItems} />
             </div>
           </header>

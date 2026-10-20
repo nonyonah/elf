@@ -85,14 +85,14 @@ export function CommandMenu({
     >
       <Button
         aria-label="Search projects"
-        className="h-7 gap-2 border border-input bg-muted/60 px-2 text-[13px] text-muted-foreground hover:text-foreground"
+        className="h-8 w-auto gap-2 border border-input bg-muted/60 px-2.5 text-[13px] text-muted-foreground hover:text-foreground sm:w-60"
         onClick={() => setOpen(true)}
         size="sm"
         variant="ghost"
       >
         <Search className="size-3.5" />
-        <span className="hidden sm:inline">Search</span>
-        <kbd className="hidden rounded border border-border px-1 font-mono text-[12px] sm:inline">
+        <span className="hidden sm:inline">Search projects…</span>
+        <kbd className="ms-auto hidden rounded border border-border px-1 font-mono text-[12px] sm:inline">
           ⌘K
         </kbd>
       </Button>

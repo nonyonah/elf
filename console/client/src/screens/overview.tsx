@@ -32,13 +32,6 @@ import {
 } from "@/components/ui/empty";
 import { Input } from "@/components/ui/input";
 import {
-  Select,
-  SelectItem,
-  SelectPopup,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   Table,
   TableBody,
   TableCell,
@@ -57,10 +50,8 @@ import {
   totalDriftCounts,
 } from "@/lib/format";
 import { navigate } from "@/lib/router";
-import type { DriftState, OverviewResponse } from "@/lib/types";
+import type { OverviewResponse } from "@/lib/types";
 import { TrendChart } from "@/components/trend-chart";
-
-type StateFilter = DriftState | "all";
 
 function greeting(): string {
   const hour = new Date().getHours();
@@ -157,12 +148,7 @@ export function OverviewScreen({
   reloadOverview: () => void;
 }): React.ReactElement {
   const [createOpen, setCreateOpen] = React.useState(false);
-  const [stateFilter, setStateFilter] = React.useState<StateFilter>("all");
-
-  const projects = overview.projects.filter((project) => {
-    if (stateFilter !== "all" && project.state !== stateFilter) return false;
-    return true;
-  });
+  const projects = overview.projects;
 
   const trendPoints = overview.trend.map((point) => ({
     label: formatDayLabel(point.date),
@@ -252,30 +238,6 @@ export function OverviewScreen({
         </Card>
       ) : (
         <>
-          <div className="flex items-center justify-end gap-3">
-            <Select
-              items={{
-                all: "All states",
-                ok: "In sync",
-                drift: "Drift",
-                stale: "Stale",
-                unknown: "Awaiting data",
-              }}
-              onValueChange={(value) => setStateFilter(value as StateFilter)}
-              value={stateFilter}
-            >
-              <SelectTrigger className="w-40">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectPopup>
-                <SelectItem value="all">All states</SelectItem>
-                <SelectItem value="ok">In sync</SelectItem>
-                <SelectItem value="drift">Drift</SelectItem>
-                <SelectItem value="stale">Stale</SelectItem>
-                <SelectItem value="unknown">Awaiting data</SelectItem>
-              </SelectPopup>
-            </Select>
-          </div>
           <CardFrame>
           <Table variant="card">
             <TableHeader>
@@ -289,16 +251,6 @@ export function OverviewScreen({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {projects.length === 0 ? (
-                <TableRow>
-                  <TableCell
-                    className="text-muted-foreground"
-                    colSpan={6}
-                  >
-                    No projects match this filter.
-                  </TableCell>
-                </TableRow>
-              ) : null}
               {projects.map((project) => {
                 const drift = totalDriftCounts(project.counts);
                 return (
