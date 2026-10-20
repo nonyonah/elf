@@ -14,7 +14,7 @@
     {
       "binding": "DB",
       "database_name": "elf-console",
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_id": "5c64240d-2115-47ca-9274-c3c7723cddf8",
       "migrations_dir": "migrations"
     }
   ],
