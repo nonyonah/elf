@@ -183,6 +183,13 @@ describe("contract v1 surface", () => {
     const project = await seedProject();
     const other = await seedProject();
 
+    // Windows are wall-clock aligned: starting near a boundary lets the batch
+    // straddle two windows, so wait for a fresh one before spending the limit.
+    const untilNextWindow = 60_000 - (Date.now() % 60_000);
+    if (untilNextWindow < 15_000) {
+      await new Promise((resolve) => setTimeout(resolve, untilNextWindow + 50));
+    }
+
     for (let i = 0; i < 60; i += 1) {
       const response = await v1("/projects/me/status", { token: project.pushToken });
       expect(response.status).toBe(200);
