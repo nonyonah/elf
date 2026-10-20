@@ -11,6 +11,8 @@ Design tokens are supposed to be the single source of truth for how a product lo
 
 **No screenshots, no pixel diffing.** Tokens compare by name and value; components (opt-in) compare by their parsed specs and Figma node hashes.
 
+**The hosted console** lives in [`console/`](console/README.md): a Cloudflare Worker + React app that receives snapshots from `elf push` and the Figma bridge, recomputes drift with this same core, serves remote config, and posts Slack digests.
+
 ---
 
 ## How it works

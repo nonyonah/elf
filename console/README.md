@@ -1,6 +1,6 @@
 # elf-console
 
-The hosted side of [elf](../elf): receives design-system snapshots from repos and Figma, computes drift with elf core, serves remote config, and notifies through Slack.
+The hosted side of [elf](../README.md): receives design-system snapshots from repos and Figma, computes drift with elf core, serves remote config, and notifies through Slack.
 
 Scope and behavior: [`DASHBOARD-SCOPE.md`](./DASHBOARD-SCOPE.md). Wire protocol (`/api/v1`, schema 1): `CONTRACT.md` in the `elf` repo.
 
@@ -92,4 +92,4 @@ npm run deploy
 
 ## Working with elf core
 
-`src/drift.ts` imports the pure core via `"elf-tokens/core"`. Locally the dependency is `"elf-tokens": "file:../elf"` (the sibling checkout) — installed with the same `--legacy-peer-deps` flag. The import path stays stable when the package is published; a fresh clone without a sibling `../elf` needs that dependency pointed at a published version or a linked checkout.
+`src/drift.ts` imports the pure core via `"elf-tokens/core"`. Locally the dependency is `"elf-tokens": "file:.."` (the repo root, so no separate checkout is needed) — installed with the same `--legacy-peer-deps` flag. The import path stays stable when the package is published; plain npm installs outside this repo can point the dependency at the published version instead.
