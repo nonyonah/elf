@@ -19,8 +19,9 @@
     }
   ],
   "vars": {
-    "CONSOLE_ORIGIN": "https://console.elf.dev",
-    "CLERK_AUTHORIZED_PARTIES": "https://console.elf.dev"
+    "CONSOLE_ORIGIN": "https://elf-console.nonyonah.workers.dev",
+    "CLERK_AUTHORIZED_PARTIES": "https://elf-console.nonyonah.workers.dev,https://console.elf.dev",
+    "CLERK_PUBLISHABLE_KEY": "pk_test_b2JsaWdpbmctZHJ1bS0yNjYxLmNsZXJrLmFjY291bnRzLmRldiQ"
   },
   "workers_dev": true,
   "triggers": {
