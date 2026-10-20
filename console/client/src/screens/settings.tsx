@@ -1,4 +1,4 @@
-import { Check, Copy, KeyRound, Plus, Users } from "lucide-react";
+import { Check, Copy, KeyRound, Plus, Users } from "@/components/icons";
 import * as React from "react";
 import { Panel } from "@/components/panel";
 import {

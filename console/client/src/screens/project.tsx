@@ -1,4 +1,4 @@
-import { CircleAlert, GitBranch, TriangleAlert } from "lucide-react";
+import { CircleAlert, GitBranch, TriangleAlert } from "@/components/icons";
 import * as React from "react";
 import { Panel } from "@/components/panel";
 import { StatCard } from "@/components/stat-card";

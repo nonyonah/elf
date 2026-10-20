@@ -1,4 +1,4 @@
-import { CircleAlert, Plug, Send } from "lucide-react";
+import { CircleAlert, Plug, Send } from "@/components/icons";
 import * as React from "react";
 import { Panel } from "@/components/panel";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";

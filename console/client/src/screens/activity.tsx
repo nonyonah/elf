@@ -6,7 +6,7 @@ import {
   Plug,
   Send,
   Sparkles,
-} from "lucide-react";
+} from "@/components/icons";
 import * as React from "react";
 import { Panel } from "@/components/panel";
 import { Button } from "@/components/ui/button";

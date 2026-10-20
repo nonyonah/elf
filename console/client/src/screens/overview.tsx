@@ -1,4 +1,4 @@
-import { Boxes, Plus, Search } from "lucide-react";
+import { Boxes, Plus, Search } from "@/components/icons";
 import * as React from "react";
 import { Panel } from "@/components/panel";
 import { StatCard } from "@/components/stat-card";
@@ -59,6 +59,13 @@ import type { DriftState, OverviewResponse } from "@/lib/types";
 import { TrendChart } from "@/components/trend-chart";
 
 type StateFilter = DriftState | "all";
+
+function greeting(): string {
+  const hour = new Date().getHours();
+  if (hour < 12) return "Good morning";
+  if (hour < 18) return "Good afternoon";
+  return "Good evening";
+}
 
 function CreateProjectDialog({
   open,
@@ -168,15 +175,14 @@ export function OverviewScreen({
   }));
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="font-heading font-semibold text-xl tracking-tight">
-            Overview
+            {greeting()}
           </h1>
           <p className="mt-0.5 text-muted-foreground text-sm">
-            The shared truth for design tokens and components, across every
-            project.
+            Here&apos;s what&apos;s happening across your projects.
           </p>
         </div>
         <Button onClick={() => setCreateOpen(true)}>
@@ -185,7 +191,7 @@ export function OverviewScreen({
         </Button>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-3">
         <StatCard
           hint={`${overview.summary.ok} in sync`}
           label="Projects"
@@ -258,6 +264,13 @@ export function OverviewScreen({
                 />
               </InputGroup>
               <Select
+                items={{
+                  all: "All states",
+                  ok: "In sync",
+                  drift: "Drift",
+                  stale: "Stale",
+                  unknown: "Awaiting data",
+                }}
                 onValueChange={(value) => setStateFilter(value as StateFilter)}
                 value={stateFilter}
               >
@@ -315,7 +328,7 @@ export function OverviewScreen({
                   >
                     <TableCell>
                       <div className="font-medium">{project.name}</div>
-                      <div className="text-muted-foreground text-xs">
+                      <div className="text-[13px] text-muted-foreground">
                         {project.slug}
                       </div>
                     </TableCell>

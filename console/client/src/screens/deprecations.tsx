@@ -1,4 +1,4 @@
-import { Download, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
+import { Download, MoreHorizontal, Pencil, Plus, Trash2 } from "@/components/icons";
 import * as React from "react";
 import { Panel } from "@/components/panel";
 import {

@@ -1,5 +1,5 @@
 import { useAuth } from "@clerk/react";
-import { CircleAlert } from "lucide-react";
+import { CircleAlert } from "@/components/icons";
 import * as React from "react";
 import { AppShell } from "@/components/app-shell";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
