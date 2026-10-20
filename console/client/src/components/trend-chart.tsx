@@ -66,7 +66,7 @@ export function TrendChart({
       <ResponsiveContainer height="100%" width="100%">
         <AreaChart
           data={points}
-          margin={{ top: 8, right: 8, bottom: 0, left: -16 }}
+          margin={{ top: 8, right: 8, bottom: 0, left: 0 }}
         >
           <defs>
             <linearGradient id={gradientId} x1="0" x2="0" y1="0" y2="1">

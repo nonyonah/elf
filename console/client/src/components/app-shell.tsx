@@ -10,6 +10,7 @@ import {
   Settings,
 } from "lucide-react";
 import type * as React from "react";
+import { useEffect, useRef } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -196,9 +197,19 @@ export function AppShell({
   devMode?: boolean;
   children: React.ReactNode;
 }): React.ReactElement {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const routeKey = hrefFor(route);
+
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: 0 });
+  }, [routeKey]);
+
   return (
-    <SidebarProvider>
-      <Sidebar collapsible="icon">
+    <SidebarProvider className="h-svh overflow-hidden bg-background">
+      <Sidebar
+        className="group-data-[side=left]:border-r-0 [&_[data-slot=sidebar-inner]]:bg-transparent"
+        collapsible="icon"
+      >
         <SidebarHeader>
           <div className="flex items-center gap-2.5 px-1 py-1.5">
             <BrandMark />
@@ -304,8 +315,8 @@ export function AppShell({
         </SidebarFooter>
         <SidebarRail />
       </Sidebar>
-      <SidebarInset className="min-w-0">
-        <header className="sticky top-0 z-20 flex h-12 shrink-0 items-center gap-2 border-b bg-background/80 px-3 backdrop-blur">
+      <SidebarInset className="m-2 min-h-0 min-w-0 overflow-hidden rounded-[12px] border bg-card shadow-shell">
+        <header className="z-20 flex h-12 shrink-0 items-center gap-2 border-b bg-card px-3">
           <SidebarTrigger />
           <Separator className="me-1 data-[orientation=vertical]:h-4" orientation="vertical" />
           <Breadcrumbs overview={overview} route={route} />
@@ -324,7 +335,10 @@ export function AppShell({
             </Button>
           </div>
         </header>
-        <div className="flex-1 px-4 py-6 sm:px-6 lg:px-8">
+        <div
+          className="min-h-0 flex-1 overflow-y-auto px-4 py-6 sm:px-6 lg:px-8"
+          ref={scrollRef}
+        >
           <div className="mx-auto w-full max-w-6xl">{children}</div>
         </div>
       </SidebarInset>
