@@ -1,0 +1,19 @@
+# Copy to .dev.vars for local development (never commit .dev.vars).
+
+# Clerk (hosted auth). Create a development instance at https://dashboard.clerk.com
+# and enable Google + email code sign-in there — no OAuth code lives in this repo.
+# Without CLERK_SECRET_KEY the worker still boots; auth-required routes answer 401.
+CLERK_SECRET_KEY=""
+CLERK_PUBLISHABLE_KEY=""
+# Comma-separated origins allowed to send session tokens (e.g. https://console.elf.dev).
+CLERK_AUTHORIZED_PARTIES=""
+
+# AES-GCM key for connection secrets (Slack webhook URLs, …). Generate with:
+#   openssl rand -base64 32
+SECRETS_KEY="replace-with-openssl-rand-base64-32"
+
+# LOCAL PREVIEW ONLY — never set in a deployed environment.
+# When CLERK_SECRET_KEY is empty, every request is treated as this user, so the
+# console UI can be reviewed without a Clerk dev instance. Pair with
+# VITE_DEV_SESSION=1 in client/.env.local and run scripts/seed-local.mjs.
+# DEV_ONLY_FAKE_USER="user_dev_preview"
