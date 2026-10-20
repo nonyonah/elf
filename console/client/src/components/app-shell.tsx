@@ -231,7 +231,7 @@ export function AppShell({
   }, [routeKey]);
 
   return (
-    <SidebarProvider className="h-svh overflow-hidden bg-background p-2">
+    <SidebarProvider className="h-svh overflow-hidden bg-page p-2">
       <div className="flex h-full min-h-0 w-full overflow-hidden rounded-[12px] border bg-card shadow-shell [&>[data-slot=sidebar]]:min-w-0">
         <Sidebar
           className="static! h-full! min-w-0 overflow-hidden border-r border-sidebar-border [&_[data-slot=sidebar-gap]]:hidden group-data-[state=collapsed]:w-0 group-data-[state=collapsed]:border-r-0"
@@ -351,7 +351,7 @@ export function AppShell({
             </div>
           </header>
           <div
-            className="min-h-0 flex-1 overflow-y-auto px-4 py-6 sm:px-6 lg:px-8"
+            className="min-h-0 flex-1 overflow-y-auto bg-background px-4 py-6 sm:px-6 lg:px-8"
             ref={scrollRef}
           >
             <div className="mx-auto w-full max-w-6xl">{children}</div>

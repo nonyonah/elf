@@ -4,6 +4,7 @@
 
 :root {
   --radius: 0.625rem;
+  --page: #e8eaee;
   --background: #f9fafb;
   --foreground: #111827;
   --card: #ffffff;
@@ -46,6 +47,7 @@
 }
 
 .dark {
+  --page: #0d0f12;
   --background: #14161a;
   --foreground: #f9fafb;
   --card: #22242a;
@@ -96,6 +98,7 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+  --color-page: var(--page);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -213,7 +216,7 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-page text-foreground;
   }
   html {
     -webkit-font-smoothing: antialiased;
