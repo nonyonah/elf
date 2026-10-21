@@ -1,6 +1,8 @@
 import { useClerk, useUser } from "@clerk/react";
 import {
   Box,
+  Boxes,
+  ChevronDownIcon,
   ChevronRight,
   ChevronsUpDown,
   History,
@@ -12,6 +14,11 @@ import type * as React from "react";
 import { useEffect, useRef } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { CommandMenu } from "@/components/command-menu";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import {
   Menu,
   MenuItem,
@@ -30,9 +37,11 @@ import {
   SidebarHeader,
   SidebarInset,
   SidebarMenu,
-  SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
@@ -268,44 +277,64 @@ export function AppShell({
             </SidebarGroupContent>
           </SidebarGroup>
           <SidebarGroup>
-            <SidebarGroupLabel>Projects</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
                 {overview.projects.length === 0 ? (
                   <div className="px-2 py-1 text-muted-foreground text-[13px]">
                     No projects yet
                   </div>
-                ) : null}
-                {overview.projects.map((project) => {
-                  const driftCount = totalDriftCounts(project.counts);
-                  const isActive =
-                    route.name === "project" && route.projectId === project.id;
-                  return (
-                    <SidebarMenuItem key={project.id}>
-                      <SidebarMenuButton
-                        isActive={isActive}
+                ) : (
+                  <Collapsible className="group/projects" defaultOpen>
+                    <SidebarMenuItem>
+                      <CollapsibleTrigger
                         render={
-                          <a
-                            href={hrefFor({
-                              name: "project",
-                              projectId: project.id,
-                              view: "overview",
-                            })}
-                          />
+                          <SidebarMenuButton isActive={route.name === "project"} />
                         }
-                        tooltip={project.name}
                       >
-                        <Box />
-                        <span className="truncate">{project.name}</span>
-                      </SidebarMenuButton>
-                      {driftCount > 0 ? (
-                        <SidebarMenuBadge className="text-warning-foreground">
-                          {driftCount}
-                        </SidebarMenuBadge>
-                      ) : null}
+                        <Boxes />
+                        <span>Projects</span>
+                        <ChevronDownIcon className="ms-auto size-4 text-muted-foreground transition-transform group-data-[open]/projects:rotate-180" />
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <SidebarMenuSub>
+                          {overview.projects.map((project) => {
+                            const driftCount = totalDriftCounts(project.counts);
+                            const isActive =
+                              route.name === "project" &&
+                              route.projectId === project.id;
+                            return (
+                              <SidebarMenuSubItem key={project.id}>
+                                <SidebarMenuSubButton
+                                  className="pe-7"
+                                  isActive={isActive}
+                                  render={
+                                    <a
+                                      href={hrefFor({
+                                        name: "project",
+                                        projectId: project.id,
+                                        view: "overview",
+                                      })}
+                                    />
+                                  }
+                                >
+                                  <Box className="size-3.5" />
+                                  <span className="truncate">
+                                    {project.name}
+                                  </span>
+                                  {driftCount > 0 ? (
+                                    <span className="ms-auto shrink-0 text-warning-foreground text-[12px] tabular-nums">
+                                      {driftCount}
+                                    </span>
+                                  ) : null}
+                                </SidebarMenuSubButton>
+                              </SidebarMenuSubItem>
+                            );
+                          })}
+                        </SidebarMenuSub>
+                      </CollapsibleContent>
                     </SidebarMenuItem>
-                  );
-                })}
+                  </Collapsible>
+                )}
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>

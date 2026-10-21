@@ -282,6 +282,30 @@ function ComponentIssuesTable({
   );
 }
 
+function FigmaSubtitle({
+  fallback,
+  url,
+}: {
+  fallback: string;
+  url: string | null;
+}): React.ReactElement {
+  if (!url) {
+    return <CardFrameDescription>{fallback}</CardFrameDescription>;
+  }
+  return (
+    <CardFrameDescription className="w-full max-w-80 truncate" title={url}>
+      <a
+        className="hover:text-foreground hover:underline"
+        href={url}
+        rel="noreferrer"
+        target="_blank"
+      >
+        {url}
+      </a>
+    </CardFrameDescription>
+  );
+}
+
 function ProjectOverview({
   detail,
   mode,
@@ -306,6 +330,9 @@ function ProjectOverview({
   }));
 
   const commit = shortCommit(detail.latestCode?.gitCommit);
+  const figmaUrl = detail.fileKey
+    ? `https://www.figma.com/file/${detail.fileKey}`
+    : null;
 
   return (
     <div className="flex flex-col gap-6">
@@ -462,25 +489,30 @@ function ProjectOverview({
           <CardFrame>
             <CardFrameHeader>
               <CardFrameTitle>Value mismatches</CardFrameTitle>
-              <CardFrameDescription>
-                The same token name with a different value on each side.
-              </CardFrameDescription>
+              <FigmaSubtitle
+                fallback="The same token name with a different value on each side."
+                url={figmaUrl}
+              />
             </CardFrameHeader>
             <ValueMismatchTable details={details} />
           </CardFrame>
           <CardFrame>
             <CardFrameHeader>
               <CardFrameTitle>Missing tokens</CardFrameTitle>
-              <CardFrameDescription>Present on one side only.</CardFrameDescription>
+              <FigmaSubtitle
+                fallback="Present on one side only."
+                url={figmaUrl}
+              />
             </CardFrameHeader>
             <MissingTokensTable details={details} />
           </CardFrame>
           <CardFrame>
             <CardFrameHeader>
               <CardFrameTitle>Components</CardFrameTitle>
-              <CardFrameDescription>
-                Components that need attention.
-              </CardFrameDescription>
+              <FigmaSubtitle
+                fallback="Components that need attention."
+                url={figmaUrl}
+              />
             </CardFrameHeader>
             <ComponentIssuesTable details={details} mode={mode} />
           </CardFrame>

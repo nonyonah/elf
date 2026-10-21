@@ -52,7 +52,7 @@ export function CardFrameHeader({
 }: useRender.ComponentProps<"div">): React.ReactElement {
   const defaultProps = {
     className: cn(
-      "relative flex grid auto-rows-min grid-rows-[auto_auto] flex-col items-start gap-x-4 gap-y-1 px-4 py-4 has-data-[slot=card-frame-action]:grid-cols-[1fr_auto]",
+      "relative flex grid auto-rows-min grid-cols-[minmax(0,1fr)] grid-rows-[auto_auto] flex-col items-start gap-x-4 gap-y-1.5 px-4 py-4 has-data-[slot=card-frame-action]:grid-cols-[minmax(0,1fr)_auto]",
       className,
     ),
     "data-slot": "card-frame-header",

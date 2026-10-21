@@ -162,7 +162,10 @@ function IssueTokenDialog({
   return (
     <Dialog onOpenChange={onOpenChange} open={open}>
       <DialogPopup>
-        <form onSubmit={(event) => void submit(event)}>
+        <form
+          className="flex min-h-0 flex-1 flex-col"
+          onSubmit={(event) => void submit(event)}
+        >
           <DialogHeader>
             <DialogTitle>Issue a token</DialogTitle>
             <DialogDescription>

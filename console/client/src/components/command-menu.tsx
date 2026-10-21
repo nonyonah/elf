@@ -85,7 +85,7 @@ export function CommandMenu({
     >
       <Button
         aria-label="Search projects"
-        className="h-8 w-auto gap-2 border border-input bg-muted/60 px-2.5 text-[13px] text-muted-foreground hover:text-foreground sm:w-60"
+        className="h-8 w-auto gap-2 border border-input bg-muted/60 px-2.5 text-[13px] text-muted-foreground hover:text-foreground sm:w-72"
         onClick={() => setOpen(true)}
         size="sm"
         variant="ghost"

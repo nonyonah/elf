@@ -204,7 +204,7 @@ function DeprecationDialog({
             Deprecations ride the remote config — every elf push sees them.
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={submit}>
+        <form className="flex min-h-0 flex-1 flex-col" onSubmit={submit}>
           <DialogPanel className="flex flex-col gap-5">
             <div className="grid gap-5 sm:grid-cols-2">
               <Field>

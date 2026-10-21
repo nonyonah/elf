@@ -113,7 +113,7 @@ function CreateProjectDialog({
             sync.
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={submit}>
+        <form className="flex min-h-0 flex-1 flex-col" onSubmit={submit}>
           <DialogPanel>
             <Field>
               <FieldLabel>Name</FieldLabel>
