@@ -291,6 +291,95 @@ describe("dashboard API", () => {
     expect(leftover?.encryptedSecret).toBeNull();
   });
 
+  it("binds a Figma project from its URL at creation and from settings", async () => {
+    const user = freshUser();
+    const created = await api("/projects", {
+      user,
+      method: "POST",
+      body: {
+        name: "Brand file",
+        figmaUrl: "https://www.figma.com/design/AbC123xyz/Brand-file?node-id=1-2",
+      },
+    });
+    expect(created.status).toBe(201);
+    const { project } = (await created.json()) as { project: ProjectShape };
+
+    const list = await api(`/projects/${project.id}/connections`, { user });
+    const body = (await list.json()) as {
+      connections: Array<Record<string, unknown>>;
+    };
+    expect(body.connections[0]).toMatchObject({
+      type: "figma",
+      status: "bound",
+      fileKey: "AbC123xyz",
+      fileName: "Brand file",
+      teamName: null,
+      channelName: null,
+    });
+
+    const updated = await api(`/projects/${project.id}/connections/figma`, {
+      user,
+      method: "PUT",
+      body: { figmaUrl: "https://www.figma.com/file/NextKey99/Second-file" },
+    });
+    expect(updated.status).toBe(200);
+    const updatedBody = (await updated.json()) as {
+      connection: Record<string, unknown>;
+    };
+    expect(updatedBody.connection).toMatchObject({
+      status: "bound",
+      fileKey: "NextKey99",
+      fileName: "Second file",
+    });
+
+    const invalid = await api(`/projects/${project.id}/connections/figma`, {
+      user,
+      method: "PUT",
+      body: { figmaUrl: "https://example.com/not-a-file" },
+    });
+    expect(invalid.status).toBe(400);
+  });
+
+  it("validates Figma fields when creating a project", async () => {
+    const user = freshUser();
+    const badUrl = await api("/projects", {
+      user,
+      method: "POST",
+      body: { name: "Nope", figmaUrl: "not a url" },
+    });
+    expect(badUrl.status).toBe(400);
+
+    const tokenOnly = await api("/projects", {
+      user,
+      method: "POST",
+      body: { name: "Nope", figmaToken: "figd_secret" },
+    });
+    expect(tokenOnly.status).toBe(400);
+    expect(
+      ((await tokenOnly.json()) as { error: { code: string } }).error.code,
+    ).toBe("invalid_payload");
+  });
+
+  it("reports Slack availability and refuses installs until configured", async () => {
+    const user = freshUser();
+    const project = await createProjectFor(user);
+
+    const workspace = await api("/workspace", { user });
+    const workspaceBody = (await workspace.json()) as {
+      slackConfigured: boolean;
+    };
+    expect(workspaceBody.slackConfigured).toBe(false);
+
+    const install = await api(
+      `/projects/${project.id}/connections/slack/install`,
+      { user },
+    );
+    expect(install.status).toBe(400);
+    expect(
+      ((await install.json()) as { error: { code: string } }).error.code,
+    ).toBe("slack_not_configured");
+  });
+
   it("keeps workspaces isolated", async () => {
     const alice = freshUser();
     const bob = freshUser();

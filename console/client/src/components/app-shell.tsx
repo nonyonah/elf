@@ -33,7 +33,6 @@ import {
   SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
-  SidebarGroupLabel,
   SidebarHeader,
   SidebarInset,
   SidebarMenu,
@@ -130,12 +129,7 @@ function Breadcrumbs({
   }
   const project =
     overview.projects.find((entry) => entry.id === route.projectId) ?? null;
-  const viewLabel =
-    route.view === "deprecations"
-      ? "Deprecations"
-      : route.view === "connections"
-        ? "Connections"
-        : null;
+  const viewLabel = route.view === "deprecations" ? "Deprecations" : null;
   return (
     <div className="flex min-w-0 items-center gap-1.5">
       <a
@@ -273,16 +267,12 @@ export function AppShell({
                     <span>Overview</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-          <SidebarGroup>
-            <SidebarGroupContent>
-              <SidebarMenu>
                 {overview.projects.length === 0 ? (
-                  <div className="px-2 py-1 text-muted-foreground text-[13px]">
-                    No projects yet
-                  </div>
+                  <SidebarMenuItem>
+                    <span className="px-2 py-1 text-muted-foreground text-[13px]">
+                      No projects yet
+                    </span>
+                  </SidebarMenuItem>
                 ) : (
                   <Collapsible className="group/projects" defaultOpen>
                     <SidebarMenuItem>
@@ -335,13 +325,6 @@ export function AppShell({
                     </SidebarMenuItem>
                   </Collapsible>
                 )}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-          <SidebarGroup>
-            <SidebarGroupLabel>Workspace</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
                 <SidebarMenuItem>
                   <SidebarMenuButton
                     isActive={route.name === "activity"}

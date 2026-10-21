@@ -76,8 +76,21 @@ Open http://127.0.0.1:8787/ — you get one demo project (“Marketing site”) 
 | `CLERK_AUTHORIZED_PARTIES` | var | Comma-separated allowed origins |
 | `CONSOLE_ORIGIN` | var | Public console origin; Slack messages link back to it |
 | `SECRETS_KEY` | secret | AES-GCM key (base64, 32 bytes) for connection secrets |
+| `SLACK_CLIENT_ID` | secret | Slack app OAuth client ID (optional) |
+| `SLACK_CLIENT_SECRET` | secret | Slack app OAuth client secret (optional) |
 
 Tokens minted for repos/plugin (`elf_push_…`, `elf_plugin_…`) are stored as SHA-256 + last4 only and shown once.
+
+### Slack (optional)
+
+Settings → Integrations exposes an “Add to Slack” switch per project. It runs Slack OAuth with the `incoming-webhook` scope, so the person installing picks a channel and Slack returns a webhook URL; the console seals that URL with `SECRETS_KEY` and the notify job posts drift digests to it.
+
+1. Create an app at <https://api.slack.com/apps> (“From scratch”).
+2. Under **OAuth & Permissions**, add `https://<console-origin>/api/slack/oauth/callback` as a redirect URL.
+3. Put the client ID and secret in `.dev.vars` locally and `wrangler secret put SLACK_CLIENT_ID` / `SLACK_CLIENT_SECRET` in production.
+4. Reinstall the app after changing the redirect URL.
+
+Until both values are set the switch is disabled and the install endpoint answers `400 slack_not_configured`.
 
 ## Deploy
 
@@ -89,6 +102,8 @@ npm run build
 npm run db:remote                     # apply migrations
 wrangler secret put CLERK_SECRET_KEY  # required before sign-in works
 wrangler secret put SECRETS_KEY
+wrangler secret put SLACK_CLIENT_ID      # optional: enables “Add to Slack”
+wrangler secret put SLACK_CLIENT_SECRET
 npm run deploy
 ```
 

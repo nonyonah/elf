@@ -156,6 +156,8 @@ export interface ConnectionView {
   secretTail: string | null;
   fileKey: string | null;
   fileName: string | null;
+  teamName: string | null;
+  channelName: string | null;
   updatedAt: string | null;
 }
 
@@ -192,6 +194,7 @@ export interface WorkspaceMember {
 export interface WorkspaceResponse {
   workspace: Workspace;
   members: WorkspaceMember[];
+  slackConfigured: boolean;
 }
 
 export interface ActivityEntry {

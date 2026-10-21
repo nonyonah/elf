@@ -1,6 +1,6 @@
 import * as React from "react";
 
-export type ProjectView = "overview" | "deprecations" | "connections";
+export type ProjectView = "overview" | "deprecations";
 
 export type Route =
   | { name: "overview" }
@@ -15,8 +15,7 @@ export function parseHash(hash: string): Route {
     return {
       name: "project",
       projectId: decodeURIComponent(segments[1]),
-      view:
-        view === "deprecations" || view === "connections" ? view : "overview",
+      view: view === "deprecations" ? view : "overview",
     };
   }
   if (segments[0] === "activity") return { name: "activity" };

@@ -1,11 +1,12 @@
 import { Hono } from "hono";
 import { apiV1 } from "./api.js";
 import { getSession, requireSession, workspaceNameFor, type AppEnv, type SessionResolver } from "./auth.js";
-import { dashboard } from "./dashboard.js";
+import { dashboard, persistSlackWebhook } from "./dashboard.js";
 import { ensureWorkspace } from "./db/workspaces.js";
 import type { Env } from "./env.js";
 import { runDueJobs } from "./jobs.js";
 import { POLL_CRON, pollFigmaSources } from "./poll.js";
+import { exchangeSlackCode, slackRedirectUri, verifySlackState } from "./slack.js";
 
 /**
  * elf-console Worker. Serves the API under /api/* (routed here first via
@@ -18,6 +19,28 @@ export function createApp(options: { sessionResolver?: SessionResolver } = {}) {
 
   // Public surface. Registered before the session middleware, so it stays open.
   app.get("/api/health", (c) => c.json({ ok: true, service: "elf-console", version: "0.1.0" }));
+
+  // Slack's OAuth callback — public by design. It trusts only the signed,
+  // expiring state minted by the authenticated install endpoint.
+  app.get("/api/slack/oauth/callback", async (c) => {
+    const origin = c.env.CONSOLE_ORIGIN ?? new URL(c.req.url).origin;
+    const done = (status: "connected" | "error") =>
+      c.redirect(`${origin}/?slack=${status}#/settings`, 302);
+    if (c.req.query("error")) return done("error");
+    const code = c.req.query("code");
+    const stateRaw = c.req.query("state");
+    if (!code || !stateRaw) return done("error");
+    const state = await verifySlackState(c.env, stateRaw);
+    if (!state) return done("error");
+    const installation = await exchangeSlackCode(
+      c.env,
+      code,
+      slackRedirectUri(c.req.url),
+    );
+    if (!installation) return done("error");
+    const saved = await persistSlackWebhook(c.env, state, installation);
+    return done(saved ? "connected" : "error");
+  });
 
   // The client contract (token-scoped, its own auth model) — mounted before
   // the Clerk gate, which then only sees the dashboard-UI routes.

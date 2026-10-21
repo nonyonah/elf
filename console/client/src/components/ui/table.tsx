@@ -9,11 +9,13 @@ export type TableVariant = "default" | "card";
 
 export type TableProps = React.ComponentProps<"table"> & {
   variant?: TableVariant;
+  containerClassName?: string;
   render?: useRender.ComponentProps<"div">["render"];
 };
 
 export function Table({
   className,
+  containerClassName,
   variant = "default",
   render,
   ...props
@@ -29,7 +31,7 @@ export function Table({
         {...props}
       />
     ),
-    className: "relative w-full overflow-x-auto",
+    className: cn("relative w-full overflow-x-auto", containerClassName),
     "data-slot": "table-container",
     "data-variant": variant,
   };

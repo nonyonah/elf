@@ -1,4 +1,4 @@
-import { Check, Copy, KeyRound, Plus, Users } from "@/components/icons";
+import { Check, Copy, KeyRound, Plug, Plus, Users } from "@/components/icons";
 import * as React from "react";
 import {
   Card,
@@ -54,6 +54,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { toastManager } from "@/components/ui/toast";
+import { ProjectIntegrations } from "@/components/project-integrations";
 import { useApi } from "@/lib/api-context";
 import { formatDateTime, formatRelative } from "@/lib/format";
 import type {
@@ -399,12 +400,38 @@ export function SettingsScreen({
   const api = useApi();
   const query = useQuery<WorkspaceResponse>(() => api.get("/workspace"), []);
 
+  React.useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const slack = params.get("slack");
+    if (!slack) return;
+    toastManager.add(
+      slack === "connected"
+        ? {
+            description: "Drift digests will post to the channel you picked.",
+            title: "Slack connected",
+            type: "success",
+          }
+        : {
+            description: "Nothing changed. Try the switch again.",
+            title: "Slack install failed",
+            type: "error",
+          },
+    );
+    params.delete("slack");
+    const search = params.toString();
+    window.history.replaceState(
+      null,
+      "",
+      `${window.location.pathname}${search ? `?${search}` : ""}${window.location.hash}`,
+    );
+  }, []);
+
   return (
     <div className="flex flex-col gap-6">
       <div>
         <h1 className="font-heading font-semibold text-lg">Settings</h1>
         <p className="mt-1 text-muted-foreground text-sm">
-          Workspace, members and the tokens the CLI and the bridge use.
+          Workspace, integrations and the tokens the CLI and the bridge use.
         </p>
       </div>
 
@@ -453,6 +480,26 @@ export function SettingsScreen({
         </div>
       </CardContent>
     </Card>
+
+      <div className="flex items-center gap-2">
+        <Plug className="size-4 text-muted-foreground" />
+        <h2 className="font-heading font-medium text-sm">Integrations</h2>
+      </div>
+
+      {overview.projects.length === 0 ? (
+        <p className="text-muted-foreground text-sm">
+          Create a project first — integrations are scoped to one project.
+        </p>
+      ) : (
+        overview.projects.map((project) => (
+          <ProjectIntegrations
+            key={project.id}
+            projectId={project.id}
+            projectName={project.name}
+            slackConfigured={query.data?.slackConfigured ?? false}
+          />
+        ))
+      )}
 
       <div className="flex items-center gap-2">
         <KeyRound className="size-4 text-muted-foreground" />

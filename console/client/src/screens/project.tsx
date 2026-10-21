@@ -45,7 +45,6 @@ import type {
   Token,
 } from "@/lib/types";
 import { useQuery } from "@/lib/use-query";
-import { ConnectionsScreen } from "./connections";
 import { DeprecationsScreen } from "./deprecations";
 
 type ViewMode = "designer" | "developer";
@@ -633,7 +632,6 @@ export function ProjectScreen({
         <TabsList>
           <TabsTab value="overview">Project</TabsTab>
           <TabsTab value="deprecations">Deprecations</TabsTab>
-          <TabsTab value="connections">Connections</TabsTab>
         </TabsList>
       </Tabs>
 
@@ -646,9 +644,6 @@ export function ProjectScreen({
           onDetailChange={query.reload}
           projectId={projectId}
         />
-      ) : null}
-      {view === "connections" ? (
-        <ConnectionsScreen projectId={projectId} />
       ) : null}
     </div>
   );

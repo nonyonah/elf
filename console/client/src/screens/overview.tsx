@@ -21,7 +21,7 @@ import {
   DialogPopup,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Field, FieldLabel } from "@/components/ui/field";
+import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import {
   Empty,
   EmptyContent,
@@ -71,24 +71,35 @@ function CreateProjectDialog({
 }): React.ReactElement {
   const api = useApi();
   const [name, setName] = React.useState("");
+  const [figmaUrl, setFigmaUrl] = React.useState("");
+  const [figmaToken, setFigmaToken] = React.useState("");
   const [pending, setPending] = React.useState(false);
 
   async function submit(event: React.FormEvent): Promise<void> {
     event.preventDefault();
     const trimmed = name.trim();
     if (!trimmed || pending) return;
+    if (figmaToken.trim() && !figmaUrl.trim()) return;
     setPending(true);
     try {
       const result = await api.post<{ project: { id: string; name: string } }>(
         "/projects",
-        { name: trimmed },
+        {
+          name: trimmed,
+          ...(figmaUrl.trim() ? { figmaUrl: figmaUrl.trim() } : {}),
+          ...(figmaToken.trim() ? { figmaToken: figmaToken.trim() } : {}),
+        },
       );
       toastManager.add({
-        description: `${result.project.name} is ready for its first push.`,
+        description: figmaUrl.trim()
+          ? `${result.project.name} is linked to its Figma file.`
+          : `${result.project.name} is ready for its first push.`,
         title: "Project created",
         type: "success",
       });
       setName("");
+      setFigmaUrl("");
+      setFigmaToken("");
       onOpenChange(false);
       onCreated(result.project);
     } catch (cause) {
@@ -114,9 +125,9 @@ function CreateProjectDialog({
           </DialogDescription>
         </DialogHeader>
         <form className="flex min-h-0 flex-1 flex-col" onSubmit={submit}>
-          <DialogPanel>
+          <DialogPanel className="flex flex-col gap-5">
             <Field>
-              <FieldLabel>Name</FieldLabel>
+              <FieldLabel>Project name</FieldLabel>
               <Input
                 autoFocus
                 maxLength={60}
@@ -125,12 +136,41 @@ function CreateProjectDialog({
                 value={name}
               />
             </Field>
+            <Field>
+              <FieldLabel>Figma project</FieldLabel>
+              <Input
+                onChange={(event) => setFigmaUrl(event.target.value)}
+                placeholder="https://www.figma.com/design/…"
+                value={figmaUrl}
+              />
+              <FieldDescription>
+                Paste the file URL — the file key and name come from it.
+              </FieldDescription>
+            </Field>
+            <Field>
+              <FieldLabel>Figma API key</FieldLabel>
+              <Input
+                autoComplete="off"
+                onChange={(event) => setFigmaToken(event.target.value)}
+                placeholder="figd_…"
+                type="password"
+                value={figmaToken}
+              />
+              <FieldDescription>
+                Write-only. Used to poll the file and keep its name current.
+              </FieldDescription>
+            </Field>
           </DialogPanel>
           <DialogFooter>
             <DialogClose render={<Button type="button" variant="outline" />}>
               Cancel
             </DialogClose>
-            <Button disabled={pending || !name.trim()} type="submit">
+            <Button
+              disabled={
+                pending || !name.trim() || (!!figmaToken.trim() && !figmaUrl.trim())
+              }
+              type="submit"
+            >
               {pending ? "Creating…" : "Create project"}
             </Button>
           </DialogFooter>
@@ -239,8 +279,11 @@ export function OverviewScreen({
       ) : (
         <>
           <CardFrame>
-          <Table variant="card">
-            <TableHeader>
+          <Table
+            containerClassName="h-[360px] overflow-y-auto bg-card"
+            variant="card"
+          >
+            <TableHeader className="sticky top-0 z-10 bg-card">
               <TableRow>
                 <TableHead>Project</TableHead>
                 <TableHead>State</TableHead>

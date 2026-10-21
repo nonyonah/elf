@@ -1,17 +1,6 @@
 import { CircleAlert, Plug, Send } from "@/components/icons";
 import * as React from "react";
 import {
-  Card,
-  CardAction,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import {
   AlertDialog,
   AlertDialogClose,
   AlertDialogDescription,
@@ -21,6 +10,16 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import {
@@ -48,8 +47,8 @@ const STATUS_META: Record<
   ConnectionView["status"],
   { label: string; variant: "success" | "info" | "secondary" | "error" }
 > = {
-  configured: { label: "Configured", variant: "success" },
-  bound: { label: "Bound", variant: "info" },
+  configured: { label: "Connected", variant: "success" },
+  bound: { label: "Link saved", variant: "info" },
   unconfigured: { label: "Not connected", variant: "secondary" },
   error: { label: "Error", variant: "error" },
 };
@@ -86,15 +85,14 @@ function useSaveConnection(
         description:
           type === "figma"
             ? "Figma binding saved."
-            : "Slack webhook saved — send a test to verify it.",
+            : "Slack is connected.",
         title: "Connection saved",
         type: "success",
       });
       onSaved();
     } catch (cause) {
       toastManager.add({
-        description:
-          cause instanceof Error ? cause.message : "Something went wrong.",
+        description: errorMessage(cause),
         title: "Could not save the connection",
         type: "error",
       });
@@ -134,8 +132,7 @@ function DisconnectButton({
       onCleared();
     } catch (cause) {
       toastManager.add({
-        description:
-          cause instanceof Error ? cause.message : "Something went wrong.",
+        description: errorMessage(cause),
         title: "Could not disconnect",
         type: "error",
       });
@@ -148,7 +145,7 @@ function DisconnectButton({
     <AlertDialog onOpenChange={setOpen} open={open}>
       <AlertDialogTrigger
         render={
-          <Button type="button" variant="ghost">
+          <Button type="button" size="sm" variant="ghost">
             {label}
           </Button>
         }
@@ -178,7 +175,11 @@ function DisconnectButton({
   );
 }
 
-function FigmaPanel({
+function figmaFileUrl(fileKey: string | null): string {
+  return fileKey ? `https://www.figma.com/file/${fileKey}` : "";
+}
+
+function FigmaSection({
   projectId,
   connection,
   onSaved,
@@ -187,67 +188,68 @@ function FigmaPanel({
   connection: ConnectionView;
   onSaved: () => void;
 }): React.ReactElement {
-  const [fileKey, setFileKey] = React.useState(connection.fileKey ?? "");
-  const [fileName, setFileName] = React.useState(connection.fileName ?? "");
+  const currentUrl = React.useMemo(
+    () => figmaFileUrl(connection.fileKey),
+    [connection.fileKey],
+  );
+  const [figmaUrl, setFigmaUrl] = React.useState(currentUrl);
   const [secret, setSecret] = React.useState("");
   const { save, saving } = useSaveConnection(projectId, "figma", () => {
     setSecret("");
     onSaved();
   });
 
-  const changed =
-    fileKey !== (connection.fileKey ?? "") ||
-    fileName !== (connection.fileName ?? "") ||
-    secret.trim() !== "";
+  React.useEffect(() => {
+    setFigmaUrl(currentUrl);
+  }, [currentUrl]);
+
+  const changed = figmaUrl !== currentUrl || secret.trim() !== "";
+  const needsUrl = secret.trim() !== "" && !figmaUrl.trim();
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Figma</CardTitle>
-        <CardDescription>
-          Where the Figma side of the truth lives. The console polls the file
-          every 15 minutes for version changes.
-        </CardDescription>
-        <CardAction>
-          <StatusBadge status={connection.status} />
-        </CardAction>
-      </CardHeader>
-      <CardContent>
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <Plug className="size-4 text-muted-foreground" />
+            <span className="font-medium text-sm">Figma</span>
+            <StatusBadge status={connection.status} />
+          </div>
+          <p className="mt-1 text-muted-foreground text-[13px]">
+            {connection.fileName ??
+              "Paste the file URL — the key and name are read from it."}
+          </p>
+        </div>
+        {connection.status !== "unconfigured" ? (
+          <DisconnectButton
+            label="Disconnect"
+            onCleared={onSaved}
+            projectId={projectId}
+            type="figma"
+          />
+        ) : null}
+      </div>
       <form
-        className="flex flex-col gap-5"
+        className="flex flex-col gap-4"
         onSubmit={(event) => {
           event.preventDefault();
           const payload: Record<string, string> = {};
-          if (fileKey !== (connection.fileKey ?? "")) payload.fileKey = fileKey;
-          if (fileName !== (connection.fileName ?? "")) payload.fileName = fileName;
+          if (figmaUrl !== currentUrl) payload.figmaUrl = figmaUrl.trim();
           if (secret.trim()) payload.secret = secret.trim();
+          if (Object.keys(payload).length === 0) return;
           void save(payload);
         }}
       >
-        <div className="grid gap-5 sm:grid-cols-2">
-          <Field>
-            <FieldLabel>File key</FieldLabel>
-            <Input
-              onChange={(event) => setFileKey(event.target.value)}
-              placeholder="LdPj1u7FVRkCqAr6O9MnHf"
-              value={fileKey}
-            />
-            <FieldDescription>
-              The segment after /design/ in the Figma file URL.
-            </FieldDescription>
-          </Field>
-          <Field>
-            <FieldLabel>File name</FieldLabel>
-            <Input
-              onChange={(event) => setFileName(event.target.value)}
-              placeholder="Design system"
-              value={fileName}
-            />
-            <FieldDescription>Optional, for display.</FieldDescription>
-          </Field>
-        </div>
         <Field>
-          <FieldLabel>Figma API token</FieldLabel>
+          <FieldLabel>Figma project</FieldLabel>
+          <Input
+            onChange={(event) => setFigmaUrl(event.target.value)}
+            placeholder="https://www.figma.com/design/…"
+            value={figmaUrl}
+          />
+        </Field>
+        <Field>
+          <FieldLabel>Figma API key</FieldLabel>
           <Input
             autoComplete="off"
             onChange={(event) => setSecret(event.target.value)}
@@ -260,32 +262,21 @@ function FigmaPanel({
             value={secret}
           />
           <FieldDescription>
-            Write-only: sealed with AES-GCM, never returned by the API.
+            Write-only. Used to poll the file and keep its name current.
           </FieldDescription>
         </Field>
         <div className="flex items-center justify-between gap-3">
           <span className="text-muted-foreground text-[13px]">
             {connection.updatedAt
               ? `Updated ${formatRelative(connection.updatedAt)}`
-              : "No secret stored yet"}
+              : "No token stored yet"}
           </span>
-          <div className="flex items-center gap-2">
-            {connection.status !== "unconfigured" ? (
-              <DisconnectButton
-                label="Disconnect"
-                onCleared={onSaved}
-                projectId={projectId}
-                type="figma"
-              />
-            ) : null}
-            <Button disabled={!changed || saving} type="submit">
-              {saving ? "Saving…" : "Save"}
-            </Button>
-          </div>
+          <Button disabled={!changed || needsUrl || saving} type="submit">
+            {saving ? "Saving…" : "Save"}
+          </Button>
         </div>
       </form>
-      </CardContent>
-    </Card>
+    </div>
   );
 }
 
@@ -334,12 +325,9 @@ function NotificationRulesSection({
   const rules = query.data?.rules ?? null;
 
   return (
-    <div className="flex flex-col gap-4 border-t pt-5">
-      <div>
-        <div className="font-heading font-medium text-sm">Notifications</div>
-        <div className="mt-0.5 text-muted-foreground text-[13px]">
-          When the notify job posts drift digests to this webhook.
-        </div>
+    <div className="flex flex-col gap-3 border-t pt-4">
+      <div className="text-muted-foreground text-[13px]">
+        When the notify job posts drift digests to this channel.
       </div>
       {rules === null ? (
         query.error ? (
@@ -400,22 +388,61 @@ function NotificationRulesSection({
   );
 }
 
-function SlackPanel({
+function SlackSection({
   projectId,
   connection,
+  slackConfigured,
   onSaved,
 }: {
   projectId: string;
   connection: ConnectionView;
+  slackConfigured: boolean;
   onSaved: () => void;
 }): React.ReactElement {
   const api = useApi();
-  const [secret, setSecret] = React.useState("");
+  const [busy, setBusy] = React.useState(false);
   const [testing, setTesting] = React.useState(false);
-  const { save, saving } = useSaveConnection(projectId, "slack", () => {
-    setSecret("");
-    onSaved();
-  });
+  const enabled = connection.status !== "unconfigured";
+
+  async function install(): Promise<void> {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const result = await api.get<{ url: string }>(
+        `/projects/${projectId}/connections/slack/install`,
+      );
+      window.location.assign(result.url);
+    } catch (cause) {
+      toastManager.add({
+        description: errorMessage(cause),
+        title: "Could not open Slack",
+        type: "error",
+      });
+      setBusy(false);
+    }
+  }
+
+  async function disable(): Promise<void> {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await api.del(`/projects/${projectId}/connections/slack`);
+      toastManager.add({
+        description: "Drift digests will no longer post to Slack.",
+        title: "Slack disconnected",
+        type: "success",
+      });
+      onSaved();
+    } catch (cause) {
+      toastManager.add({
+        description: errorMessage(cause),
+        title: "Could not disconnect Slack",
+        type: "error",
+      });
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function test(): Promise<void> {
     if (testing) return;
@@ -441,157 +468,138 @@ function SlackPanel({
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Slack</CardTitle>
-        <CardDescription>
-          Where drift digests land — verify the webhook, then tune when it
-          fires.
-        </CardDescription>
-        <CardAction>
-          <StatusBadge status={connection.status} />
-        </CardAction>
-      </CardHeader>
-      <CardContent>
-      <div className="flex flex-col gap-5">
-        {connection.status === "error" && connection.statusMessage ? (
-          <Alert variant="error">
-            <CircleAlert />
-            <AlertTitle>The last Slack delivery failed</AlertTitle>
-            <AlertDescription>{connection.statusMessage}</AlertDescription>
-          </Alert>
-        ) : null}
-        <form
-          className="flex flex-col gap-5"
-          onSubmit={(event) => {
-            event.preventDefault();
-            if (!secret.trim()) return;
-            void save({ secret: secret.trim() });
+    <div className="flex flex-col gap-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <Send className="size-4 text-muted-foreground" />
+            <span className="font-medium text-sm">Slack</span>
+            {enabled ? <StatusBadge status={connection.status} /> : null}
+          </div>
+          <p className="mt-1 text-muted-foreground text-[13px]">
+            {enabled
+              ? `${connection.teamName ?? "Slack"}${connection.channelName ? ` · #${connection.channelName.replace(/^#/, "")}` : ""} — drift digests post here.`
+              : "Add the elf bot to a channel; Slack returns a webhook for digests."}
+          </p>
+        </div>
+        <Switch
+          checked={enabled}
+          disabled={busy || (!enabled && !slackConfigured)}
+          onCheckedChange={(checked) => {
+            if (checked) void install();
+            else void disable();
           }}
-        >
-          <Field>
-            <FieldLabel>Webhook URL</FieldLabel>
-            <Input
-              autoComplete="off"
-              onChange={(event) => setSecret(event.target.value)}
-              placeholder={
-                connection.secretTail
-                  ? `Stored ${connection.secretTail} — paste to replace`
-                  : "https://hooks.slack.com/services/…"
-              }
-              type="password"
-              value={secret}
-            />
-            <FieldDescription>
-              Write-only: sealed with AES-GCM, never returned by the API.
-            </FieldDescription>
-          </Field>
+        />
+      </div>
+
+      {!slackConfigured ? (
+        <p className="text-muted-foreground text-[13px]">
+          Slack is not configured on this server yet — set SLACK_CLIENT_ID and
+          SLACK_CLIENT_SECRET to enable the switch.
+        </p>
+      ) : null}
+
+      {connection.status === "error" && connection.statusMessage ? (
+        <Alert variant="error">
+          <CircleAlert />
+          <AlertTitle>The last Slack delivery failed</AlertTitle>
+          <AlertDescription>{connection.statusMessage}</AlertDescription>
+        </Alert>
+      ) : null}
+
+      {enabled ? (
+        <>
           <div className="flex items-center justify-between gap-3">
             <span className="text-muted-foreground text-[13px]">
               {connection.updatedAt
-                ? `Updated ${formatRelative(connection.updatedAt)}`
-                : "No webhook stored yet"}
+                ? `Connected ${formatRelative(connection.updatedAt)}`
+                : "Connected"}
             </span>
             <div className="flex items-center gap-2">
-              {connection.status !== "unconfigured" ? (
-                <DisconnectButton
-                  label="Disconnect"
-                  onCleared={onSaved}
-                  projectId={projectId}
-                  type="slack"
-                />
-              ) : null}
-              {connection.status !== "unconfigured" ? (
-                <Button
-                  disabled={testing}
-                  onClick={() => void test()}
-                  type="button"
-                  variant="outline"
-                >
-                  <Send />
-                  {testing ? "Sending…" : "Send test"}
-                </Button>
-              ) : null}
-              <Button disabled={!secret.trim() || saving} type="submit">
-                {saving ? "Saving…" : "Save webhook"}
+              <DisconnectButton
+                label="Disconnect"
+                onCleared={onSaved}
+                projectId={projectId}
+                type="slack"
+              />
+              <Button
+                disabled={testing}
+                onClick={() => void test()}
+                size="sm"
+                type="button"
+                variant="outline"
+              >
+                <Send />
+                {testing ? "Sending…" : "Send test"}
               </Button>
             </div>
           </div>
-        </form>
-        <NotificationRulesSection projectId={projectId} />
-      </div>
-      </CardContent>
-    </Card>
+          <NotificationRulesSection projectId={projectId} />
+        </>
+      ) : null}
+    </div>
   );
 }
 
-export function ConnectionsScreen({
+export function ProjectIntegrations({
   projectId,
+  projectName,
+  slackConfigured,
 }: {
   projectId: string;
+  projectName: string;
+  slackConfigured: boolean;
 }): React.ReactElement {
   const api = useApi();
   const query = useQuery<{ connections: ConnectionView[] }>(
     () => api.get(`/projects/${projectId}/connections`),
     [projectId],
   );
+  const figma =
+    query.data?.connections.find((entry) => entry.type === "figma") ?? null;
+  const slack =
+    query.data?.connections.find((entry) => entry.type === "slack") ?? null;
 
-  if (query.loading && !query.data) {
-    return (
-      <div className="flex items-center gap-2 text-muted-foreground text-sm">
-        <Spinner className="size-4" />
-        Loading connections…
-      </div>
-    );
-  }
-
-  if (query.error || !query.data) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Could not load connections</CardTitle>
-        </CardHeader>
-        <CardContent>
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{projectName}</CardTitle>
+        <CardDescription>
+          Figma file and Slack digests for this project.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {query.loading && !query.data ? (
+          <div className="flex items-center gap-2 py-2 text-muted-foreground text-sm">
+            <Spinner className="size-4" />
+            Loading integrations…
+          </div>
+        ) : query.error || !query.data || !figma || !slack ? (
           <div className="flex items-center gap-3 text-sm">
-            <span className="text-muted-foreground">{query.error}</span>
+            <span className="text-muted-foreground">
+              {query.error ?? "Could not load integrations."}
+            </span>
             <Button onClick={query.reload} size="sm" variant="outline">
               Retry
             </Button>
           </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  const figma = query.data.connections.find(
-    (connection) => connection.type === "figma",
-  );
-  const slack = query.data.connections.find(
-    (connection) => connection.type === "slack",
-  );
-
-  return (
-    <div className="flex flex-col gap-6">
-      <p className="flex items-center gap-2 text-muted-foreground text-sm">
-        <Plug className="size-4" />
-        Bind the sources for this project. Secrets are write-only.
-      </p>
-      {figma ? (
-        <FigmaPanel
-          connection={figma}
-          key={`figma-${figma.updatedAt ?? "new"}`}
-          onSaved={query.reload}
-          projectId={projectId}
-        />
-      ) : null}
-      {slack ? (
-        <SlackPanel
-          connection={slack}
-          key={`slack-${slack.updatedAt ?? "new"}`}
-          onSaved={query.reload}
-          projectId={projectId}
-        />
-      ) : null}
-    </div>
+        ) : (
+          <div className="flex flex-col gap-5">
+            <FigmaSection
+              connection={figma}
+              onSaved={query.reload}
+              projectId={projectId}
+            />
+            <div className="border-t" />
+            <SlackSection
+              connection={slack}
+              onSaved={query.reload}
+              projectId={projectId}
+              slackConfigured={slackConfigured}
+            />
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }

@@ -14,6 +14,7 @@ import { Hono } from "hono";
 import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { getSession, workspaceNameFor, type AppEnv } from "./auth.js";
+import type { Env } from "./env.js";
 import { logAudit } from "./audit.js";
 import { importSecretsKey, openSecret, sealSecret } from "./db/crypto.js";
 import { createToken, type TokenKind } from "./db/tokens.js";
@@ -34,6 +35,13 @@ import {
   type DriftDetails,
 } from "./drift.js";
 import type { CodeSnapshotPayload } from "./contract.js";
+import { fetchFigmaFileName, parseFigmaRef } from "./figma.js";
+import {
+  signSlackState,
+  slackAuthorizeUrl,
+  slackOAuthConfigured,
+  slackRedirectUri,
+} from "./slack.js";
 
 const MAX_BODY_BYTES = 64 * 1024;
 const TREND_DAYS = 30;
@@ -76,6 +84,8 @@ interface ConnectionView {
   secretTail: string | null;
   fileKey: string | null;
   fileName: string | null;
+  teamName: string | null;
+  channelName: string | null;
   updatedAt: string | null;
 }
 
@@ -316,6 +326,8 @@ async function connectionViews(db: D1Database, projectId: string): Promise<Conne
       secretTail: typeof figmaMeta.last4 === "string" ? `…${figmaMeta.last4}` : null,
       fileKey: source?.fileKey ?? null,
       fileName: source?.fileName ?? null,
+      teamName: null,
+      channelName: null,
       updatedAt: figma?.updatedAt ?? null,
     },
     {
@@ -325,9 +337,50 @@ async function connectionViews(db: D1Database, projectId: string): Promise<Conne
       secretTail: typeof slackMeta.last4 === "string" ? `…${slackMeta.last4}` : null,
       fileKey: null,
       fileName: null,
+      teamName: typeof slackMeta.teamName === "string" ? slackMeta.teamName : null,
+      channelName:
+        typeof slackMeta.channelName === "string" ? slackMeta.channelName : null,
       updatedAt: slack?.updatedAt ?? null,
     },
   ];
+}
+
+export async function persistSlackWebhook(
+  env: Env,
+  state: { projectId: string; workspaceId: string; userId: string },
+  installation: {
+    webhookUrl: string;
+    teamName: string | null;
+    channelName: string | null;
+  },
+): Promise<boolean> {
+  if (!env.SECRETS_KEY) return false;
+  const project = await env.DB
+    .prepare("SELECT id FROM projects WHERE id = ? AND workspaceId = ?")
+    .bind(state.projectId, state.workspaceId)
+    .first<{ id: string }>();
+  if (!project) return false;
+  const key = await importSecretsKey(env.SECRETS_KEY);
+  const sealed = await sealSecret(installation.webhookUrl, key);
+  await upsertConnection(
+    env.DB,
+    state.projectId,
+    "slack",
+    sealed.ciphertext,
+    sealed.iv,
+    {
+      last4: installation.webhookUrl.slice(-4),
+      ...(installation.teamName ? { teamName: installation.teamName } : {}),
+      ...(installation.channelName ? { channelName: installation.channelName } : {}),
+    },
+    "configured",
+  );
+  await logAudit(env.DB, state.workspaceId, state.userId, "connection.update", {
+    projectId: state.projectId,
+    type: "slack",
+    via: "oauth",
+  });
+  return true;
 }
 
 async function sealFor(c: Context<AppEnv>, plaintext: string): Promise<{ ciphertext: string; iv: string } | null> {
@@ -434,6 +487,33 @@ export function dashboard(): Hono<AppEnv> {
     if (!name) {
       return fail(c, 400, "invalid_payload", "`name` must be a non-empty string of at most 60 characters.");
     }
+
+    const hasFigmaUrl = "figmaUrl" in body.value;
+    const figmaUrl = hasFigmaUrl ? readString(body.value.figmaUrl, 1000) : null;
+    if (hasFigmaUrl && !figmaUrl) {
+      return fail(c, 400, "invalid_payload", "`figmaUrl` must be a Figma file URL.");
+    }
+    const hasFigmaToken = "figmaToken" in body.value;
+    const figmaToken = hasFigmaToken ? readString(body.value.figmaToken, 500) : null;
+    if (hasFigmaToken && !figmaToken) {
+      return fail(c, 400, "invalid_payload", "`figmaToken` must be a non-empty string.");
+    }
+    if (figmaToken && !figmaUrl) {
+      return fail(c, 400, "invalid_payload", "`figmaToken` requires `figmaUrl`.");
+    }
+    if (figmaToken && !c.env.SECRETS_KEY) {
+      return fail(c, 500, "server_error", "SECRETS_KEY is not configured on the server.");
+    }
+    const figmaRef = figmaUrl ? parseFigmaRef(figmaUrl) : null;
+    if (figmaUrl && !figmaRef) {
+      return fail(
+        c,
+        400,
+        "invalid_payload",
+        "`figmaUrl` must be a Figma file URL (https://www.figma.com/design/…).",
+      );
+    }
+
     const workspace = await workspaceFor(c);
     let project: ProjectRow;
     try {
@@ -441,9 +521,51 @@ export function dashboard(): Hono<AppEnv> {
     } catch {
       return fail(c, 500, "server_error", "Could not create the project.");
     }
+
+    if (figmaRef) {
+      const fileName = figmaToken
+        ? ((await fetchFigmaFileName(figmaRef.fileKey, figmaToken)) ?? figmaRef.fileName)
+        : figmaRef.fileName;
+      await c.env.DB
+        .prepare(
+          `INSERT INTO figma_sources (projectId, fileKey, fileName) VALUES (?, ?, ?)
+           ON CONFLICT(projectId) DO UPDATE SET fileKey = excluded.fileKey,
+             fileName = COALESCE(excluded.fileName, figma_sources.fileName)`,
+        )
+        .bind(project.id, figmaRef.fileKey, fileName)
+        .run();
+
+      if (figmaToken) {
+        const sealed = await sealFor(c, figmaToken);
+        if (!sealed) {
+          return fail(c, 500, "server_error", "SECRETS_KEY is not configured on the server.");
+        }
+        await upsertConnection(
+          c.env.DB,
+          project.id,
+          "figma",
+          sealed.ciphertext,
+          sealed.iv,
+          { fileKey: figmaRef.fileKey, last4: figmaToken.slice(-4) },
+          "configured",
+        );
+      } else {
+        await upsertConnection(
+          c.env.DB,
+          project.id,
+          "figma",
+          null,
+          null,
+          { fileKey: figmaRef.fileKey },
+          "bound",
+        );
+      }
+    }
+
     await logAudit(c.env.DB, workspace.id, getSession(c).userId, "project.create", {
       projectId: project.id,
       name,
+      ...(figmaRef ? { figmaFileKey: figmaRef.fileKey } : {}),
     });
     return c.json({ project }, 201);
   });
@@ -697,8 +819,24 @@ export function dashboard(): Hono<AppEnv> {
       iv = sealed.iv;
       meta.last4 = secret.slice(-4);
     } else {
+      const hasFigmaUrl = "figmaUrl" in body.value;
+      const figmaUrl = hasFigmaUrl ? readString(body.value.figmaUrl, 1000) : null;
+      if (hasFigmaUrl && !figmaUrl) {
+        return fail(c, 400, "invalid_payload", "`figmaUrl` must be a Figma file URL.");
+      }
+      const figmaRef = figmaUrl ? parseFigmaRef(figmaUrl) : null;
+      if (figmaUrl && !figmaRef) {
+        return fail(
+          c,
+          400,
+          "invalid_payload",
+          "`figmaUrl` must be a Figma file URL (https://www.figma.com/design/…).",
+        );
+      }
       const hasFileKey = "fileKey" in body.value;
-      const fileKey = hasFileKey ? readString(body.value.fileKey, 200) : null;
+      const fileKey =
+        figmaRef?.fileKey ??
+        (hasFileKey ? readString(body.value.fileKey, 200) : null);
       if (hasFileKey && !fileKey) {
         return fail(c, 400, "invalid_payload", "`fileKey` must be a non-empty string of at most 200 characters.");
       }
@@ -708,7 +846,7 @@ export function dashboard(): Hono<AppEnv> {
         if (!secret) return fail(c, 400, "invalid_payload", "`secret` must be a non-empty string.");
       }
       if (!fileKey && !secret) {
-        return fail(c, 400, "invalid_payload", "Provide `fileKey` and/or `secret`.");
+        return fail(c, 400, "invalid_payload", "Provide `figmaUrl`, `fileKey` and/or `secret`.");
       }
       if (secret) {
         const sealed = await sealFor(c, secret);
@@ -718,7 +856,12 @@ export function dashboard(): Hono<AppEnv> {
         meta.last4 = secret.slice(-4);
       }
       if (fileKey) {
-        const fileName = "fileName" in body.value ? readString(body.value.fileName, 200) : null;
+        let fileName =
+          figmaRef?.fileName ??
+          ("fileName" in body.value ? readString(body.value.fileName, 200) : null);
+        if (secret) {
+          fileName = (await fetchFigmaFileName(fileKey, secret)) ?? fileName;
+        }
         await db
           .prepare(
             `INSERT INTO figma_sources (projectId, fileKey, fileName) VALUES (?, ?, ?)
@@ -771,6 +914,24 @@ export function dashboard(): Hono<AppEnv> {
     return c.json({ connection: views.find((view) => view.type === type) });
   });
 
+  d.get("/projects/:id/connections/slack/install", async (c) => {
+    const workspace = await workspaceFor(c);
+    const project = await findProject(c.env.DB, workspace.id, c.req.param("id"));
+    if (!project) return fail(c, 404, "not_found", "No such project.");
+    if (!slackOAuthConfigured(c.env)) {
+      return fail(c, 400, "slack_not_configured", "Slack is not configured on this server.");
+    }
+    const state = await signSlackState(c.env, {
+      projectId: project.id,
+      workspaceId: workspace.id,
+      userId: getSession(c).userId,
+    });
+    if (!state) return fail(c, 500, "server_error", "SECRETS_KEY is not configured on the server.");
+    const url = slackAuthorizeUrl(c.env, state, slackRedirectUri(c.req.url));
+    if (!url) return fail(c, 500, "server_error", "Could not start the Slack install.");
+    return c.json({ url });
+  });
+
   d.post("/projects/:id/connections/slack/test", async (c) => {
     const db = c.env.DB;
     const workspace = await workspaceFor(c);
@@ -790,7 +951,7 @@ export function dashboard(): Hono<AppEnv> {
       const key = await importSecretsKey(c.env.SECRETS_KEY);
       webhookUrl = await openSecret({ ciphertext: conn.encryptedSecret, iv: conn.iv }, key);
     } catch {
-      return fail(c, 500, "server_error", "The stored webhook can't be decrypted — replace it in Connections.");
+      return fail(c, 500, "server_error", "The stored webhook can't be decrypted — replace it in Settings → Integrations.");
     }
 
     const origin = c.env.CONSOLE_ORIGIN;
@@ -933,7 +1094,11 @@ export function dashboard(): Hono<AppEnv> {
     )
       .bind(workspace.id)
       .all<{ userId: string; role: string; createdAt: string }>();
-    return c.json({ workspace, members: members.results });
+    return c.json({
+      workspace,
+      members: members.results,
+      slackConfigured: slackOAuthConfigured(c.env),
+    });
   });
 
   d.get("/activity", async (c) => {

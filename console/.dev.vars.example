@@ -12,6 +12,13 @@ CLERK_AUTHORIZED_PARTIES=""
 #   openssl rand -base64 32
 SECRETS_KEY="replace-with-openssl-rand-base64-32"
 
+# Slack app OAuth (optional). Redirect URL:
+#   http://127.0.0.1:8787/api/slack/oauth/callback (local)
+#   https://<console-origin>/api/slack/oauth/callback (production)
+# Leave empty to hide the “Add to Slack” flow.
+SLACK_CLIENT_ID=""
+SLACK_CLIENT_SECRET=""
+
 # LOCAL PREVIEW ONLY — never set in a deployed environment.
 # When CLERK_SECRET_KEY is empty, every request is treated as this user, so the
 # console UI can be reviewed without a Clerk dev instance. Pair with

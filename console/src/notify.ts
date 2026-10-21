@@ -161,7 +161,7 @@ export async function runNotifyJob(
   return true;
 }
 
-/** The Connections screen's "Send test message" body — same Slack payload shape. */
+/** The integrations panel's "Send test" body — same Slack payload shape. */
 export function buildSlackTestMessage(projectName: string, url?: string): NotifyMessage {
   const fallback = `elf test message: the Slack connection for “${projectName}” works.`;
   return {
