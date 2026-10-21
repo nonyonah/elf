@@ -235,10 +235,11 @@ export function AppShell({
 
   return (
     <SidebarProvider className="h-svh overflow-hidden bg-background">
-      <Sidebar
-        className="border-r border-border-soft [&_[data-slot=sidebar-gap]]:hidden group-data-[state=collapsed]:border-r-0"
-        collapsible="offcanvas"
-      >
+      <div className="flex h-full min-h-0 w-full gap-2 overflow-hidden">
+        <Sidebar
+          className="static! h-full! min-w-0 overflow-hidden [&_[data-slot=sidebar-gap]]:hidden group-data-[state=collapsed]:w-0"
+          collapsible="offcanvas"
+        >
           <SidebarHeader>
           <div className="flex items-center gap-2.5 px-1 py-1.5">
             <BrandMark />
@@ -352,7 +353,8 @@ export function AppShell({
           {devMode ? <DevUserBlock /> : <UserFooter />}
         </SidebarFooter>
         </Sidebar>
-      <SidebarInset className="min-h-0 min-w-0 flex-1 bg-background">
+        <SidebarInset className="min-h-0 min-w-0 flex-1 bg-transparent p-2 md:pl-0">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[12px] bg-card shadow-shell">
           <header className="relative z-20 flex h-12 shrink-0 items-center gap-2 border-b border-border-soft bg-card px-3">
             <SidebarTrigger />
             <Separator className="me-1 data-[orientation=vertical]:h-4" orientation="vertical" />
@@ -362,12 +364,14 @@ export function AppShell({
             </div>
           </header>
           <div
-            className="min-h-0 flex-1 overflow-y-auto bg-background px-4 py-6 sm:px-6 lg:px-8"
+            className="min-h-0 flex-1 overflow-y-auto bg-card px-4 py-6 sm:px-6 lg:px-8"
             ref={scrollRef}
           >
-            <div className="mx-auto w-full max-w-6xl">{children}</div>
-        </div>
-      </SidebarInset>
+              <div className="mx-auto w-full max-w-6xl">{children}</div>
+            </div>
+          </div>
+        </SidebarInset>
+      </div>
     </SidebarProvider>
   );
 }
