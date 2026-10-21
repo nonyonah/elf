@@ -96,7 +96,7 @@ function UserFooter(): React.ReactElement {
               </AvatarFallback>
             </Avatar>
             <div className="grid flex-1 text-left leading-tight">
-              <span className="truncate font-medium text-[13px]">{name}</span>
+              <span className="truncate font-medium text-[13px] text-foreground">{name}</span>
               <span className="truncate text-muted-foreground text-[13px]">
                 {email}
               </span>
@@ -176,7 +176,7 @@ function DevUserBlock(): React.ReactElement {
             DV
           </div>
           <div className="grid flex-1 text-left leading-tight">
-            <span className="truncate font-medium text-[13px]">Dev preview</span>
+            <span className="truncate font-medium text-[13px] text-foreground">Dev preview</span>
             <span className="truncate text-muted-foreground text-[13px]">
               Clerk bypass · local only
             </span>
@@ -312,7 +312,7 @@ export function AppShell({
           <div className="flex items-center gap-2.5 px-1 py-1.5">
             <BrandMark />
             <div className="grid min-w-0 flex-1 leading-tight">
-              <span className="truncate font-heading font-semibold text-[13px]">
+              <span className="truncate font-heading font-semibold text-[13px] text-foreground">
                 {PRODUCT_NAME}
               </span>
               <span className="truncate text-muted-foreground text-[13px]">

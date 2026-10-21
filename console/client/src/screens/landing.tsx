@@ -77,7 +77,7 @@ export function LandingScreen(): React.ReactElement {
                 borderRadius: "0.625rem",
                 colorPrimary: "#262626",
                 fontFamily:
-                  "Inter, ui-sans-serif, system-ui, sans-serif",
+                  "Inter Variable, Inter, ui-sans-serif, system-ui, sans-serif",
               },
             }}
             routing="hash"

@@ -4,6 +4,7 @@ import { createRoot } from "react-dom/client";
 import { App, DevApp } from "./App";
 import { ToastProvider } from "./components/ui/toast";
 import { ConfigNotice } from "./screens/landing";
+import "@fontsource-variable/inter/wght.css";
 import "./index.css";
 
 const publishableKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;

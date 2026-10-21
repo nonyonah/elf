@@ -6,17 +6,17 @@
   --radius: 0.625rem;
   --page: #e8eaee;
   --background: #faf9f7;
-  --foreground: #17181c;
+  --foreground: #2f2f31;
   --card: #ffffff;
-  --card-foreground: #17181c;
+  --card-foreground: #2f2f31;
   --popover: #ffffff;
-  --popover-foreground: #17181c;
+  --popover-foreground: #2f2f31;
   --primary: #4a55c9;
   --primary-foreground: #ffffff;
   --secondary: #efede8;
-  --secondary-foreground: #17181c;
+  --secondary-foreground: #2f2f31;
   --muted: #f1efea;
-  --muted-foreground: #6b6d72;
+  --muted-foreground: #59595b;
   --accent: #f1efea;
   --accent-foreground: #17181c;
   --destructive: #b0402f;
@@ -31,11 +31,11 @@
   --chart-4: #b0402f;
   --chart-5: #6b6d72;
   --sidebar: var(--page);
-  --sidebar-foreground: #17181c;
+  --sidebar-foreground: #59595b;
   --sidebar-primary: #4a55c9;
   --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: #f3f4f6;
-  --sidebar-accent-foreground: #17181c;
+  --sidebar-accent-foreground: #2f2f31;
   --sidebar-border: #e0ddd7;
   --sidebar-ring: color-mix(in srgb, #4a55c9 55%, transparent);
   --info: #4a55c9;
@@ -92,8 +92,8 @@
 }
 
 @theme inline {
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-heading: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Inter Variable", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-heading: "Inter Variable", "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
   --shadow-shell: var(--shell-shadow);
   --radius-sm: calc(var(--radius) - 4px);
