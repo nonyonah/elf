@@ -1,6 +1,7 @@
 import {
   Archive as ArchiveGlyph,
   Bell as BellGlyph,
+  BookOpen as BookOpenGlyph,
   Box as BoxGlyph,
   Boxes as BoxesGlyph,
   Check as CheckGlyph,
@@ -56,6 +57,7 @@ function icon(glyph: IconSvgElement) {
 
 export const Archive = icon(ArchiveGlyph);
 export const Bell = icon(BellGlyph);
+export const BookOpen = icon(BookOpenGlyph);
 export const Box = icon(BoxGlyph);
 export const Boxes = icon(BoxesGlyph);
 export const Check = icon(CheckGlyph);
