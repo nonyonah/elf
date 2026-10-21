@@ -1,4 +1,4 @@
-import { CircleAlert, Plug, Send } from "@/components/icons";
+import { CircleAlert, Send } from "@/components/icons";
 import * as React from "react";
 import {
   AlertDialog,
@@ -20,8 +20,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectItem,
@@ -64,43 +62,6 @@ function StatusBadge({
       {meta.label}
     </Badge>
   );
-}
-
-function useSaveConnection(
-  projectId: string,
-  type: ConnectionType,
-  onSaved: () => void,
-): {
-  save: (payload: Record<string, string>) => Promise<void>;
-  saving: boolean;
-} {
-  const api = useApi();
-  const [saving, setSaving] = React.useState(false);
-  async function save(payload: Record<string, string>): Promise<void> {
-    if (saving) return;
-    setSaving(true);
-    try {
-      await api.put(`/projects/${projectId}/connections/${type}`, payload);
-      toastManager.add({
-        description:
-          type === "figma"
-            ? "Figma binding saved."
-            : "Slack is connected.",
-        title: "Connection saved",
-        type: "success",
-      });
-      onSaved();
-    } catch (cause) {
-      toastManager.add({
-        description: errorMessage(cause),
-        title: "Could not save the connection",
-        type: "error",
-      });
-    } finally {
-      setSaving(false);
-    }
-  }
-  return { save, saving };
 }
 
 function DisconnectButton({
@@ -172,111 +133,6 @@ function DisconnectButton({
         </AlertDialogFooter>
       </AlertDialogPopup>
     </AlertDialog>
-  );
-}
-
-function figmaFileUrl(fileKey: string | null): string {
-  return fileKey ? `https://www.figma.com/file/${fileKey}` : "";
-}
-
-function FigmaSection({
-  projectId,
-  connection,
-  onSaved,
-}: {
-  projectId: string;
-  connection: ConnectionView;
-  onSaved: () => void;
-}): React.ReactElement {
-  const currentUrl = React.useMemo(
-    () => figmaFileUrl(connection.fileKey),
-    [connection.fileKey],
-  );
-  const [figmaUrl, setFigmaUrl] = React.useState(currentUrl);
-  const [secret, setSecret] = React.useState("");
-  const { save, saving } = useSaveConnection(projectId, "figma", () => {
-    setSecret("");
-    onSaved();
-  });
-
-  React.useEffect(() => {
-    setFigmaUrl(currentUrl);
-  }, [currentUrl]);
-
-  const changed = figmaUrl !== currentUrl || secret.trim() !== "";
-  const needsUrl = secret.trim() !== "" && !figmaUrl.trim();
-
-  return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between gap-3">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <Plug className="size-4 text-muted-foreground" />
-            <span className="font-medium text-sm">Figma</span>
-            <StatusBadge status={connection.status} />
-          </div>
-          <p className="mt-1 text-muted-foreground text-[13px]">
-            {connection.fileName ??
-              "Paste the file URL — the key and name are read from it."}
-          </p>
-        </div>
-        {connection.status !== "unconfigured" ? (
-          <DisconnectButton
-            label="Disconnect"
-            onCleared={onSaved}
-            projectId={projectId}
-            type="figma"
-          />
-        ) : null}
-      </div>
-      <form
-        className="flex flex-col gap-4"
-        onSubmit={(event) => {
-          event.preventDefault();
-          const payload: Record<string, string> = {};
-          if (figmaUrl !== currentUrl) payload.figmaUrl = figmaUrl.trim();
-          if (secret.trim()) payload.secret = secret.trim();
-          if (Object.keys(payload).length === 0) return;
-          void save(payload);
-        }}
-      >
-        <Field>
-          <FieldLabel>Figma project</FieldLabel>
-          <Input
-            onChange={(event) => setFigmaUrl(event.target.value)}
-            placeholder="https://www.figma.com/design/…"
-            value={figmaUrl}
-          />
-        </Field>
-        <Field>
-          <FieldLabel>Figma API key</FieldLabel>
-          <Input
-            autoComplete="off"
-            onChange={(event) => setSecret(event.target.value)}
-            placeholder={
-              connection.secretTail
-                ? `Stored ${connection.secretTail} — type to replace`
-                : "figd_…"
-            }
-            type="password"
-            value={secret}
-          />
-          <FieldDescription>
-            Write-only. Used to poll the file and keep its name current.
-          </FieldDescription>
-        </Field>
-        <div className="flex items-center justify-between gap-3">
-          <span className="text-muted-foreground text-[13px]">
-            {connection.updatedAt
-              ? `Updated ${formatRelative(connection.updatedAt)}`
-              : "No token stored yet"}
-          </span>
-          <Button disabled={!changed || needsUrl || saving} type="submit">
-            {saving ? "Saving…" : "Save"}
-          </Button>
-        </div>
-      </form>
-    </div>
   );
 }
 
@@ -555,8 +411,6 @@ export function ProjectIntegrations({
     () => api.get(`/projects/${projectId}/connections`),
     [projectId],
   );
-  const figma =
-    query.data?.connections.find((entry) => entry.type === "figma") ?? null;
   const slack =
     query.data?.connections.find((entry) => entry.type === "slack") ?? null;
 
@@ -564,9 +418,7 @@ export function ProjectIntegrations({
     <Card>
       <CardHeader>
         <CardTitle>{projectName}</CardTitle>
-        <CardDescription>
-          Figma file and Slack digests for this project.
-        </CardDescription>
+        <CardDescription>Slack digests for this project.</CardDescription>
       </CardHeader>
       <CardContent>
         {query.loading && !query.data ? (
@@ -574,7 +426,7 @@ export function ProjectIntegrations({
             <Spinner className="size-4" />
             Loading integrations…
           </div>
-        ) : query.error || !query.data || !figma || !slack ? (
+        ) : query.error || !slack ? (
           <div className="flex items-center gap-3 text-sm">
             <span className="text-muted-foreground">
               {query.error ?? "Could not load integrations."}
@@ -584,20 +436,12 @@ export function ProjectIntegrations({
             </Button>
           </div>
         ) : (
-          <div className="flex flex-col gap-5">
-            <FigmaSection
-              connection={figma}
-              onSaved={query.reload}
-              projectId={projectId}
-            />
-            <div className="border-t" />
-            <SlackSection
-              connection={slack}
-              onSaved={query.reload}
-              projectId={projectId}
-              slackConfigured={slackConfigured}
-            />
-          </div>
+          <SlackSection
+            connection={slack}
+            onSaved={query.reload}
+            projectId={projectId}
+            slackConfigured={slackConfigured}
+          />
         )}
       </CardContent>
     </Card>

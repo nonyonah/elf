@@ -111,7 +111,7 @@ export function TableHead({
   return (
     <th
       className={cn(
-        "h-10 whitespace-nowrap px-4 text-left align-middle font-medium text-muted-foreground leading-none has-[[role=checkbox]]:w-px last:has-[[role=checkbox]]:ps-0 first:has-[[role=checkbox]]:pe-0",
+        "h-11 whitespace-nowrap px-4 text-left align-middle font-medium text-muted-foreground leading-none has-[[role=checkbox]]:w-px last:has-[[role=checkbox]]:ps-0 first:has-[[role=checkbox]]:pe-0",
         className,
       )}
       data-slot="table-head"
@@ -127,7 +127,7 @@ export function TableCell({
   return (
     <td
       className={cn(
-        "whitespace-nowrap bg-clip-padding px-4 py-3 in-data-[slot=table-footer]:py-3.5 align-middle leading-none has-[[role=checkbox]]:w-px last:has-[[role=checkbox]]:ps-0 first:has-[[role=checkbox]]:pe-0",
+        "whitespace-nowrap bg-clip-padding px-4 py-4 in-data-[slot=table-footer]:py-4 align-middle leading-none has-[[role=checkbox]]:w-px last:has-[[role=checkbox]]:ps-0 first:has-[[role=checkbox]]:pe-0",
         className,
       )}
       data-slot="table-cell"

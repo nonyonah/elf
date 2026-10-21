@@ -33,9 +33,9 @@ export interface PollOutcome {
 }
 
 function figmaErrorMessage(status: number): string {
-  if (status === 401) return "Figma rejected the token — check it in Settings → Integrations.";
+  if (status === 401) return "Figma rejected the project's API key.";
   if (status === 403) return "Figma denied access to this file — check the token's scopes and file permissions.";
-  if (status === 404) return "Figma could not find this file — check the file key in Settings → Integrations.";
+  if (status === 404) return "Figma could not find this file for the project.";
   return `Figma returned ${status}.`;
 }
 
