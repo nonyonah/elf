@@ -486,7 +486,13 @@ export function dashboard(): Hono<AppEnv> {
     }
 
     const trend = await workspaceTrend(db, workspace.id);
-    return c.json({ workspace, summary, trend, projects: entries });
+    return c.json({
+      workspace,
+      summary,
+      trend,
+      projects: entries,
+      slackConfigured: slackOAuthConfigured(c.env),
+    });
   });
 
   d.post("/projects", async (c) => {

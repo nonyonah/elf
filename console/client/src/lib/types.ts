@@ -111,6 +111,7 @@ export interface OverviewResponse {
   summary: WorkspaceSummary;
   trend: TrendPoint[];
   projects: ProjectSummaryEntry[];
+  slackConfigured: boolean;
 }
 
 export interface ProjectDetailResponse {

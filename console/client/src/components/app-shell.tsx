@@ -10,8 +10,11 @@ import {
   Settings,
 } from "@/components/icons";
 import type * as React from "react";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
+import { toastManager } from "@/components/ui/toast";
 import { CommandMenu } from "@/components/command-menu";
 import { ProjectIcon } from "@/components/project-icon";
 import {
@@ -44,7 +47,8 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
-import { totalDriftCounts } from "@/lib/format";
+import { useApi } from "@/lib/api-context";
+import { errorMessage, totalDriftCounts } from "@/lib/format";
 import type { Route } from "@/lib/router";
 import { hrefFor, navigate } from "@/lib/router";
 import type { OverviewResponse } from "@/lib/types";
@@ -183,6 +187,70 @@ function DevUserBlock(): React.ReactElement {
   );
 }
 
+function SlackConnectButton({
+  overview,
+  route,
+}: {
+  overview: OverviewResponse;
+  route: Route;
+}): React.ReactElement {
+  const api = useApi();
+  const [busy, setBusy] = useState(false);
+  const project =
+    (route.name === "project"
+      ? overview.projects.find((entry) => entry.id === route.projectId)
+      : undefined) ?? overview.projects[0];
+  const disabled = busy || !project || !overview.slackConfigured;
+
+  async function connect(): Promise<void> {
+    if (busy || !project) return;
+    setBusy(true);
+    try {
+      const result = await api.get<{ url: string }>(
+        `/projects/${project.id}/connections/slack/install`,
+      );
+      window.location.assign(result.url);
+    } catch (cause) {
+      toastManager.add({
+        description: errorMessage(cause),
+        title: "Could not open Slack",
+        type: "error",
+      });
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Button
+      className="w-full justify-start"
+      disabled={disabled}
+      onClick={() => void connect()}
+      size="sm"
+      title={
+        !overview.slackConfigured
+          ? "Slack is not configured on this server"
+          : project
+            ? `Connect ${project.name} to Slack`
+            : "Create a project first"
+      }
+      variant="secondary"
+    >
+      {busy ? (
+        <Spinner className="size-4" />
+      ) : (
+        <img
+          alt=""
+          className="size-4"
+          height={16}
+          src="https://upload.wikimedia.org/wikipedia/commons/d/d5/Slack_icon_2019.svg"
+          width={16}
+        />
+      )}
+      Connect to Slack
+    </Button>
+  );
+}
+
 export function AppShell({
   overview,
   route,
@@ -234,10 +302,10 @@ export function AppShell({
   }, [routeKey]);
 
   return (
-    <SidebarProvider className="h-svh overflow-hidden bg-background">
+    <SidebarProvider className="h-svh overflow-hidden bg-page">
       <div className="flex h-full min-h-0 w-full gap-2 overflow-hidden">
         <Sidebar
-          className="static! h-full! min-w-0 overflow-hidden [&_[data-slot=sidebar-gap]]:hidden group-data-[state=collapsed]:w-0"
+          className="static! h-full! min-w-0 overflow-hidden border-r-0! [&_[data-slot=sidebar-gap]]:hidden group-data-[side=left]:border-r-0! group-data-[state=collapsed]:w-0"
           collapsible="offcanvas"
         >
           <SidebarHeader>
@@ -350,6 +418,7 @@ export function AppShell({
           </SidebarGroup>
         </SidebarContent>
         <SidebarFooter>
+          <SlackConnectButton overview={overview} route={route} />
           {devMode ? <DevUserBlock /> : <UserFooter />}
         </SidebarFooter>
         </Sidebar>
