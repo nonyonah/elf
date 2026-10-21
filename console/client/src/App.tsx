@@ -2,11 +2,12 @@ import { useAuth } from "@clerk/react";
 import { CircleAlert } from "@/components/icons";
 import * as React from "react";
 import { AppShell } from "@/components/app-shell";
+import { CreateProjectProvider } from "@/components/create-project";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { ApiProvider, useApi } from "@/lib/api-context";
 import { createApi } from "@/lib/api";
-import { useRoute } from "@/lib/router";
+import { navigate, useRoute } from "@/lib/router";
 import type { OverviewResponse } from "@/lib/types";
 import { useQuery } from "@/lib/use-query";
 import { ConfigNotice, LandingScreen, SplashScreen } from "@/screens/landing";
@@ -46,29 +47,37 @@ function Console({
   }
 
   return (
-    <AppShell
-      devMode={devMode}
-      overview={query.data}
-      route={route}
+    <CreateProjectProvider
+      onCreated={(project) => {
+        query.reload();
+        navigate({
+          name: "project",
+          projectId: project.id,
+          view: "overview",
+        });
+      }}
     >
-      {route.name === "overview" ? (
-        <OverviewScreen
-          overview={query.data}
-          reloadOverview={query.reload}
-        />
-      ) : route.name === "activity" ? (
-        <ActivityScreen />
-      ) : route.name === "settings" ? (
-        <SettingsScreen overview={query.data} />
-      ) : (
-        <ProjectScreen
-          key={route.projectId}
-          onOverviewChange={query.reload}
-          projectId={route.projectId}
-          view={route.view}
-        />
-      )}
-    </AppShell>
+      <AppShell
+        devMode={devMode}
+        overview={query.data}
+        route={route}
+      >
+        {route.name === "overview" ? (
+          <OverviewScreen overview={query.data} />
+        ) : route.name === "activity" ? (
+          <ActivityScreen />
+        ) : route.name === "settings" ? (
+          <SettingsScreen overview={query.data} />
+        ) : (
+          <ProjectScreen
+            key={route.projectId}
+            onOverviewChange={query.reload}
+            projectId={route.projectId}
+            view={route.view}
+          />
+        )}
+      </AppShell>
+    </CreateProjectProvider>
   );
 }
 
