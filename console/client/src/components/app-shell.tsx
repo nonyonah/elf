@@ -234,12 +234,11 @@ export function AppShell({
   }, [routeKey]);
 
   return (
-    <SidebarProvider className="h-svh overflow-hidden bg-page p-2">
-      <div className="flex h-full min-h-0 w-full overflow-hidden rounded-[12px] border border-border-soft bg-card shadow-shell [&>[data-slot=sidebar]]:min-w-0">
-        <Sidebar
-          className="static! h-full! min-w-0 overflow-hidden border-r border-border-soft [&_[data-slot=sidebar-gap]]:hidden group-data-[state=collapsed]:w-0 group-data-[state=collapsed]:border-r-0"
-          collapsible="offcanvas"
-        >
+    <SidebarProvider className="h-svh overflow-hidden bg-background">
+      <Sidebar
+        className="border-r border-border-soft [&_[data-slot=sidebar-gap]]:hidden group-data-[state=collapsed]:border-r-0"
+        collapsible="offcanvas"
+      >
           <SidebarHeader>
           <div className="flex items-center gap-2.5 px-1 py-1.5">
             <BrandMark />
@@ -353,7 +352,7 @@ export function AppShell({
           {devMode ? <DevUserBlock /> : <UserFooter />}
         </SidebarFooter>
         </Sidebar>
-        <SidebarInset className="min-h-0 min-w-0 flex-1 bg-card">
+      <SidebarInset className="min-h-0 min-w-0 flex-1 bg-background">
           <header className="relative z-20 flex h-12 shrink-0 items-center gap-2 border-b border-border-soft bg-card px-3">
             <SidebarTrigger />
             <Separator className="me-1 data-[orientation=vertical]:h-4" orientation="vertical" />
@@ -367,9 +366,8 @@ export function AppShell({
             ref={scrollRef}
           >
             <div className="mx-auto w-full max-w-6xl">{children}</div>
-          </div>
-        </SidebarInset>
-      </div>
+        </div>
+      </SidebarInset>
     </SidebarProvider>
   );
 }

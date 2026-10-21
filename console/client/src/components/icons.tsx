@@ -11,6 +11,7 @@ import {
   ChevronsUpDown as ChevronsUpDownGlyph,
   CircleAlert as CircleAlertGlyph,
   CircleCheckIcon as CircleCheckGlyph,
+  CodeXml as CodeXmlGlyph,
   Copy as CopyGlyph,
   Download as DownloadGlyph,
   GitBranch as GitBranchGlyph,
@@ -25,6 +26,7 @@ import {
   MoreHorizontal as MoreHorizontalGlyph,
   PanelLeftIcon as PanelLeftGlyph,
   Pencil as PencilGlyph,
+  PenTool as PenToolGlyph,
   Plug as PlugGlyph,
   Plus as PlusGlyph,
   RefreshCw as RefreshCwGlyph,
@@ -82,6 +84,8 @@ export const MoreHorizontal = icon(MoreHorizontalGlyph);
 export const PanelLeftIcon = icon(PanelLeftGlyph);
 export const Pencil = icon(PencilGlyph);
 export const Plug = icon(PlugGlyph);
+export const PenTool = icon(PenToolGlyph);
+export const CodeXml = icon(CodeXmlGlyph);
 export const Plus = icon(PlusGlyph);
 export const RefreshCw = icon(RefreshCwGlyph);
 export const Search = icon(SearchGlyph);

@@ -1,4 +1,4 @@
-import { CircleAlert, GitBranch, TriangleAlert } from "@/components/icons";
+import { CircleAlert, CodeXml, GitBranch, PenTool, TriangleAlert } from "@/components/icons";
 import * as React from "react";
 import {
   Card,
@@ -620,15 +620,6 @@ export function ProjectScreen({
               : ""}
           </p>
         </div>
-        <Tabs
-          onValueChange={(value) => setMode(value as ViewMode)}
-          value={mode}
-        >
-          <TabsList size="sm">
-            <TabsTab value="designer">Designer</TabsTab>
-            <TabsTab value="developer">Developer</TabsTab>
-          </TabsList>
-        </Tabs>
       </div>
 
       <Tabs
@@ -657,6 +648,35 @@ export function ProjectScreen({
           projectId={projectId}
         />
       ) : null}
+
+      <div
+        aria-label="View mode"
+        className="fixed right-4 bottom-4 z-30 flex items-center gap-0.5 rounded-full border border-border-soft bg-card/95 p-1 shadow-lg shadow-black/5 backdrop-blur sm:right-6 sm:bottom-6"
+        role="group"
+      >
+        <Button
+          aria-label="Designer view"
+          aria-pressed={mode === "designer"}
+          className="rounded-full"
+          onClick={() => setMode("designer")}
+          size="icon"
+          title="Designer view"
+          variant={mode === "designer" ? "secondary" : "ghost"}
+        >
+          <PenTool />
+        </Button>
+        <Button
+          aria-label="Developer view"
+          aria-pressed={mode === "developer"}
+          className="rounded-full"
+          onClick={() => setMode("developer")}
+          size="icon"
+          title="Developer view"
+          variant={mode === "developer" ? "secondary" : "ghost"}
+        >
+          <CodeXml />
+        </Button>
+      </div>
     </div>
   );
 }
