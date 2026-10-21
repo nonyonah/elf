@@ -27,6 +27,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Tabs, TabsList, TabsTab } from "@/components/ui/tabs";
 import { useApi } from "@/lib/api-context";
 import { ProjectIconEditor } from "@/components/project-icon";
 import {
@@ -620,6 +621,22 @@ export function ProjectScreen({
           </p>
         </div>
       </div>
+
+      <Tabs
+        onValueChange={(value) =>
+          navigate({
+            name: "project",
+            projectId,
+            view: value as ProjectView,
+          })
+        }
+        value={view}
+      >
+        <TabsList>
+          <TabsTab value="overview">Project</TabsTab>
+          <TabsTab value="deprecations">Deprecations</TabsTab>
+        </TabsList>
+      </Tabs>
 
       {view === "overview" ? (
         <ProjectOverview detail={detail} mode={mode} />
