@@ -20,6 +20,7 @@ export interface ApiClient {
   get<T>(path: string): Promise<T>;
   post<T>(path: string, body?: unknown): Promise<T>;
   put<T>(path: string, body?: unknown): Promise<T>;
+  patch<T>(path: string, body?: unknown): Promise<T>;
   del<T>(path: string): Promise<T>;
 }
 
@@ -44,7 +45,7 @@ export function createApi(
   getToken: () => Promise<string | null>,
 ): ApiClient {
   async function request<T>(
-    method: "GET" | "POST" | "PUT" | "DELETE",
+    method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE",
     path: string,
     body?: unknown,
   ): Promise<T> {
@@ -68,6 +69,7 @@ export function createApi(
     get: (path) => request("GET", path),
     post: (path, body) => request("POST", path, body),
     put: (path, body) => request("PUT", path, body),
+    patch: (path, body) => request("PATCH", path, body),
     del: (path) => request("DELETE", path),
   };
 }

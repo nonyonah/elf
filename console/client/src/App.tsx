@@ -63,6 +63,7 @@ function Console({
       ) : (
         <ProjectScreen
           key={route.projectId}
+          onOverviewChange={query.reload}
           projectId={route.projectId}
           view={route.view}
         />

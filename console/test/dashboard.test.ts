@@ -291,6 +291,55 @@ describe("dashboard API", () => {
     expect(leftover?.encryptedSecret).toBeNull();
   });
 
+  it("stores, edits and clears a project icon", async () => {
+    const user = freshUser();
+    const created = await api("/projects", {
+      user,
+      method: "POST",
+      body: { name: "Iconic", icon: "🎨" },
+    });
+    expect(created.status).toBe(201);
+    const { project } = (await created.json()) as {
+      project: ProjectShape & { icon: string | null };
+    };
+    expect(project.icon).toBe("🎨");
+
+    const patched = await api(`/projects/${project.id}`, {
+      user,
+      method: "PATCH",
+      body: { icon: "🪄" },
+    });
+    expect(patched.status).toBe(200);
+    expect(
+      ((await patched.json()) as { project: { icon: string } }).project.icon,
+    ).toBe("🪄");
+
+    const list = await api("/projects", { user });
+    const listBody = (await list.json()) as {
+      projects: Array<{ id: string; icon: string | null }>;
+    };
+    expect(listBody.projects.find((entry) => entry.id === project.id)?.icon).toBe(
+      "🪄",
+    );
+
+    const cleared = await api(`/projects/${project.id}`, {
+      user,
+      method: "PATCH",
+      body: { icon: "" },
+    });
+    expect(
+      ((await cleared.json()) as { project: { icon: string | null } }).project
+        .icon,
+    ).toBeNull();
+
+    const tooLong = await api(`/projects/${project.id}`, {
+      user,
+      method: "PATCH",
+      body: { icon: "x".repeat(25) },
+    });
+    expect(tooLong.status).toBe(400);
+  });
+
   it("binds a Figma project from its URL at creation and from settings", async () => {
     const user = freshUser();
     const created = await api("/projects", {

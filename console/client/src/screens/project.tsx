@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTab } from "@/components/ui/tabs";
 import { useApi } from "@/lib/api-context";
+import { ProjectIconEditor } from "@/components/project-icon";
 import {
   formatDate,
   formatDateTime,
@@ -539,9 +540,11 @@ function ProjectOverview({
 export function ProjectScreen({
   projectId,
   view,
+  onOverviewChange,
 }: {
   projectId: string;
   view: ProjectView;
+  onOverviewChange: () => void;
 }): React.ReactElement {
   const api = useApi();
   const [mode, setMode] = useViewMode();
@@ -595,7 +598,16 @@ export function ProjectScreen({
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2.5">
+          <div className="flex flex-wrap items-center gap-2">
+            <ProjectIconEditor
+              compact
+              icon={detail.project.icon}
+              onSaved={() => {
+                query.reload();
+                onOverviewChange();
+              }}
+              projectId={projectId}
+            />
             <h1 className="font-heading font-semibold text-xl tracking-tight">
               {detail.project.name}
             </h1>

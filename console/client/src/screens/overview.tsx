@@ -22,6 +22,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
+import { EmojiPicker, ProjectIcon } from "@/components/project-icon";
 import {
   Empty,
   EmptyContent,
@@ -71,6 +72,7 @@ function CreateProjectDialog({
 }): React.ReactElement {
   const api = useApi();
   const [name, setName] = React.useState("");
+  const [icon, setIcon] = React.useState<string | null>(null);
   const [figmaUrl, setFigmaUrl] = React.useState("");
   const [figmaToken, setFigmaToken] = React.useState("");
   const [pending, setPending] = React.useState(false);
@@ -86,6 +88,7 @@ function CreateProjectDialog({
         "/projects",
         {
           name: trimmed,
+          ...(icon ? { icon } : {}),
           ...(figmaUrl.trim() ? { figmaUrl: figmaUrl.trim() } : {}),
           ...(figmaToken.trim() ? { figmaToken: figmaToken.trim() } : {}),
         },
@@ -98,6 +101,7 @@ function CreateProjectDialog({
         type: "success",
       });
       setName("");
+      setIcon(null);
       setFigmaUrl("");
       setFigmaToken("");
       onOpenChange(false);
@@ -137,6 +141,14 @@ function CreateProjectDialog({
               />
             </Field>
             <Field>
+              <FieldLabel>Icon</FieldLabel>
+              <EmojiPicker className="w-full" onChange={setIcon} value={icon} />
+              <FieldDescription>
+                Pick a preset or paste your own emoji. It shows next to the
+                project in the sidebar.
+              </FieldDescription>
+            </Field>
+            <Field>
               <FieldLabel>Figma project</FieldLabel>
               <Input
                 onChange={(event) => setFigmaUrl(event.target.value)}
@@ -148,7 +160,7 @@ function CreateProjectDialog({
               </FieldDescription>
             </Field>
             <Field>
-              <FieldLabel>Figma API key</FieldLabel>
+              <FieldLabel>Figma access token</FieldLabel>
               <Input
                 autoComplete="off"
                 onChange={(event) => setFigmaToken(event.target.value)}
@@ -279,11 +291,8 @@ export function OverviewScreen({
       ) : (
         <>
           <CardFrame>
-          <Table
-            containerClassName="h-[360px] overflow-y-auto bg-card"
-            variant="card"
-          >
-            <TableHeader className="sticky top-0 z-10 bg-card">
+          <Table containerClassName="bg-card" variant="card">
+            <TableHeader>
               <TableRow>
                 <TableHead>Project</TableHead>
                 <TableHead>State</TableHead>
@@ -309,10 +318,22 @@ export function OverviewScreen({
                     }
                   >
                     <TableCell>
-                      <div className="font-medium">{project.name}</div>
-                      <div className="text-[13px] text-muted-foreground">
-                        {project.slug}
+                      <div className="flex items-center gap-2">
+                        <ProjectIcon icon={project.icon} />
+                        <span className="font-medium">{project.name}</span>
                       </div>
+                      {project.fileKey ? (
+                        <a
+                          className="mt-0.5 block max-w-64 truncate text-[13px] text-muted-foreground hover:text-foreground"
+                          href={`https://www.figma.com/file/${project.fileKey}`}
+                          onClick={(event) => event.stopPropagation()}
+                          rel="noreferrer"
+                          target="_blank"
+                          title={`https://www.figma.com/file/${project.fileKey}`}
+                        >
+                          {`https://www.figma.com/file/${project.fileKey}`}
+                        </a>
+                      ) : null}
                     </TableCell>
                     <TableCell>
                       <StatusPill size="sm" state={project.state} />

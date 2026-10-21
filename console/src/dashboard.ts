@@ -52,6 +52,7 @@ interface ProjectRow {
   id: string;
   name: string;
   slug: string;
+  icon: string | null;
   createdAt: string;
 }
 
@@ -108,7 +109,7 @@ async function workspaceFor(c: Context<AppEnv>): Promise<Workspace> {
 
 async function findProject(db: D1Database, workspaceId: string, projectId: string): Promise<ProjectRow | null> {
   return db
-    .prepare("SELECT id, name, slug, createdAt FROM projects WHERE id = ? AND workspaceId = ?")
+    .prepare("SELECT id, name, slug, icon, createdAt FROM projects WHERE id = ? AND workspaceId = ?")
     .bind(projectId, workspaceId)
     .first<ProjectRow>();
 }
@@ -123,7 +124,12 @@ function slugify(name: string): string {
   return slug || "project";
 }
 
-async function createProject(db: D1Database, workspaceId: string, name: string): Promise<ProjectRow> {
+async function createProject(
+  db: D1Database,
+  workspaceId: string,
+  name: string,
+  icon: string | null,
+): Promise<ProjectRow> {
   const id = `prj_${crypto.randomUUID()}`;
   const createdAt = new Date().toISOString();
   const base = slugify(name);
@@ -136,10 +142,12 @@ async function createProject(db: D1Database, workspaceId: string, name: string):
     if (taken) continue;
     try {
       await db
-        .prepare("INSERT INTO projects (id, workspaceId, name, slug, createdAt) VALUES (?, ?, ?, ?, ?)")
-        .bind(id, workspaceId, name, slug, createdAt)
+        .prepare(
+          "INSERT INTO projects (id, workspaceId, name, slug, icon, createdAt) VALUES (?, ?, ?, ?, ?, ?)",
+        )
+        .bind(id, workspaceId, name, slug, icon, createdAt)
         .run();
-      return { id, name, slug, createdAt };
+      return { id, name, slug, icon, createdAt };
     } catch {
       // Slug raced with a concurrent create; try the next suffix.
     }
@@ -405,7 +413,7 @@ export function dashboard(): Hono<AppEnv> {
     const db = c.env.DB;
     const workspace = await workspaceFor(c);
     const projects = await db
-      .prepare("SELECT id, name, slug, createdAt FROM projects WHERE workspaceId = ? ORDER BY createdAt DESC")
+      .prepare("SELECT id, name, slug, icon, createdAt FROM projects WHERE workspaceId = ? ORDER BY createdAt DESC")
       .bind(workspace.id)
       .all<ProjectRow>();
 
@@ -448,6 +456,7 @@ export function dashboard(): Hono<AppEnv> {
           id: project.id,
           name: project.name,
           slug: project.slug,
+          icon: project.icon,
           createdAt: project.createdAt,
           state: status.state,
           checkedAt: status.checkedAt,
@@ -514,10 +523,15 @@ export function dashboard(): Hono<AppEnv> {
       );
     }
 
+    const icon = "icon" in body.value ? readOptionalText(body.value.icon, 24) : null;
+    if (icon === false) {
+      return fail(c, 400, "invalid_payload", "`icon` must be a short emoji.");
+    }
+
     const workspace = await workspaceFor(c);
     let project: ProjectRow;
     try {
-      project = await createProject(c.env.DB, workspace.id, name);
+      project = await createProject(c.env.DB, workspace.id, name, icon);
     } catch {
       return fail(c, 500, "server_error", "Could not create the project.");
     }
@@ -565,6 +579,7 @@ export function dashboard(): Hono<AppEnv> {
     await logAudit(c.env.DB, workspace.id, getSession(c).userId, "project.create", {
       projectId: project.id,
       name,
+      icon,
       ...(figmaRef ? { figmaFileKey: figmaRef.fileKey } : {}),
     });
     return c.json({ project }, 201);
@@ -642,6 +657,30 @@ export function dashboard(): Hono<AppEnv> {
             }
           : null,
     });
+  });
+
+  d.patch("/projects/:id", async (c) => {
+    const body = await readBody(c);
+    if (!body.ok) return body.response;
+    if (!("icon" in body.value)) {
+      return fail(c, 400, "invalid_payload", "`icon` is required.");
+    }
+    const icon = readOptionalText(body.value.icon, 24);
+    if (icon === false) {
+      return fail(c, 400, "invalid_payload", "`icon` must be a short emoji.");
+    }
+    const workspace = await workspaceFor(c);
+    const project = await findProject(c.env.DB, workspace.id, c.req.param("id"));
+    if (!project) return fail(c, 404, "not_found", "No such project.");
+    await c.env.DB
+      .prepare("UPDATE projects SET icon = ? WHERE id = ?")
+      .bind(icon, project.id)
+      .run();
+    await logAudit(c.env.DB, workspace.id, getSession(c).userId, "project.update", {
+      projectId: project.id,
+      icon,
+    });
+    return c.json({ project: { ...project, icon } });
   });
 
   d.get("/projects/:id/deprecations", async (c) => {

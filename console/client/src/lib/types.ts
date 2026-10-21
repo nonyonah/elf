@@ -74,6 +74,7 @@ export interface ProjectSummaryEntry {
   id: string;
   name: string;
   slug: string;
+  icon: string | null;
   createdAt: string;
   state: DriftState;
   checkedAt: string;
@@ -113,7 +114,13 @@ export interface OverviewResponse {
 }
 
 export interface ProjectDetailResponse {
-  project: { id: string; name: string; slug: string; createdAt: string };
+  project: {
+    id: string;
+    name: string;
+    slug: string;
+    icon: string | null;
+    createdAt: string;
+  };
   state: DriftState;
   staleReason: "age" | "figma" | null;
   checkedAt: string;

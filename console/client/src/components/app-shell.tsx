@@ -1,6 +1,5 @@
 import { useClerk, useUser } from "@clerk/react";
 import {
-  Box,
   Boxes,
   ChevronDownIcon,
   ChevronRight,
@@ -14,6 +13,7 @@ import type * as React from "react";
 import { useEffect, useRef } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { CommandMenu } from "@/components/command-menu";
+import { ProjectIcon } from "@/components/project-icon";
 import {
   Collapsible,
   CollapsibleContent,
@@ -235,9 +235,9 @@ export function AppShell({
 
   return (
     <SidebarProvider className="h-svh overflow-hidden bg-page p-2">
-      <div className="flex h-full min-h-0 w-full overflow-hidden rounded-[12px] border bg-card shadow-shell [&>[data-slot=sidebar]]:min-w-0">
+      <div className="flex h-full min-h-0 w-full overflow-hidden rounded-[12px] border border-border-soft bg-card shadow-shell [&>[data-slot=sidebar]]:min-w-0">
         <Sidebar
-          className="static! h-full! min-w-0 overflow-hidden border-r border-sidebar-border [&_[data-slot=sidebar-gap]]:hidden group-data-[state=collapsed]:w-0 group-data-[state=collapsed]:border-r-0"
+          className="static! h-full! min-w-0 overflow-hidden border-r border-border-soft [&_[data-slot=sidebar-gap]]:hidden group-data-[state=collapsed]:w-0 group-data-[state=collapsed]:border-r-0"
           collapsible="offcanvas"
         >
           <SidebarHeader>
@@ -307,7 +307,7 @@ export function AppShell({
                                     />
                                   }
                                 >
-                                  <Box className="size-3.5" />
+                                  <ProjectIcon icon={project.icon} className="size-3.5" />
                                   <span className="truncate">
                                     {project.name}
                                   </span>
@@ -354,7 +354,7 @@ export function AppShell({
         </SidebarFooter>
         </Sidebar>
         <SidebarInset className="min-h-0 min-w-0 flex-1 bg-card">
-          <header className="relative z-20 flex h-12 shrink-0 items-center gap-2 border-b bg-card px-3">
+          <header className="relative z-20 flex h-12 shrink-0 items-center gap-2 border-b border-border-soft bg-card px-3">
             <SidebarTrigger />
             <Separator className="me-1 data-[orientation=vertical]:h-4" orientation="vertical" />
             <Breadcrumbs overview={overview} route={route} />
