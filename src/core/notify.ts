@@ -66,9 +66,17 @@ export function driftFingerprint(result: DriftResult): string {
 /**
  * Alerts only when something changed: a first report with anything to say,
  * or any difference from the previous state (including a recovery to clean).
+ * Pass `onlyOnChange = false` to notify on every run instead.
  */
-export function decideNotification(previous: NotifyState | null, result: DriftResult): NotifyDecision {
+export function decideNotification(
+  previous: NotifyState | null,
+  result: DriftResult,
+  onlyOnChange = true,
+): NotifyDecision {
   const fingerprint = driftFingerprint(result);
+  if (!onlyOnChange) {
+    return { send: true, reason: previous === null ? "first-report" : "state-changed", fingerprint };
+  }
   if (previous === null) {
     const noteworthy = result.driftFound || hasNotes(result);
     return { send: noteworthy, reason: noteworthy ? "first-report" : "unchanged", fingerprint };

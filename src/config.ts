@@ -1,8 +1,23 @@
-import { readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import type { ComponentsConfig, DashboardConfig, Deprecation, DriftConfig, ModeStrategy, NotifyConfig } from "./core/types.js";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Find the nearest elf.config.json walking up from a directory.
+ * Lets commands work from nested folders such as `settings-next/`.
+ */
+export function findConfigPath(startDir = process.cwd()): string | null {
+  let dir = resolve(startDir);
+  while (true) {
+    const candidate = join(dir, "elf.config.json");
+    if (existsSync(candidate)) return candidate;
+    const parent = dirname(dir);
+    if (parent === dir) return null;
+    dir = parent;
+  }
+}
 
 export function loadConfig(configPath: string): DriftConfig {
   let raw: unknown;
@@ -85,12 +100,16 @@ function parseNotify(value: unknown, configDir: string, configPath: string): Not
   if (format !== "slack" && format !== "text") {
     throw new Error(`Config "${configPath}": "notify.format" must be "slack" or "text", got ${JSON.stringify(record.format)}.`);
   }
+  if (record.onlyOnChange !== undefined && typeof record.onlyOnChange !== "boolean") {
+    throw new Error(`Config "${configPath}": "notify.onlyOnChange" must be a boolean.`);
+  }
   if (record.stateFile !== undefined && (typeof record.stateFile !== "string" || !record.stateFile.trim())) {
     throw new Error(`Config "${configPath}": "notify.stateFile" must be a non-empty path.`);
   }
   return {
     webhookEnv: record.webhookEnv.trim(),
     format,
+    onlyOnChange: record.onlyOnChange ?? true,
     ...(typeof record.stateFile === "string" ? { stateFile: resolve(configDir, record.stateFile) } : {}),
   };
 }

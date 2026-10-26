@@ -18,7 +18,9 @@ export {
   type NotifyState,
 } from "./core/notify.js";
 
+import type { NotifyConfig } from "./core/types.js";
 import type { NotifyMessage, NotifyState } from "./core/notify.js";
+import { readSlackWebhook, SLACK_WEBHOOK_FILE } from "./slack.js";
 
 /** Missing, unreadable, or pre-fingerprint state files count as a first report. */
 export function readNotifyState(path: string): NotifyState | null {
@@ -36,6 +38,31 @@ export function readNotifyState(path: string): NotifyState | null {
 export function writeNotifyState(path: string, state: NotifyState): void {
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, `${JSON.stringify(state, null, 2)}\n`);
+}
+
+export interface ResolvedNotifyWebhook {
+  url: string;
+  /** Where the URL came from, for the CLI's confirmation line. */
+  source: string;
+}
+
+/**
+ * The notify webhook comes from the configured env var first. If that is
+ * unset, a Slack connection made through `elf connect slack` / `elf settings`
+ * is the fallback — that is what makes the settings toggle enough to turn on
+ * CLI notifications. Plain-text webhooks (ntfy etc.) stay env-only.
+ */
+export function resolveNotifyWebhook(
+  notify: NotifyConfig | undefined,
+  configPath: string,
+  env: NodeJS.ProcessEnv = process.env,
+): ResolvedNotifyWebhook | null {
+  if (!notify) return null;
+  const fromEnv = env[notify.webhookEnv]?.trim();
+  if (fromEnv) return { url: fromEnv, source: notify.webhookEnv };
+  if (notify.format !== "slack") return null;
+  const stored = readSlackWebhook(configPath);
+  return stored ? { url: stored.url, source: SLACK_WEBHOOK_FILE } : null;
 }
 
 export async function postNotification(

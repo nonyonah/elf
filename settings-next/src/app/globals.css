@@ -1,0 +1,158 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+@custom-variant not-dark (&:not(.dark *));
+
+:root {
+  color-scheme: light;
+
+  /* Rift surfaces */
+  --surface-app: #f5f7f8;
+  --surface-card: #ffffff;
+  --surface-input: #ffffff;
+  --surface-subtle: #eef0f2;
+
+  /* Rift text */
+  --fg-default: #121619;
+  --fg-muted: #494e51;
+  --fg-faint: #65696d;
+
+  /* Rift lines + primary */
+  --line-default: #e1e3e5;
+  --line-input: #868a8c;
+  --primary: #121619;
+  --primary-hover: #282c2f;
+  --on-primary: #ffffff;
+  --ring: #121619;
+
+  /* Rift status */
+  --success-fg: #0d7a3e;
+  --warning-fg: #8c6104;
+  --danger-fg: #bf3b35;
+
+  /* Semantic aliases used by the coss components */
+  --background: var(--surface-app);
+  --foreground: var(--fg-default);
+  --card: var(--surface-card);
+  --card-foreground: var(--fg-default);
+  --popover: var(--surface-card);
+  --popover-foreground: var(--fg-default);
+  --primary-foreground: var(--on-primary);
+  --secondary: var(--surface-subtle);
+  --secondary-foreground: var(--fg-default);
+  --muted: var(--surface-subtle);
+  --muted-foreground: var(--fg-muted);
+  --accent: var(--surface-subtle);
+  --accent-foreground: var(--fg-default);
+  --destructive: var(--danger-fg);
+  --destructive-foreground: var(--danger-fg);
+  --border: var(--line-default);
+  --input: var(--line-default);
+  --info: var(--fg-muted);
+  --info-foreground: var(--fg-muted);
+  --success: var(--success-fg);
+  --success-foreground: var(--success-fg);
+  --warning: var(--warning-fg);
+  --warning-foreground: var(--warning-fg);
+  --faint: var(--fg-faint);
+
+  --radius: 0.5rem;
+  --radius-sm: 0.375rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.625rem;
+  --radius-2xl: 0.75rem;
+}
+
+.dark {
+  color-scheme: dark;
+
+  --surface-app: #090d10;
+  --surface-card: #1d2124;
+  --surface-input: #282c2f;
+  --surface-subtle: #282c2f;
+
+  --fg-default: #f5f7f8;
+  --fg-muted: #ced1d3;
+  --fg-faint: #a9adaf;
+
+  --line-default: #34393c;
+  --line-input: #868a8c;
+  --primary: #f5f7f8;
+  --primary-hover: #e1e3e5;
+  --on-primary: #121619;
+  --ring: #f5f7f8;
+
+  --success-fg: #4aa969;
+  --warning-fg: #bd8d3a;
+  --danger-fg: #f46c61;
+
+  --info: var(--fg-muted);
+  --info-foreground: var(--fg-muted);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-faint: var(--faint);
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-heading: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+    font-size: 13px;
+    line-height: 1.55;
+  }
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.toast-in {
+  animation: toast-in 150ms ease-out;
+}

@@ -13,8 +13,9 @@ this works on a **free or Professional** plan.
 
 The plugin main thread cannot open sockets, so the **UI iframe holds the WebSocket** and relays
 messages to the main thread over `postMessage`. Every request carries an `id`; every response returns
-that `id` plus `ok`/`error`. The bridge binds to `127.0.0.1` only and requires a shared token in the
-handshake.
+that `id` plus `ok`/`error`. The bridge binds to `127.0.0.1` only. The plugin pairs once with a
+short-lived code printed by the server; the resulting session secret is kept in Figma's
+`clientStorage`, so reopening the file reconnects without asking for the code again.
 
 ---
 
@@ -29,11 +30,14 @@ npm install
 
 The MCP server is its own package — it has no effect on the root `elf-tokens` install.
 
-### 2. Create a token
+### 2. Create a server secret
 
 ```bash
 export ELF_MCP_TOKEN=$(openssl rand -hex 24)     # min 8 chars; keep it out of git
 ```
+
+`ELF_MCP_TOKEN` signs the session secrets and still guards the `/control` lane and the optional HTTP
+transport. It is **not** pasted into the plugin anymore — pairing handles that.
 
 Or put it in `mcp/.env` — the server loads that file automatically at startup; real environment
 variables win over it:
@@ -46,12 +50,12 @@ Environment variables:
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `ELF_MCP_TOKEN` | *(required)* | Shared secret in the WebSocket handshake. Never logged; only a sha256 fingerprint is printed at startup. |
-| `ELF_MCP_PORT` | `8765` | Loopback port for the bridge. If you change it, also set it in the plugin's host field and in `bridge-plugin/manifest.json`. |
+| `ELF_MCP_TOKEN` | *(required)* | Signs plugin session secrets and guards `/control` + HTTP. Never logged; only a sha256 fingerprint is printed at startup. |
+| `ELF_MCP_PORT` | `8765` | Loopback port for the bridge. If you change it, also set it in the plugin's **Bridge address** field and in `bridge-plugin/manifest.json`. |
 | `ELF_MCP_HTTP_PORT` | `8788` | Port for the Streamable HTTP transport (`npm run start:http`). Tunnel this port for web clients. |
 | `ELF_MCP_TIMEOUT_MS` | `10000` | Per-request timeout. |
 
-The server refuses to start without a token, so a stray bridge is never open to the network.
+The server refuses to start without a secret, so a stray bridge is never open to the network.
 
 ### 3. Build the plugin
 
@@ -62,12 +66,24 @@ npm run build:bridge-plugin      # writes bridge-plugin/code.js from code.ts
 ### 4. Load it in Figma
 
 1. **Plugins → Development → New plugin → Link existing plugin** → pick `bridge-plugin/manifest.json`.
-2. Open the plugin panel, paste the same token into **Bridge token** (leave the host at
-   `localhost:8765` unless you changed it — see below for tunnels), press **Connect**.
-3. The pill turns green and reads `connected · localhost:8765`. The token is kept in
-   `figma.clientStorage` (per machine, per plugin) — it is **not** written into the Figma document.
+2. Start the server (`cd mcp && npm start`). It prints a pairing code, for example
+   `pairing code abcd-efgh-jkmn — paste it into the Elf Bridge plugin (single-use; …)`.
+3. Open the plugin panel, leave the bridge address at `localhost:8765` unless you changed it, paste
+   the code and press **Pair this file**. The pill turns green.
+4. The server returns a longer-lived session secret. The plugin keeps it in `figma.clientStorage`
+   (per file, per machine) — it is **not** written into the Figma document, so reopening the file
+   reconnects automatically.
 
-The host field also accepts a full URL: `https://…` connects over `wss://` (e.g. an ngrok tunnel,
+The pairing code is single-use and expires **5 minutes after the server starts**. Once used (or
+expired), restart the server to print a fresh code. Disconnecting from the panel deletes the stored
+session and returns the file to the pairing screen.
+
+If your MCP client launches the server for you, the code goes to that client's MCP logs (Cursor:
+Settings → MCP → `elf-figma` → logs). Easier: run `npm start` in a terminal once, pair the plugin,
+then stop it and let the client start its own copy — the session is signed with `ELF_MCP_TOKEN`, so
+it survives the restart and the plugin reconnects by itself.
+
+The **Bridge address** field also accepts a full URL: `https://…` connects over `wss://` (e.g. an ngrok tunnel,
 see below), `http://…` over `ws://`. The bridge itself always binds to `127.0.0.1` and the manifest
 always declares `ws://localhost:8765` for local use — **use `localhost`, not `127.0.0.1`**: Figma's
 manifest validator rejects raw IPs (`127.0.0.1` fails with "should be a valid URL"), while
@@ -83,18 +99,18 @@ ngrok just gives Figma's sandbox a `wss://` URL to connect to.
 ngrok http 8765        # note the https://….ngrok-free.app URL it prints
 ```
 
-Paste that URL into the plugin's **Bridge host** field (`https://…` becomes `wss://`
-automatically) and press **Connect**. `bridge-plugin/manifest.json` already declares
+Paste that URL into the plugin's **Bridge address** field (`https://…` becomes `wss://`
+automatically), then pair with the code from the server terminal. `bridge-plugin/manifest.json` already declares
 `wss://*.ngrok-free.app`, so any free ngrok tunnel works without editing the manifest. Free-plan
 hostnames change on every restart — just paste the new one into the panel again.
 
-Security notes: the tunnel URL is public, so the token is the only gate — keep it long
-(`openssl rand -hex 24`) and stop the tunnel (`Ctrl-C`) when you're done. If the tunnel answers
+Security notes: the tunnel URL is public, so the pairing code/session is the gate — keep the server
+secret long (`openssl rand -hex 24`) and stop the tunnel (`Ctrl-C`) when you're done. If the tunnel answers
 with ngrok's HTML interstitial instead of upgrading the socket, the connection fails immediately
 with a closed socket — reload the panel once; if it persists, that tunnel is behind a warning page
 your plugin can't clear, and `localhost` (or a paid ngrok domain) is the way around it.
 
-If you change the local port, put the same value in the panel's host field
+If you change the local port, put the same value in the panel's **Bridge address** field
 (`localhost:<port>`) and update `devAllowedDomains` in `bridge-plugin/manifest.json` to match.
 
 ### 5. Add it to your MCP client
@@ -107,7 +123,7 @@ Cursor / Claude Desktop (`~/.cursor/mcp.json` or `claude_desktop_config.json`):
     "elf-figma": {
       "command": "/absolute/path/to/elf/mcp/node_modules/.bin/tsx",
       "args": ["/absolute/path/to/elf/mcp/src/index.ts"],
-      "env": { "ELF_MCP_TOKEN": "the-same-token-you-pasted-into-figma" }
+      "env": { "ELF_MCP_TOKEN": "the-bridge-secret-from-step-2" }
     }
   }
 }
@@ -333,14 +349,15 @@ and the same error codes (`not-connected`, `timeout`, `auth`, `plugin`, …).
 ## Testing
 
 ```bash
-cd mcp && npm test              # 59 unit tests: bridge, config, control client, variable/component tools
+cd mcp && npm test              # 66 unit tests: bridge, pairing, config, control client, tools
 npm --prefix mcp run verify:plugin   # from the repo root
 ```
 
 `npm test` runs a mock plugin over the **real** WebSocket server: request/response round trip and id
-matching, timeout, not-connected error, bad-token rejection (close code `4001`), mid-flight
-disconnect, verbatim plugin errors, upsert idempotency, the not-connected path for every tool, and
-the `/control` client (round trips, auth/refusal messages, timeouts, bridge shutdown).
+matching, timeout, not-connected error, bad token/code/session rejection (close code `4001`), single-use pairing
+codes, session reconnect across server restarts, code/session expiry, mid-flight disconnect, verbatim
+plugin errors, upsert idempotency, the not-connected path for every tool, and the `/control` client
+(round trips, auth/refusal messages, timeouts, bridge shutdown).
 
 `verify:plugin` is the end-to-end check of the **real compiled plugin** (`bridge-plugin/code.js`)
 without Figma: it loads the bundle against a stub `figma` global and drives it through the real
@@ -354,8 +371,13 @@ half-created. Run it after every `npm run build:bridge-plugin`.
 
 Run through this once on a free/Professional account:
 
-- [ ] **Load** — `Plugins → Development → Elf Bridge` opens; the pill shows `disconnected · 8765`.
-- [ ] **Connect** — paste the token, press Connect, pill turns green and logs `connected`.
+- [ ] **Load** — `Plugins → Development → Elf Bridge` opens; the panel shows **Pair this file** and
+      the pill shows `offline`.
+- [ ] **Pair** — start the server, paste the printed code, press Pair; the pill turns green and the
+      panel shows the file name.
+- [ ] **Reopen** — close and reopen the plugin. It reconnects from the saved session without a code.
+- [ ] **Disconnect** — press Disconnect; the session is removed from `clientStorage` and the panel
+      returns to the pairing screen.
 - [ ] **Status** — ask the client for `status`; it reports `connected: true` with the throwaway file's name and key.
 - [ ] **Create a collection** — `create_collection { name: "Bridge Test", modes: ["Light", "Dark"] }`; the file gets a collection with exactly those two modes (not a leftover `Mode 1`).
 - [ ] **Create 5 variables** — `upsert_variables` with two colors, two floats and one string; all five return ids and carry the `codeKey`.
@@ -368,7 +390,8 @@ Run through this once on a free/Professional account:
 - [ ] **Create styles** — `upsert_text_style` and `upsert_effect_style`; both appear under *Local styles* in the Figma styles panel; re-running updates the same style entry.
 - [ ] **Read back** — `get_node { nodeId }` reports the layout, the fill and `boundVariables`.
 - [ ] **Delete** — `delete_variable { names: [...] }`; confirm the ids are gone and `missing` lists anything that didn't match.
-- [ ] **Wrong token** — paste a different token, press Connect; the panel shows `auth failed` and the tools report not-connected. No token is ever printed in the panel or the server log.
+- [ ] **Bad code** — paste a wrong code; the panel reports that it is invalid, expired, or already
+      used, and no request reaches the tools. The code and session are never printed by the plugin.
 
 ---
 

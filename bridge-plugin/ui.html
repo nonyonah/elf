@@ -2,161 +2,529 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
+  <meta name="color-scheme" content="light dark" />
   <style>
     :root {
-      --bg: var(--figma-color-bg, #1e1e1e);
-      --bg-secondary: var(--figma-color-bg-secondary, #2c2c2c);
-      --text: var(--figma-color-text, #ffffff);
-      --text-secondary: var(--figma-color-text-secondary, #b3b3b3);
-      --accent: var(--figma-color-bg-brand, #0d99ff);
-      --danger: var(--figma-color-text-danger, #f24822);
-      --success: #1fc04d;
-      --border: var(--figma-color-border, #333333);
-      --radius: 6px;
+      --surface-app: #f5f7f8;
+      --surface-card: #ffffff;
+      --surface-subtle: #eef0f2;
+      --surface-raised: #ffffff;
+      --fg-default: #121619;
+      --fg-muted: #494e51;
+      --fg-faint: #65696d;
+      --line-default: #e1e3e5;
+      --line-strong: #cdd1d4;
+      --primary: #121619;
+      --on-primary: #ffffff;
+      --success: #1f7a4d;
+      --success-soft: #e8f3ed;
+      --warning: #8c6104;
+      --warning-soft: #fbf3e2;
+      --danger: #9f2d2d;
+      --danger-soft: #fbeceb;
+      --focus: #121619;
     }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --surface-app: #090d10;
+        --surface-card: #1d2124;
+        --surface-subtle: #282c2f;
+        --surface-raised: #24282b;
+        --fg-default: #f5f7f8;
+        --fg-muted: #b7bcc0;
+        --fg-faint: #8e9397;
+        --line-default: #313639;
+        --line-strong: #41474a;
+        --primary: #f5f7f8;
+        --on-primary: #121619;
+        --success: #6fca9b;
+        --success-soft: #12251b;
+        --warning: #e2b45f;
+        --warning-soft: #2a2113;
+        --danger: #f0928c;
+        --danger-soft: #2d1716;
+        --focus: #f5f7f8;
+      }
+    }
+
     * { box-sizing: border-box; margin: 0; padding: 0; }
+    [hidden] { display: none !important; }
+
+    html, body { height: 100%; }
+
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      font-size: 12px;
-      padding: 12px;
       display: flex;
       flex-direction: column;
-      gap: 10px;
-      height: 100vh;
+      overflow: hidden;
+      background: var(--surface-app);
+      color: var(--fg-default);
+      font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 12px;
+      line-height: 1.55;
+      -webkit-font-smoothing: antialiased;
     }
-    header { display: flex; align-items: center; justify-content: space-between; }
-    h1 { font-size: 13px; font-weight: 600; }
-    .file { color: var(--text-secondary); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .file strong { color: var(--text); font-weight: 600; }
-    .status {
+
+    button, input { font: inherit; color: inherit; }
+
+    .wrap {
       display: flex;
-      align-items: center;
-      gap: 6px;
-      font-weight: 600;
-      font-size: 11px;
-      padding: 5px 9px;
-      border-radius: 999px;
-      white-space: nowrap;
-    }
-    .status.connected { background: rgba(31, 192, 77, 0.15); color: var(--success); }
-    .status.connecting { background: rgba(13, 153, 255, 0.15); color: var(--accent); }
-    .status.disconnected { background: rgba(255, 255, 255, 0.08); color: var(--text-secondary); }
-    .status.error { background: rgba(242, 72, 34, 0.15); color: var(--danger); }
-    .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
-    label { display: block; color: var(--text-secondary); margin-bottom: 4px; font-size: 11px; }
-    input {
-      width: 100%;
-      background: var(--bg);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      color: var(--text);
-      padding: 7px 10px;
-      font-size: 12px;
-    }
-    input:focus { outline: 1px solid var(--accent); }
-    .row { display: flex; gap: 8px; align-items: flex-end; }
-    .row > .host { flex: 1; min-width: 0; }
-    .row > .token { flex: 1.4; min-width: 0; }
-    button {
-      background: var(--accent);
-      color: #ffffff;
-      border: none;
-      border-radius: var(--radius);
-      padding: 8px 12px;
-      font-size: 12px;
-      font-weight: 600;
-      cursor: pointer;
-      white-space: nowrap;
-    }
-    button.secondary { background: transparent; color: var(--text-secondary); border: 1px solid var(--border); }
-    button:disabled { opacity: 0.5; cursor: default; }
-    .hint { color: var(--text-secondary); font-size: 10.5px; line-height: 1.45; }
-    .log {
       flex: 1;
       min-height: 0;
-      overflow-y: auto;
-      background: var(--bg-secondary);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 8px 9px;
-      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-      font-size: 10px;
-      line-height: 1.55;
-      color: var(--text-secondary);
+      flex-direction: column;
+      padding: 16px;
     }
-    .log div { overflow-wrap: anywhere; }
-    .log .ok { color: var(--success); }
-    .log .err { color: var(--danger); }
+
+    header {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      margin-bottom: 18px;
+      flex-shrink: 0;
+    }
+
+    .mark {
+      display: flex;
+      width: 32px;
+      height: 32px;
+      flex-shrink: 0;
+      align-items: center;
+      justify-content: center;
+      border-radius: 9px;
+      background: var(--primary);
+      color: var(--on-primary);
+      font-size: 16px;
+      font-weight: 600;
+      letter-spacing: -0.04em;
+    }
+
+    .titles { min-width: 0; flex: 1; }
+    .titles h1 { font-size: 13px; font-weight: 600; line-height: 1.35; }
+    .titles p { font-size: 10.5px; color: var(--fg-faint); line-height: 1.4; }
+
+    .status {
+      display: inline-flex;
+      flex-shrink: 0;
+      align-items: center;
+      gap: 5px;
+      border-radius: 999px;
+      padding: 3px 8px;
+      background: var(--surface-subtle);
+      color: var(--fg-muted);
+      font-size: 10px;
+      font-weight: 500;
+      white-space: nowrap;
+    }
+    .status::before {
+      content: "";
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+    .status.online { background: var(--success-soft); color: var(--success); }
+    .status.pairing { background: var(--warning-soft); color: var(--warning); }
+
+    main { flex: 1; min-height: 0; }
+    [data-panel] { display: none; }
+    body[data-phase="loading"] [data-panel="loading"],
+    body[data-phase="disconnected"] [data-panel="disconnected"],
+    body[data-phase="pairing"] [data-panel="pairing"],
+    body[data-phase="connected"] [data-panel="connected"] { display: block; }
+
+    .card {
+      border: 0.5px solid var(--line-default);
+      border-radius: 12px;
+      background: var(--surface-card);
+      padding: 14px;
+    }
+
+    h2 { font-size: 13px; font-weight: 600; line-height: 1.45; }
+
+    .sub {
+      margin-top: 2px;
+      color: var(--fg-muted);
+      font-size: 11.5px;
+      line-height: 1.5;
+    }
+
+    .field-label {
+      display: block;
+      margin: 14px 0 5px;
+      color: var(--fg-faint);
+      font-size: 9.5px;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    input[type="text"] {
+      width: 100%;
+      height: 34px;
+      border: 0.5px solid var(--line-strong);
+      border-radius: 8px;
+      background: var(--surface-app);
+      padding: 0 10px;
+      font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace;
+      font-size: 12px;
+      letter-spacing: 0.02em;
+      outline: none;
+    }
+    input[type="text"]::placeholder { color: var(--fg-faint); opacity: 0.7; }
+    input[type="text"]:focus { border-color: var(--focus); box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus) 12%, transparent); }
+    input[type="text"]:disabled { opacity: 0.6; }
+
+    .error {
+      display: none;
+      margin-top: 8px;
+      border-radius: 7px;
+      background: var(--danger-soft);
+      padding: 6px 8px;
+      color: var(--danger);
+      font-size: 10.5px;
+      line-height: 1.45;
+    }
+    .error.visible { display: block; }
+
+    .primary, .secondary {
+      display: inline-flex;
+      width: 100%;
+      height: 34px;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      border-radius: 8px;
+      border: 0.5px solid transparent;
+      cursor: pointer;
+      font-size: 11.5px;
+      font-weight: 500;
+      transition: opacity 120ms ease, background-color 120ms ease;
+    }
+    .primary {
+      margin-top: 10px;
+      background: var(--primary);
+      border-color: var(--primary);
+      color: var(--on-primary);
+    }
+    .primary:hover:not(:disabled) { opacity: 0.88; }
+    .secondary {
+      border-color: var(--line-strong);
+      background: transparent;
+      color: var(--fg-muted);
+    }
+    .secondary:hover:not(:disabled) { background: var(--surface-subtle); color: var(--fg-default); }
+    button:disabled { cursor: default; opacity: 0.42; }
+    button:focus-visible, summary:focus-visible {
+      outline: 2px solid var(--focus);
+      outline-offset: 2px;
+    }
+
+    .hint {
+      margin-top: 9px;
+      color: var(--fg-faint);
+      font-size: 10px;
+      line-height: 1.5;
+    }
+
+    .pairing-box {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 26px 14px 20px;
+      text-align: center;
+    }
+    .spinner {
+      width: 20px;
+      height: 20px;
+      margin-bottom: 10px;
+      border: 2px solid var(--line-default);
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin 700ms linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .pairing-box h2 { font-size: 12.5px; }
+    .pairing-box .sub { max-width: 210px; }
+    .pairing-box .secondary { width: auto; height: 28px; margin-top: 14px; padding: 0 12px; }
+
+    .connected-head {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+    }
+    .check {
+      display: flex;
+      width: 26px;
+      height: 26px;
+      flex-shrink: 0;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      background: var(--success-soft);
+      color: var(--success);
+    }
+    .file-name {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 12.5px;
+      font-weight: 600;
+      line-height: 1.45;
+    }
+    .file-meta { color: var(--fg-faint); font-size: 10.5px; line-height: 1.45; }
+
+    .rows {
+      margin-top: 14px;
+      border-top: 0.5px solid var(--line-default);
+    }
+    .row {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 7px 0;
+      border-bottom: 0.5px solid var(--line-default);
+    }
+    .row:last-child { border-bottom: 0; }
+    .row dt { flex-shrink: 0; color: var(--fg-faint); font-size: 10.5px; }
+    .row dd {
+      min-width: 0;
+      overflow: hidden;
+      color: var(--fg-muted);
+      font-size: 10.5px;
+      text-align: right;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .row dd.mono { font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace; font-size: 10px; }
+    .row dd.ok { color: var(--success); }
+
+    .disconnect { margin-top: 12px; }
+    #reconnect { margin-top: 8px; }
+
+    .advanced {
+      margin-top: 12px;
+      border-top: 0.5px solid var(--line-default);
+      padding-top: 10px;
+    }
+    .advanced summary {
+      display: flex;
+      cursor: pointer;
+      list-style: none;
+      align-items: center;
+      justify-content: space-between;
+      color: var(--fg-faint);
+      font-size: 10.5px;
+    }
+    .advanced summary::-webkit-details-marker { display: none; }
+    .advanced summary::after { content: "+"; font-size: 13px; line-height: 1; }
+    .advanced[open] summary::after { content: "−"; }
+    .advanced .field-label { margin-top: 10px; }
+    .advanced .primary { height: 30px; margin-top: 8px; font-size: 11px; }
+
+    footer {
+      flex-shrink: 0;
+      padding-top: 12px;
+      color: var(--fg-faint);
+      font-size: 9.5px;
+      line-height: 1.45;
+      text-align: center;
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 14px;
+      left: 50%;
+      z-index: 10;
+      max-width: calc(100% - 32px);
+      transform: translate(-50%, 8px);
+      border-radius: 7px;
+      background: var(--primary);
+      padding: 6px 10px;
+      color: var(--on-primary);
+      font-size: 10.5px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 150ms ease, transform 150ms ease;
+    }
+    .toast.visible { opacity: 1; transform: translate(-50%, 0); }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
   </style>
 </head>
-<body>
-  <header>
-    <div>
-      <h1>Elf Bridge</h1>
-      <div class="file" id="file">…</div>
-    </div>
-    <div class="status disconnected" id="status">
-      <span class="dot"></span>
-      <span id="statusText">disconnected</span>
-    </div>
-  </header>
+<body data-phase="loading">
+  <div class="wrap">
+    <header>
+      <div class="mark" aria-hidden="true">e</div>
+      <div class="titles">
+        <h1>Elf Bridge</h1>
+        <p>Figma → code</p>
+      </div>
+      <div class="status" id="status" aria-live="polite">offline</div>
+    </header>
 
-  <div class="row">
-    <div class="host">
-      <label for="host">Bridge host (or https://…ngrok-free.app)</label>
-      <input id="host" type="text" placeholder="localhost:8765" spellcheck="false" />
-    </div>
-    <div class="token">
-      <label for="token">Bridge token (matches ELF_MCP_TOKEN)</label>
-      <input id="token" type="password" placeholder="stored per machine, never in the file" />
-    </div>
+    <main>
+      <section data-panel="loading" aria-label="Loading">
+        <div class="card pairing-box">
+          <div class="spinner" aria-hidden="true"></div>
+          <h2>Reading this file…</h2>
+          <p class="sub">Bridge state is kept in Figma, not in the document.</p>
+        </div>
+      </section>
+
+      <section data-panel="disconnected" aria-labelledby="pair-heading">
+        <div class="card">
+          <h2 id="pair-heading">Pair this file</h2>
+          <p class="sub">Start the elf MCP server, then paste the pairing code it printed.</p>
+
+          <label class="field-label" for="code">Pairing code</label>
+          <input
+            id="code"
+            type="text"
+            inputmode="text"
+            autocomplete="off"
+            autocapitalize="off"
+            autocorrect="off"
+            spellcheck="false"
+            maxlength="14"
+            placeholder="abcd-efgh-jkmn"
+          />
+          <div class="error" id="error" role="alert"></div>
+
+          <button class="primary" id="pair" disabled>Pair this file</button>
+          <button class="secondary" id="reconnect" hidden>Reconnect saved session</button>
+          <p class="hint">Single-use · expires 5 minutes after the server starts. Restart the server if the code was already used.</p>
+
+          <details class="advanced">
+            <summary>Bridge address</summary>
+            <label class="field-label" for="host">Host or tunnel URL</label>
+            <input id="host" type="text" spellcheck="false" placeholder="localhost:8765" />
+            <button class="primary" id="save-host">Save address</button>
+          </details>
+        </div>
+      </section>
+
+      <section data-panel="pairing" aria-labelledby="pairing-heading">
+        <div class="card pairing-box">
+          <div class="spinner" aria-hidden="true"></div>
+          <h2 id="pairing-heading">Pairing this file…</h2>
+          <p class="sub">Waiting for the local bridge to accept the code.</p>
+          <button class="secondary" id="cancel-pair">Cancel</button>
+        </div>
+      </section>
+
+      <section data-panel="connected" aria-labelledby="connected-heading">
+        <div class="card">
+          <div class="connected-head">
+            <div class="check" aria-hidden="true">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                <path d="M3.5 8.4 6.4 11.2 12.5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+            <div style="min-width: 0">
+              <h2 id="connected-heading" class="file-name">Connected</h2>
+              <p class="file-meta">This Figma file is paired with the local bridge.</p>
+            </div>
+          </div>
+
+          <dl class="rows">
+            <div class="row">
+              <dt>Bridge</dt>
+              <dd class="mono" id="bridge-label">localhost:8765</dd>
+            </div>
+            <div class="row">
+              <dt>File key</dt>
+              <dd class="mono" id="file-key">—</dd>
+            </div>
+            <div class="row">
+              <dt>Session</dt>
+              <dd class="ok" id="session-label">Saved in this file</dd>
+            </div>
+            <div class="row">
+              <dt>Requests</dt>
+              <dd id="request-count">0 this session</dd>
+            </div>
+          </dl>
+
+          <button class="secondary disconnect" id="disconnect">Disconnect this file</button>
+        </div>
+      </section>
+    </main>
+
+    <footer>Scoped to this file · nothing is written into the document</footer>
   </div>
 
-  <div class="row">
-    <button id="connect">Connect</button>
-    <button id="disconnect" class="secondary" disabled>Disconnect</button>
-  </div>
-
-  <div class="hint">
-    MCP client → stdio → elf-mcp → <code>ws://localhost:8765</code> (or an ngrok tunnel) → this panel → Figma Plugin API.
-  </div>
-
-  <div class="log" id="log"></div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
   <script>
-    const AUTH_FAILED = 4001; // bad or missing token
-    const REPLACED = 4002;    // another plugin took over the bridge
+    const AUTH_FAILED = 4001;
+    const REPLACED = 4002;
+    const MAX_ATTEMPTS = 5;
 
     const $ = (id) => document.getElementById(id);
-    const state = { host: "localhost:8765", token: "", autoConnect: true, socket: null, attempts: 0, manualClose: false, file: null, plugin: null };
 
-    function log(message, kind) {
-      const line = document.createElement("div");
-      if (kind) line.className = kind;
-      const time = new Date().toLocaleTimeString();
-      line.textContent = time + "  " + message;
-      const box = $("log");
-      box.appendChild(line);
-      while (box.childElementCount > 200) box.removeChild(box.firstChild);
-      box.scrollTop = box.scrollHeight;
+    const state = {
+      host: "localhost:8765",
+      session: "",
+      socket: null,
+      authMode: null,
+      manualClose: false,
+      ready: false,
+      readyTimer: null,
+      reconnectTimer: null,
+      attempts: 0,
+      file: null,
+      plugin: null,
+      requestCount: 0,
+      sessionSaved: true,
+    };
+
+    function setPhase(phase) {
+      document.body.dataset.phase = phase;
     }
 
     function setStatus(kind, text) {
-      $("status").className = "status " + kind;
-      $("statusText").textContent = text;
+      const pill = $("status");
+      pill.className = "status" + (kind ? " " + kind : "");
+      pill.textContent = text;
     }
 
-    function settings() {
-      return { type: "settings", host: state.host, token: state.token };
+    function showError(message) {
+      const box = $("error");
+      box.textContent = message || "";
+      box.classList.toggle("visible", Boolean(message));
     }
 
-    // Accepts "host:port", "https://…" (→ wss, e.g. an ngrok tunnel), or a
-    // full ws(s) URL. The default stays on localhost — Figma rejects raw IPs
-    // like 127.0.0.1 in manifest domains, so localhost is the local spelling.
+    let toastTimer = null;
+    function toast(message) {
+      const box = $("toast");
+      box.textContent = message;
+      box.classList.add("visible");
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => box.classList.remove("visible"), 1800);
+    }
+
+    function formatCode(value) {
+      const raw = value.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 12);
+      return raw.replace(/(.{4})(?=.)/g, "$1-");
+    }
+
+    function normalizedCode() {
+      return $("code").value.toLowerCase().replace(/[^a-z0-9]/g, "");
+    }
+
     function bridgeUrl() {
-      const host = state.host.trim() || "localhost:8765";
+      const host = (state.host || "localhost:8765").trim();
       const withPath = (url) => (url.endsWith("/") ? url : url + "/");
       if (/^https:\/\//i.test(host)) return withPath("wss://" + host.slice(8));
       if (/^http:\/\//i.test(host)) return withPath("ws://" + host.slice(7));
@@ -165,154 +533,271 @@
     }
 
     function shortHost() {
-      const host = state.host.replace(/^wss?:\/\//i, "");
-      return host.length > 26 ? host.slice(0, 24) + "…" : host;
+      const host = (state.host || "localhost:8765").replace(/^wss?:\/\//i, "");
+      return host.length > 24 ? host.slice(0, 22) + "…" : host;
     }
 
-    function saveSettings() {
-      parent.postMessage({ pluginMessage: settings() }, "*");
+    function renderConnected() {
+      $("connected-heading").textContent = state.file ? state.file.name : "Connected";
+      $("bridge-label").textContent = shortHost();
+      $("file-key").textContent = state.file ? state.file.key : "—";
+      $("session-label").textContent = state.sessionSaved ? "Saved in this file" : "Saving…";
+      $("request-count").textContent =
+        state.requestCount === 1 ? "1 this session" : state.requestCount + " this session";
     }
 
-    function connect() {
+    function clearReadyTimer() {
+      if (state.readyTimer) clearTimeout(state.readyTimer);
+      state.readyTimer = null;
+    }
+
+    function clearReconnectTimer() {
+      if (state.reconnectTimer) clearTimeout(state.reconnectTimer);
+      state.reconnectTimer = null;
+    }
+
+    function connect(mode) {
       if (state.socket) return;
-      if (!state.token) {
-        setStatus("error", "no token");
-        log("Set the bridge token first — it must match ELF_MCP_TOKEN on the MCP server.", "err");
+      clearReconnectTimer();
+      if (mode === "session" && !state.session) {
+        showPairing("Pair this file again to refresh the saved session.");
         return;
       }
 
+      state.authMode = mode;
       state.manualClose = false;
-      setStatus("connecting", "connecting…");
+      state.ready = false;
+      setPhase("pairing");
+      setStatus("pairing", "pairing…");
 
-      const url = bridgeUrl() + "?token=" + encodeURIComponent(state.token);
+      const query = new URLSearchParams();
+      if (mode === "code") query.set("code", normalizedCode());
+      else query.set("session", state.session);
+
       let socket;
       try {
-        socket = new WebSocket(url);
+        socket = new WebSocket(bridgeUrl() + "?" + query.toString());
       } catch (error) {
-        setStatus("error", "invalid url");
-        log(String(error), "err");
+        showPairing("That bridge address is not a valid URL.");
         return;
       }
-      state.socket = socket;
 
-      socket.onopen = () => {
-        state.attempts = 0;
-        setStatus("connected", "connected · " + shortHost());
-        $("connect").disabled = true;
-        $("disconnect").disabled = false;
-        log("connected to " + bridgeUrl(), "ok");
-        // Tell the bridge which file this plugin is attached to, so `status`
-        // can report it. No token is ever echoed back.
-        if (socket.readyState === WebSocket.OPEN) {
-          socket.send(JSON.stringify({ type: "status", file: state.file, plugin: state.plugin }));
+      state.socket = socket;
+      clearReadyTimer();
+      state.readyTimer = setTimeout(() => {
+        if (!state.ready) {
+          socket.close(1000, "pairing timed out");
+          if (mode === "code") showPairing("The bridge did not answer. Check that the server is running.");
+          else showPairing("Could not reach the bridge. Check the address and try again.");
         }
-        parent.postMessage({ pluginMessage: { type: "context" } }, "*");
-      };
+      }, 10000);
 
       socket.onmessage = (event) => {
         let message;
         try {
           message = JSON.parse(event.data);
         } catch (error) {
-          log("ignoring non-JSON message: " + event.data, "err");
           return;
         }
+
+        if (message.type === "ready") {
+          state.ready = true;
+          clearReadyTimer();
+          state.attempts = 0;
+          if (message.session) {
+            state.session = message.session;
+            state.sessionSaved = false;
+            parent.postMessage({ pluginMessage: { type: "save-session", session: message.session } }, "*");
+          } else {
+            state.sessionSaved = true;
+          }
+          setPhase("connected");
+          setStatus("online", "connected");
+          renderConnected();
+          if (socket.readyState === WebSocket.OPEN) {
+            socket.send(
+              JSON.stringify({
+                type: "status",
+                file: state.file,
+                plugin: state.plugin,
+              }),
+            );
+          }
+          return;
+        }
+
         if (message.type === "request") {
-          // Straight through to the plugin main thread; the answer comes back
-          // as { type: "response", id } and is forwarded to the socket.
+          state.requestCount += 1;
+          renderConnected();
           parent.postMessage({ pluginMessage: message }, "*");
-          return;
         }
-        if (message.type === "status") log("bridge status message");
       };
 
       socket.onerror = () => {
-        // The close event carries the real reason (auth, refused, replaced).
+        // The close event carries the actionable reason.
       };
 
       socket.onclose = (event) => {
+        const modeUsed = state.authMode;
         state.socket = null;
-        $("connect").disabled = false;
-        $("disconnect").disabled = true;
+        state.authMode = null;
+        state.ready = false;
+        clearReadyTimer();
 
         if (event.code === AUTH_FAILED) {
-          setStatus("error", "auth failed");
-          log("bridge rejected the token (code 4001) — check ELF_MCP_TOKEN.", "err");
-          return;
-        }
-        if (event.code === REPLACED) {
-          setStatus("disconnected", "replaced");
-          log("another plugin connection took over the bridge (code 4002).", "err");
-          return;
-        }
-        if (state.manualClose) {
-          setStatus("disconnected", "disconnected · " + shortHost());
-          log("disconnected.");
+          if (modeUsed === "session") {
+            state.session = "";
+            state.sessionSaved = true;
+            parent.postMessage({ pluginMessage: { type: "forget-session" } }, "*");
+            showPairing("The saved session is no longer valid. Pair this file again.");
+          } else {
+            showPairing("That pairing code is invalid, expired, or already used.");
+          }
           return;
         }
 
-        setStatus("error", "disconnected · " + shortHost());
-        log("connection lost (code " + event.code + ")", "err");
-        if (state.autoConnect && state.attempts < 5) {
+        if (event.code === REPLACED) {
+          showPairing("Another Elf Bridge panel connected. This one was replaced.");
+          return;
+        }
+
+        if (state.manualClose) {
+          showPairing("");
+          return;
+        }
+
+        if (modeUsed === "session" && state.session && state.attempts < MAX_ATTEMPTS) {
           const delay = Math.min(500 * Math.pow(2, state.attempts), 8000);
           state.attempts += 1;
-          log("reconnecting in " + delay + "ms…");
-          setTimeout(() => { if (!state.socket) connect(); }, delay);
+          setPhase("pairing");
+          setStatus("pairing", "reconnecting…");
+          clearReconnectTimer();
+          state.reconnectTimer = setTimeout(() => {
+            if (!state.socket) connect("session");
+          }, delay);
+          return;
+        }
+
+        if (modeUsed === "code") {
+          showPairing("Connection lost before pairing finished. Try the code again.");
+        } else if (state.session) {
+          showPairing("Could not reach the bridge. Check that the server is running.");
+        } else {
+          showPairing("Connection lost. Pair this file again.");
         }
       };
+    }
+
+    function showPairing(error) {
+      clearReadyTimer();
+      clearReconnectTimer();
+      setPhase("disconnected");
+      setStatus("", "offline");
+      $("pair").disabled = normalizedCode().length !== 12;
+      $("reconnect").hidden = !state.session;
+      showError(error || "");
     }
 
     function disconnect() {
       state.manualClose = true;
-      if (state.socket) state.socket.close(1000, "closed from the plugin panel");
-      else setStatus("disconnected", "disconnected · " + shortHost());
+      state.session = "";
+      state.sessionSaved = true;
+      state.requestCount = 0;
+      state.attempts = 0;
+      clearReconnectTimer();
+      parent.postMessage({ pluginMessage: { type: "forget-session" } }, "*");
+      if (state.socket) {
+        state.socket.close(1000, "disconnected from the plugin panel");
+      } else {
+        showPairing("");
+      }
+      showPairing("");
     }
 
-    $("host").addEventListener("change", (event) => {
-      state.host = event.target.value.trim() || "localhost:8765";
-      event.target.value = state.host;
-      saveSettings();
-    });
-    $("token").addEventListener("change", (event) => {
-      state.token = event.target.value.trim();
-      saveSettings();
+    $("code").addEventListener("input", (event) => {
+      event.target.value = formatCode(event.target.value);
+      showError("");
+      $("pair").disabled = normalizedCode().length !== 12;
     });
 
-    $("connect").addEventListener("click", () => {
-      state.autoConnect = true;
-      connect();
+    $("code").addEventListener("keydown", (event) => {
+      if (event.key === "Enter" && normalizedCode().length === 12) {
+        event.preventDefault();
+        connect("code");
+      }
+    });
+
+    $("pair").addEventListener("click", () => connect("code"));
+    $("reconnect").addEventListener("click", () => {
+      state.attempts = 0;
+      connect("session");
+    });
+    $("cancel-pair").addEventListener("click", () => {
+      state.manualClose = true;
+      clearReconnectTimer();
+      if (state.socket) state.socket.close(1000, "pairing cancelled");
+      else showPairing("");
     });
     $("disconnect").addEventListener("click", disconnect);
+
+    $("host").addEventListener("input", (event) => {
+      state.host = event.target.value.trim() || "localhost:8765";
+    });
+
+    $("save-host").addEventListener("click", () => {
+      state.host = $("host").value.trim() || "localhost:8765";
+      $("host").value = state.host;
+      parent.postMessage({ pluginMessage: { type: "save-host", host: state.host } }, "*");
+      toast("Bridge address saved");
+    });
 
     window.onmessage = (event) => {
       const message = event.data.pluginMessage;
       if (!message) return;
 
       if (message.type === "context") {
-        $("file").textContent = message.file.name;
-        state.file = message.file;
+        state.file = message.file || null;
         state.plugin = message.plugin || null;
-        state.host = message.settings.host || "localhost:8765";
-        state.token = message.settings.token;
+        state.host = (message.bridge && message.bridge.host) || "localhost:8765";
+        state.session = (message.bridge && message.bridge.session) || "";
         $("host").value = state.host;
-        $("token").value = state.token;
-        log("file: " + message.file.name + " (" + message.file.key + ")");
-        if (state.token) connect();
-      } else if (message.type === "response") {
-        const short = String(message.id || "").slice(0, 8);
-        if (message.ok) {
-          log(short + " ok", "ok");
+        renderConnected();
+
+        if (state.session) {
+          connect("session");
         } else {
-          const text = (message.error && message.error.message) || "Unknown plugin error";
-          log(short + " " + text, "err");
+          setPhase("disconnected");
+          setStatus("", "offline");
+          $("pair").disabled = normalizedCode().length !== 12;
+          $("reconnect").hidden = !state.session;
         }
+        return;
+      }
+
+      if (message.type === "response") {
         if (state.socket && state.socket.readyState === WebSocket.OPEN) {
           state.socket.send(JSON.stringify(message));
         }
-      } else if (message.type === "saved") {
-        log("settings saved to this machine.");
-      } else if (message.type === "log") {
-        log(message.message, message.level === "error" ? "err" : "");
+        return;
+      }
+
+      if (message.type === "session-saved") {
+        state.sessionSaved = true;
+        if (document.body.dataset.phase === "connected") renderConnected();
+        return;
+      }
+
+      if (message.type === "session-forgotten") {
+        state.sessionSaved = true;
+        return;
+      }
+
+      if (message.type === "host-saved") {
+        return;
+      }
+
+      if (message.type === "log" && message.level === "error") {
+        toast(message.message || "Something went wrong.");
       }
     };
 

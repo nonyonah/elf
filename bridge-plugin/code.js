@@ -11,6 +11,8 @@
  */
 const PLUGIN_NAME = "Elf Bridge";
 const SETTINGS_KEY = "elf-bridge-settings";
+const HOST_KEY = "elf-bridge-host";
+const SESSION_KEY = "elf-bridge-session";
 const NAMESPACE = "elf";
 const CODE_KEY = "codeKey";
 const ROLE_KEY = "role";
@@ -18,14 +20,31 @@ const LABEL_ROLE = "label";
 const SLOT_ROLE = "slot";
 const DEFAULT_HOST = "localhost:8765";
 // ---------------------------------------------------------------------------
-// Settings — kept in clientStorage, never in the document or the repo.
+// Bridge state — kept in clientStorage, never in the document or the repo.
+// The session secret is written only after a successful pairing and removed
+// on disconnect, so reopening the file connects without asking for a code.
 // ---------------------------------------------------------------------------
-async function loadSettings() {
-    const stored = (await figma.clientStorage.getAsync(SETTINGS_KEY));
-    return { host: stored?.host?.trim() || DEFAULT_HOST, token: stored?.token ?? "" };
+async function loadBridgeState() {
+    const legacy = (await figma.clientStorage.getAsync(SETTINGS_KEY));
+    const storedHost = (await figma.clientStorage.getAsync(HOST_KEY));
+    const session = (await figma.clientStorage.getAsync(SESSION_KEY));
+    // Drop the old handshake token from storage; pairing replaces it.
+    if (legacy?.token) {
+        await figma.clientStorage.setAsync(SETTINGS_KEY, { host: legacy.host ?? DEFAULT_HOST });
+    }
+    return {
+        host: (storedHost ?? legacy?.host ?? DEFAULT_HOST).trim() || DEFAULT_HOST,
+        session: typeof session === "string" ? session : "",
+    };
 }
-async function saveSettings(settings) {
-    await figma.clientStorage.setAsync(SETTINGS_KEY, settings);
+async function saveHost(host) {
+    await figma.clientStorage.setAsync(HOST_KEY, host.trim() || DEFAULT_HOST);
+}
+async function saveSession(session) {
+    await figma.clientStorage.setAsync(SESSION_KEY, session);
+}
+async function forgetSession() {
+    await figma.clientStorage.deleteAsync(SESSION_KEY);
 }
 // ---------------------------------------------------------------------------
 // Variables
@@ -1122,23 +1141,33 @@ async function handle(method, params) {
             throw new Error(`Unknown method "${method}".`);
     }
 }
-figma.showUI(__html__, { width: 340, height: 300, themeColors: true });
+figma.showUI(__html__, { width: 320, height: 480, themeColors: true });
 async function announceContext() {
     figma.ui.postMessage({
         type: "context",
         file: { name: figma.root.name, key: figma.fileKey ?? "draft" },
-        settings: await loadSettings(),
+        bridge: await loadBridgeState(),
         plugin: { name: PLUGIN_NAME, apiVersion: figma.apiVersion },
     });
 }
 figma.ui.onmessage = async (message) => {
     try {
-        if (message.type === "settings") {
-            await saveSettings({
-                host: String(message.host ?? "").trim() || DEFAULT_HOST,
-                token: String(message.token ?? ""),
-            });
-            figma.ui.postMessage({ type: "saved" });
+        if (message.type === "save-host") {
+            await saveHost(String(message.host ?? ""));
+            figma.ui.postMessage({ type: "host-saved" });
+            return;
+        }
+        if (message.type === "save-session") {
+            const session = String(message.session ?? "");
+            if (!session)
+                throw new Error("Cannot save an empty session.");
+            await saveSession(session);
+            figma.ui.postMessage({ type: "session-saved" });
+            return;
+        }
+        if (message.type === "forget-session") {
+            await forgetSession();
+            figma.ui.postMessage({ type: "session-forgotten" });
             return;
         }
         if (message.type === "context") {

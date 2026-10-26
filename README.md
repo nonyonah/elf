@@ -90,7 +90,7 @@ In Figma: **Account settings → Security → Personal access tokens → Generat
 | `FIGMA_WEBHOOK_PASSCODE` | Auths webhook registration (designer → repo chain) | Your shell env while running `elf-tokens webhook`; must equal the worker's `FIGMA_PASSCODE` |
 | `FIGMA_PASSCODE` | Verifies webhook events at the worker | Cloudflare worker secret: `npx wrangler secret put FIGMA_PASSCODE` |
 | `GITHUB_TOKEN` | Worker → GitHub: `repository_dispatch` + drift-data reads | Cloudflare worker secret: `npx wrangler secret put GITHUB_TOKEN` — classic PAT with `repo` scope, or fine-grained with **Actions: read/write** + **Contents: read** |
-| `SLACK_WEBHOOK_URL` (or any name via `notify.webhookEnv`) | `--notify` drift alerts + worker Slack pings | Shell env for the CLI (`export SLACK_WEBHOOK_URL=…`); Cloudflare worker secret for live pings. Treat the URL like the passcode — anyone holding it can post to the channel |
+| `SLACK_WEBHOOK_URL` (or any name via `notify.webhookEnv`) | `--notify` drift alerts + worker Slack pings | Stored locally by `elf connect slack` in `.elf/slack-webhook.json` (gitignored); an env var of the same name overrides it. The worker needs the same URL as its own Cloudflare secret for live pings. Treat the URL like the passcode — anyone holding it can post to the channel |
 | `ELF_DASHBOARD_TOKEN` (`elf_push_…`) | `elf push` snapshots to the elf console dashboard | Shell/CI secret only — created once on the project's page in the console. **Never** in the config (which stores just `dashboard.url`) |
 | Figma file key | Picks *which* file to check | `figma.fileKey` in `elf.config.json`, copied once from `figma.com/design/<KEY>/…`. Only the CLI/CI need it — the plugin reads its own file key automatically |
 
@@ -134,7 +134,8 @@ Copy `elf.config.json` and point it at your file and your token source:
   },
   "notify": {                                // optional — where --notify posts alerts
     "webhookEnv": "SLACK_WEBHOOK_URL",       // env var holding the URL (the URL itself never goes here)
-    "format": "slack"                        // "slack" (Block Kit) | "text" (plain body, e.g. ntfy)
+    "format": "slack",                       // "slack" (Block Kit) | "text" (plain body, e.g. ntfy)
+    "onlyOnChange": true                     // false → notify after every run (default: true)
   }
 }
 ```
@@ -205,13 +206,13 @@ git push
 GitHub Actions is only one trigger. `--notify` posts a summary — headline, per-category counts, top 10 items — to a webhook whenever the drift state changes, and it works on any machine with Node ≥ 20:
 
 ```bash
-export SLACK_WEBHOOK_URL=https://hooks.slack.com/services/…
+npx elf-tokens connect slack   # once; stores the webhook locally
 npx elf-tokens --notify
 ```
 
-Slack incoming webhooks are free, need no Slack app, and one URL is all the setup there is. The same JSON also works with Discord (append `/slack` to the webhook URL); `"format": "text"` posts a plain body anywhere else (ntfy, etc.). The URL lives in the environment variable named by `notify.webhookEnv` — never in the config, never in the logs.
+Slack incoming webhooks are free and one URL is all the setup there is. The same JSON also works with Discord (append `/slack` to the webhook URL); `"format": "text"` posts a plain body anywhere else (ntfy, etc.). `--notify` uses the environment variable named by `notify.webhookEnv` when it is set, otherwise it falls back to the Slack connection stored by `elf connect slack` / `elf settings`. The URL is never stored in the config file or printed in full.
 
-Alerts are deduped: a first report with drift (or deprecation notes), any later change, and a "drift resolved" message when it clears — nothing on repeat runs with the same state. The state lives in `drift-status.json` next to the report; set `notify.stateFile` to keep it somewhere else. If a post fails, the state is not advanced, so the next run retries.
+Alerts are deduped by default: a first report with drift (or deprecation notes), any later change, and a "drift resolved" message when it clears — nothing on repeat runs with the same state. Set `"onlyOnChange": false` in `notify` to post after every run instead. The dedupe state lives in `drift-status.json` next to the report; set `notify.stateFile` to keep it somewhere else. If a post fails, the state is not advanced, so the next run retries.
 
 Want to see the whole alert lifecycle without a Slack workspace? The bundled drill runs real checks against sample data with a local capture server standing in for the webhook:
 
@@ -230,7 +231,7 @@ npx elf-tokens --notify >/dev/null 2>&1 || true
 0 9 * * * cd /path/to/repo && npx elf-tokens --notify
 ```
 
-And for the design side, the [live-mode worker](#live-mode-figma-edits-notify-the-repo-optional) pings Slack directly on every accepted Figma event when `SLACK_WEBHOOK_URL` is set — no `repository_dispatch`, no Actions required.
+And for the design side, the [live-mode worker](#live-mode-figma-edits-notify-the-repo-optional) pings Slack directly on every accepted Figma event when its own `SLACK_WEBHOOK_URL` secret is set — no `repository_dispatch`, no Actions required. The worker is deployed separately, so connecting Slack locally does not write its Cloudflare secret; use the same channel webhook for both if you want one destination.
 
 ---
 
@@ -324,7 +325,7 @@ MCP client ──stdio──► mcp/ server ──ws://127.0.0.1:8765──► b
 ```
 
 - **Tools:** `status`, `list_collections`, `list_variables`, `create_collection`, `upsert_variables` (arrays, upsert by name), `rename_variable`, `delete_variable`, `list_components`, `upsert_component` (with instance children), `upsert_component_set`, `upsert_text_style`, `upsert_effect_style`, `get_node`.
-- **Safe by construction:** every write is an upsert matched by name/`codeKey`, every touched node returns its Figma id, everything is tagged `setSharedPluginData("elf", "codeKey", …)`, the socket binds to `127.0.0.1` with a shared token, and Figma's plan-limit errors come back word for word.
+- **Safe by construction:** every write is an upsert matched by name/`codeKey`, every touched node returns its Figma id, everything is tagged `setSharedPluginData("elf", "codeKey", …)`, the socket binds to `127.0.0.1` and pairs through a single-use code plus a stored session, and Figma's plan-limit errors come back word for word.
 
 Setup, tool reference and a manual test checklist: **[`mcp/README.md`](mcp/README.md)**.
 
@@ -390,9 +391,9 @@ The CLI reads the token from the environment of whatever process runs it, nothin
 
 **"The Figma bridge is not connected"** — a token check configured with `"source": "bridge"` (or the component check) needs the local bridge: run `npm --prefix mcp run start:http` and open the Elf bridge plugin in the Figma file. See [`mcp/README.md`](mcp/README.md) for setup.
 
-**`--notify` fails with "Webhook URL not found"** — the URL is read from the environment variable named by `notify.webhookEnv` (e.g. `SLACK_WEBHOOK_URL`), never from the config itself. Export it locally, or add it as a repository secret in CI.
+**`--notify` fails with "Webhook URL not found"** — run `elf connect slack`, or set the environment variable named by `notify.webhookEnv` (e.g. `SLACK_WEBHOOK_URL`). The URL is read from that env var first, then from the locally stored Slack connection; it is never in the config itself.
 
-**`--notify` ran but nothing was posted** — that's the dedupe: alerts fire only when the drift state changes, so `No notification sent: drift state unchanged` means the previous `drift-status.json` (or `notify.stateFile`) already describes this exact state. Delete that file to force a fresh first report.
+**`--notify` ran but nothing was posted** — that's the dedupe: alerts fire only when the drift state changes, so `No notification sent: drift state unchanged` means the previous `drift-status.json` (or `notify.stateFile`) already describes this exact state. Delete that file (or set `notify.onlyOnChange` to `false`) to force a fresh report.
 
 ---
 
@@ -403,32 +404,96 @@ elf-tokens [options]
 elf-tokens push [options]
 elf-tokens status [options]
 elf-tokens webhook [options]
+elf-tokens connect slack [options]
+elf-tokens disconnect slack
+elf-tokens settings
 
-  --config <path>     config file (default: elf.config.json)
-  --out <path>        where to write the report (default: drift-report.md)
-  --sample [format]   run against bundled sample data, no token needed
-  --fail-on-drift     exit with code 2 when drift is found (off by default)
-  --notify            post a summary to notify.webhookEnv, only when the
-                      drift state changed since the last run
-  --json              with status: print drift-status.json verbatim
-  --help              show usage
+  --config <path>        config file (default: elf.config.json)
+  --out <path>           where to write the report (default: drift-report.md)
+  --sample [format]      run against bundled sample data, no token needed
+                         Optional format: variables | styles | tailwind | css | tokens-json
+  --fail-on-drift        exit with code 2 when drift is found (off by default)
+  --notify               post via notify.webhookEnv or the saved Slack
+                         connection (respects notify.onlyOnChange, default true)
+  --json                 with status: print drift-status.json verbatim
+  --help                 show usage
 
 push subcommand:
-  --dry-run           print the exact JSON payload and exit 0 without sending
-  --url <url>         dashboard base URL (default: dashboard.url in the config)
-                      token: ELF_DASHBOARD_TOKEN environment variable
+  --dry-run              print the exact JSON payload and exit 0 without sending
+  --url <url>            dashboard base URL (default: dashboard.url in the config)
+                         token: ELF_DASHBOARD_TOKEN environment variable
+
+connect slack subcommand:
+  --webhook-url <url>    store a manual Slack incoming webhook URL instead of
+                         running the OAuth flow. The URL is never printed in full.
 
 status subcommand:
   reads drift-status.json next to the report (--out) written by the last
   check — prints the state, counts and fingerprint; no Figma access needed.
 
 webhook subcommand:
-  --endpoint <url>    worker URL (default: webhook.endpoint in the config)
-  --list              list webhooks registered for the file
-  --test              send a fake Figma event through the worker
+  --endpoint <url>       worker URL (default: webhook.endpoint in the config)
+  --list                 list webhooks registered for the file
+  --test                 send a fake Figma event through the worker
 ```
 
 Exit codes: `0` — ran (drift may or may not exist), `1` — error (bad config, missing token, network), `2` — drift found with `--fail-on-drift`. The npm package installs both `elf-tokens` and `elf` — same CLI, either name.
+
+---
+
+## Connect Slack
+
+`elf connect slack` runs a real Slack OAuth install and stores the resulting incoming-webhook URL locally in a gitignored file (`.elf/slack-webhook.json`). The flow starts a tiny HTTP server on `localhost:3000`, opens Slack, waits for the redirect, exchanges the code, and shuts the server down.
+
+### OAuth setup (recommended)
+
+Create a Slack app at [api.slack.com/apps](https://api.slack.com/apps), then:
+
+1. **OAuth & Permissions → Redirect URLs** add `http://localhost:3000/callback`.
+2. **Bot Token Scopes** add `incoming-webhook`.
+3. Leave **PKCE disabled**. Slack treats localhost as a desktop redirect for PKCE apps and rejects bot scopes; `incoming-webhook` is a bot scope.
+4. Copy the **Client ID** and **Client Secret**. Put them in the project `.env` or `settings-next/.env` (both are gitignored), or export them in the shell:
+
+```bash
+# in .env, or exported in the shell
+ELF_SLACK_CLIENT_ID=...
+ELF_SLACK_CLIENT_SECRET=...
+
+# then
+elf connect slack
+# or
+npm run settings
+```
+
+The CLI loads the project `.env`, then `settings-next/.env`; real shell variables win. The callback is always `http://localhost:3000/callback`. The client secret is never written to the config or the webhook file. With a secret set, the CLI uses the non-PKCE exchange. If port 3000 is busy (for example, `next dev` is running), stop that process first.
+
+If no secret is set, the CLI falls back to PKCE with the built-in client ID. That path is for apps configured for PKCE and is not suitable for `incoming-webhook` on localhost.
+
+**Manual fallback**: `elf connect slack --webhook-url <url>` stores a manually provided webhook URL (must start with `https://hooks.slack.com/services/`). No OAuth, no browser. This is the simplest option if you only need a channel webhook.
+
+**CLI notifications**: once connected, `--notify` falls back to the stored webhook when `notify.webhookEnv` is unset, so the toggle in `elf settings` is enough for local runs. CI jobs should set the webhook env var (or provision `.elf/slack-webhook.json` explicitly), since that folder is gitignored.
+
+**Disconnect**: `elf disconnect slack` removes the stored webhook.
+
+**Timeout**: if no callback arrives in 2 minutes, the local server stops and the command fails with a clear message.
+
+---
+
+## Settings page
+
+`elf settings` (or `npm run settings` in this repo) opens a small local web page served by the CLI at `http://localhost:3000`. The command finds the nearest `elf.config.json` walking up from the current folder, so it also works from a nested folder such as `settings-next/`. The page shows the resolved config path so you can see which project it is editing. If port 3000 is busy, stop the other process (usually `next dev`) and run it again.
+
+From the page you can:
+
+- See Slack connection status (connected/disconnected, channel/team)
+- Connect Slack through the full OAuth flow from the page, or disconnect the stored webhook
+- Toggle **"Notify on drift"** (master switch — when off, the `notify` section is removed from `elf.config.json`)
+- Toggle **"Only when counts changed"** (writes `notify.onlyOnChange`; when off, `--notify` posts after every run)
+- Note: overdue deprecations always notify regardless of these switches
+
+Switches write straight to `elf.config.json` on change — no separate Save button — with success and error toasts. The server runs until you press Ctrl+C. This page is entirely local; it does not need the Cloudflare worker or the MCP bridge.
+
+The page is a static Next.js export (`settings-next/`, React + Tailwind) using the Rift Labs design language and coss UI components; the CLI server serves the built files from `dist/settings` and exposes the local API. `npm run dev` inside `settings-next/` now launches that CLI server. Running Next directly with `npm run dev:ui` only serves the UI and has no `/api` routes, so it will show a 404; use `elf-tokens settings` (or `npm run settings`) for the working page.
 
 ---
 

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -10,10 +10,20 @@ import {
   driftFingerprint,
   postNotification,
   readNotifyState,
+  resolveNotifyWebhook,
   writeNotifyState,
   type NotifyMeta,
 } from "../src/notify.js";
-import type { Token } from "../src/core/types.js";
+import { SLACK_WEBHOOK_FILE } from "../src/slack.js";
+import type { NotifyConfig, Token } from "../src/core/types.js";
+
+const SLACK_WEBHOOK_URL = [
+  "https://hooks.slack.com",
+  "services",
+  "T00000000",
+  "B00000000",
+  "XXXXXXXXXXXXXXXXXXXXXXXX",
+].join("/");
 
 const meta: NotifyMeta = {
   fileKey: "abc123",
@@ -73,6 +83,19 @@ test("unchanged state is skipped and any change sends", () => {
   const resolved = decideNotification(state, diffTokens([token("color/bg", "#EEEEEE")], [token("color/bg", "#EEEEEE")], {}));
   assert.equal(resolved.send, true);
   assert.match(buildNotifyMessage(diffTokens([token("color/bg", "#EEEEEE")], [token("color/bg", "#EEEEEE")], {}), meta, "slack", state).text, /resolved/);
+});
+
+test("onlyOnChange false sends even when the fingerprint is unchanged", () => {
+  const result = drifting();
+  const state = { fingerprint: driftFingerprint(result), driftFound: true };
+
+  const same = decideNotification(state, drifting(), false);
+  assert.equal(same.send, true);
+  assert.equal(same.reason, "state-changed");
+
+  const first = decideNotification(null, diffTokens([], [], {}), false);
+  assert.equal(first.send, true);
+  assert.equal(first.reason, "first-report");
 });
 
 test("drift messages carry the counts and cap the item list", () => {
@@ -193,5 +216,42 @@ test("posting sends JSON for slack and plain text otherwise", async () => {
     );
   } finally {
     globalThis.fetch = originalFetch;
+  }
+});
+
+test("notify falls back to the Slack connection saved by settings", () => {
+  const dir = mkdtempSync(join(tmpdir(), "elf-notify-webhook-"));
+  const configPath = join(dir, "elf.config.json");
+  const url = SLACK_WEBHOOK_URL;
+  mkdirSync(join(dir, ".elf"), { recursive: true });
+  writeFileSync(join(dir, SLACK_WEBHOOK_FILE), JSON.stringify({
+    url,
+    channel: "design-system",
+    channelId: "C123",
+    teamName: "Rift Labs",
+    teamId: "T123",
+    configuredAt: "2026-10-24T00:00:00.000Z",
+  }));
+
+  const notify: NotifyConfig = { webhookEnv: "SLACK_WEBHOOK_URL", format: "slack", onlyOnChange: true };
+  try {
+    assert.deepEqual(resolveNotifyWebhook(notify, configPath, {}), { url, source: SLACK_WEBHOOK_FILE });
+
+    const fromEnv = resolveNotifyWebhook(notify, configPath, { SLACK_WEBHOOK_URL: "https://hooks.example/env" });
+    assert.deepEqual(fromEnv, { url: "https://hooks.example/env", source: "SLACK_WEBHOOK_URL" });
+
+    assert.equal(
+      resolveNotifyWebhook({ ...notify, format: "text" }, configPath, {}),
+      null,
+      "plain-text webhooks are env-only",
+    );
+    assert.equal(
+      resolveNotifyWebhook(notify, join(dir, "other", "elf.config.json"), {}),
+      null,
+      "the Slack file is resolved next to the config",
+    );
+    assert.equal(resolveNotifyWebhook(undefined, configPath, {}), null);
+  } finally {
+    rmSync(dir, { recursive: true });
   }
 });

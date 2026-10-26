@@ -67,6 +67,14 @@ export interface BridgeStatusMessage {
   plugin?: BridgePluginInfo;
 }
 
+/** Sent by the server after a plugin handshake is accepted. */
+export interface BridgeReadyMessage {
+  type: "ready";
+  /** Present only when the handshake used a one-time pairing code. */
+  session?: string;
+  sessionExpiresAt?: string;
+}
+
 export type BridgeMessage =
   | BridgeRequestMessage
   | BridgeResponseMessage
@@ -90,7 +98,7 @@ export interface BridgeControlResultMessage {
 
 export type BridgeControlMessage = BridgeControlCallMessage | BridgeControlResultMessage;
 
-/** WebSocket close code sent when the handshake token is missing or wrong. */
+/** WebSocket close code sent when pairing, session or token auth fails. */
 export const AUTH_FAILED_CODE = 4001;
 
 /** WebSocket close code sent to a plugin connection that a newer one replaces. */

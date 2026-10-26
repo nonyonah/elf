@@ -7,7 +7,7 @@
   "editorType": ["figma"],
   "networkAccess": {
     "allowedDomains": ["wss://*.ngrok-free.app"],
-    "reasoning": "During development the bridge runs on the developer's own machine. ngrok is only listed as an optional tunnel for setups where Figma cannot reach localhost directly; the bridge itself still binds to 127.0.0.1 and requires a shared token, so no design data is exposed.",
+    "reasoning": "During development the bridge runs on the developer's own machine. ngrok is only listed as an optional tunnel for setups where Figma cannot reach localhost directly; the bridge itself still binds to 127.0.0.1 and requires a one-time pairing code or a paired session, so no design data is exposed.",
     "devAllowedDomains": ["ws://localhost:8765"]
   }
 }

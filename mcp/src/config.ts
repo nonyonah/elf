@@ -11,7 +11,7 @@ import {
 } from "./protocol.js";
 
 export interface BridgeConfig {
-  /** Shared secret required in the WebSocket handshake. Never logged. */
+  /** Signs plugin session secrets and guards /control + HTTP. Never logged. */
   token: string;
   port: number;
   timeoutMs: number;
@@ -50,20 +50,20 @@ export function loadDotEnvFile(path: string, env: NodeJS.ProcessEnv = process.en
 
 /**
  * Reads bridge settings from the environment. Throws with an actionable
- * message rather than silently falling back — a missing token would leave the
- * bridge open to anything on the machine.
+ * message rather than silently falling back — a missing secret would leave
+ * the bridge open to anything on the machine.
  */
 export function loadBridgeConfig(env: NodeJS.ProcessEnv = process.env): BridgeConfig {
   const token = env[TOKEN_ENV]?.trim() ?? "";
   if (!token) {
     throw new Error(
-      `Bridge token not found. Set the ${TOKEN_ENV} environment variable ` +
-        `(generate one with: openssl rand -hex 24) and give the same value to the plugin.`,
+      `Bridge secret not found. Set the ${TOKEN_ENV} environment variable ` +
+        `(generate one with: openssl rand -hex 24). It signs plugin sessions and guards /control.`,
     );
   }
   if (token.length < MIN_TOKEN_LENGTH) {
     throw new Error(
-      `Bridge token in ${TOKEN_ENV} is too short (${token.length} characters, minimum ${MIN_TOKEN_LENGTH}).`,
+      `Bridge secret in ${TOKEN_ENV} is too short (${token.length} characters, minimum ${MIN_TOKEN_LENGTH}).`,
     );
   }
 

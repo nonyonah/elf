@@ -28,6 +28,13 @@ async function main(): Promise<void> {
   const config = loadBridgeConfig();
   const bridge = new Bridge({ ...config, logger: stderrLogger });
   const port = await bridge.start();
+  const pairing = bridge.pairingCode;
+  if (pairing) {
+    stderrLogger.log(
+      `pairing code ${pairing.code} — paste it into the Elf Bridge plugin ` +
+        `(single-use; expires at ${new Date(pairing.expiresAt).toLocaleTimeString()})`,
+    );
+  }
   stderrLogger.log(`token fingerprint ${tokenFingerprint(config.token)} (${TOKEN_ENV})`);
 
   const client = new PluginClient(bridge);

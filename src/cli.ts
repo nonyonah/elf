@@ -4,7 +4,8 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { detectCodebaseSource, parseCodebaseTokens } from "./codebase/index.js";
 import { diffComponents } from "./components.js";
-import { loadConfig } from "./config.js";
+import { findConfigPath, loadConfig } from "./config.js";
+import { loadSettingsEnv } from "./env.js";
 import { applyDeprecations } from "./core/deprecations.js";
 import { diffTokens, hasDrift, type DriftResult } from "./core/diff.js";
 import { connectBridge, type BridgeCaller } from "./figma/bridge.js";
@@ -16,8 +17,10 @@ import {
   driftFingerprint,
   postNotification,
   readNotifyState,
+  resolveNotifyWebhook,
   writeNotifyState,
   type NotifyState,
+  type ResolvedNotifyWebhook,
 } from "./notify.js";
 import { buildReport, buildStatusPayload, type ReportMeta } from "./core/report.js";
 import { buildSampleConfig, createSampleFigmaApi, type SampleFormat } from "./sample.js";
@@ -30,6 +33,15 @@ import {
   listWebhooks,
   registerWebhooks,
 } from "./webhook.js";
+import {
+  connectSlackOAuth,
+  connectSlackManual,
+  disconnectSlack,
+  readSlackWebhook,
+  SLACK_WEBHOOK_FILE,
+  maskWebhookUrl,
+} from "./slack.js";
+import { runSettingsServer } from "./settings.js";
 
 const USAGE = `elf-tokens — design token drift checker
 
@@ -41,6 +53,9 @@ Usage:
   elf-tokens push [options]
   elf-tokens status [options]
   elf-tokens webhook [options]
+  elf-tokens connect slack [options]
+  elf-tokens disconnect slack
+  elf-tokens settings
   npm run check-drift [options]
 
 The npm package installs both \`elf\` and \`elf-tokens\` — same CLI, either name.
@@ -54,6 +69,10 @@ Commands:
   webhook              Register Figma webhooks that notify the repo
                        when tokens change in the file (see --help with
                        the webhook command for details).
+  connect slack        Connect a Slack incoming webhook via OAuth (PKCE, no backend)
+                       or pass --webhook-url to store a manual URL.
+  disconnect slack     Remove the stored Slack webhook.
+  settings             Open a local web page to configure Slack notifications.
 
 Options:
   --config <path>        Path to the config file (default: elf.config.json)
@@ -61,9 +80,9 @@ Options:
   --sample [format]      Run against bundled sample data, no Figma token needed.
                          Optional format: variables | styles | tailwind | css | tokens-json
   --fail-on-drift        Exit with code 2 when drift is found (off by default)
-  --notify               Post a summary to the webhook named by "notify.webhookEnv"
-                         in the config (a Slack incoming webhook by default), only
-                         when the drift state changed since the last run
+  --notify               Post a summary using "notify.webhookEnv", or the Slack
+                         connection saved by \`elf connect slack\` / \`elf settings\`.
+                         Sends only when the drift state changed since the last run.
   --json                 With status: print drift-status.json verbatim
   --help                 Show this help
 
@@ -73,10 +92,14 @@ Push options:
                          Token: ELF_DASHBOARD_TOKEN environment variable, never
                          stored in the config.
 
+Connect slack options:
+  --webhook-url <url>    Store a manual Slack incoming webhook URL instead of
+                         running the OAuth flow. The URL is never printed in full.
+
 Requires the Figma API token in the environment variable named by
 figma.apiTokenEnv in the config (default: FIGMA_API_TOKEN). The notify
-webhook URL also lives in an environment variable — it is never stored
-in the config itself.
+webhook URL comes from notify.webhookEnv or the stored Slack connection —
+it is never stored in the config file.
 `;
 
 const WEBHOOK_USAGE = `elf-tokens webhook — wire Figma token changes to this repo
@@ -118,6 +141,7 @@ interface CliArgs {
   endpoint?: string;
   list?: boolean;
   test?: boolean;
+  webhookUrl?: string;
 }
 
 function parseArgs(argv: string[]): CliArgs {
@@ -159,7 +183,10 @@ function parseArgs(argv: string[]): CliArgs {
 
 async function main(): Promise<number> {
   const rawArgs = process.argv.slice(2);
-  const [command, ...rest] = rawArgs[0] && !rawArgs[0].startsWith("-") ? rawArgs : ["", ...rawArgs];
+  const command = rawArgs[0] && !rawArgs[0].startsWith("-") ? rawArgs[0] : "";
+  const hasSubcommand = command !== "" && rawArgs[1] !== undefined && !rawArgs[1].startsWith("-");
+  const subcommand = hasSubcommand ? rawArgs[1] : "";
+  const rest = hasSubcommand ? rawArgs.slice(2) : command === "" ? rawArgs : rawArgs.slice(1);
   const args = parseArgs(rest);
   if (args.help) {
     console.log(command === "webhook" ? WEBHOOK_USAGE : USAGE);
@@ -171,10 +198,20 @@ async function main(): Promise<number> {
   if (command === "status") {
     return runStatusCommand(args);
   }
+  if (command === "connect" && subcommand === "slack") {
+    return runConnectSlackCommand(args);
+  }
+  if (command === "disconnect" && subcommand === "slack") {
+    return runDisconnectSlackCommand(args);
+  }
+  if (command === "settings") {
+    return runSettingsCommand(args);
+  }
 
+  const configPath = args.config ?? "elf.config.json";
   const baseConfig: DriftConfig = args.sample
     ? buildSampleConfig(typeof args.sample === "string" ? (args.sample as SampleFormat) : undefined)
-    : loadConfig(args.config ?? "elf.config.json");
+    : loadConfig(configPath);
   const config = args.sample ? baseConfig : await mergeDashboardConfig(baseConfig, args);
 
   let api: FigmaApi | null = null;
@@ -194,20 +231,30 @@ async function main(): Promise<number> {
       return await runPushCommand(args, config, restApi, getBridge);
     }
 
+    let notifyWebhook: ResolvedNotifyWebhook | null = null;
     if (args.notify) {
       if (!config.notify) {
         throw new Error('--notify needs a "notify" section in the config, e.g. {"notify": {"webhookEnv": "SLACK_WEBHOOK_URL"}}.');
       }
-      if (!process.env[config.notify.webhookEnv]) {
+      notifyWebhook = resolveNotifyWebhook(config.notify, configPath);
+      if (!notifyWebhook) {
         throw new Error(
-          `Webhook URL not found. Set the ${config.notify.webhookEnv} environment variable ` +
-            `(the URL itself is never stored in the config).`,
+          config.notify.format === "slack"
+            ? `Webhook URL not found. Set the ${config.notify.webhookEnv} environment variable ` +
+                "or connect Slack with `elf-tokens connect slack`."
+            : `Webhook URL not found. Set the ${config.notify.webhookEnv} environment variable.`,
         );
       }
     }
-    const webhookUrl = config.notify ? process.env[config.notify.webhookEnv] ?? "" : "";
 
-    return await runDriftCheck(args, config, restApi, getBridge, webhookUrl);
+    return await runDriftCheck(
+      args,
+      config,
+      restApi,
+      getBridge,
+      notifyWebhook?.url ?? "",
+      notifyWebhook?.source ?? "",
+    );
   } finally {
     // The bridge websocket would otherwise keep the process alive after the report.
     (bridge as BridgeCaller | null)?.close();
@@ -311,6 +358,7 @@ async function runDriftCheck(
   restApi: () => FigmaApi,
   getBridge: () => Promise<BridgeCaller>,
   webhookUrl: string,
+  webhookSource: string,
 ): Promise<number> {
   const { result, meta, report } = await runCheckCore(config, restApi, getBridge);
 
@@ -329,7 +377,7 @@ async function runDriftCheck(
     const notifyConfig = config.notify;
     const statePath = notifyConfig.stateFile ?? statusPath;
     const previousState = readNotifyState(statePath);
-    const decision = decideNotification(previousState, result);
+    const decision = decideNotification(previousState, result, notifyConfig.onlyOnChange !== false);
 
     let posted = false;
     if (decision.send) {
@@ -340,7 +388,7 @@ async function runDriftCheck(
           buildNotifyMessage(result, meta, notifyConfig.format, previousState),
         );
         posted = true;
-        console.log(`Notification posted (via ${notifyConfig.webhookEnv}).`);
+        console.log(`Notification posted (via ${webhookSource || notifyConfig.webhookEnv}).`);
       } catch (error) {
         console.error(`Notification failed: ${(error as Error).message}`);
       }
@@ -567,6 +615,70 @@ async function runWebhookCommand(args: CliArgs): Promise<number> {
     : "Passcode: from environment");
   console.log("Done. Token edits in Figma will now trigger the figma-drift-watch workflow.");
 
+  return 0;
+}
+
+async function runConnectSlackCommand(args: CliArgs): Promise<number> {
+  const configPath = args.config ?? "elf.config.json";
+  loadSettingsEnv(configPath);
+  const config = loadConfig(configPath);
+
+  // Argument parser stores kebab-case keys
+  const webhookUrl = (args as unknown as Record<string, unknown>)['webhook-url'] as string | undefined;
+  if (webhookUrl) {
+    // Manual fallback path
+    const info = await connectSlackManual(configPath, webhookUrl);
+    console.log("Slack webhook stored manually.");
+    console.log(`  Team: ${info.teamName}`);
+    console.log(`  Channel: #${info.channel}`);
+    console.log(`  Webhook: ${maskWebhookUrl(info.url)}`);
+    console.log("The CLI will use this webhook for --notify when its env var is unset.");
+    console.log("For live Figma pings, set the same URL as the worker's SLACK_WEBHOOK_URL secret.");
+    return 0;
+  }
+
+  // PKCE OAuth flow
+  try {
+    const info = await connectSlackOAuth(configPath);
+    console.log("Slack connected via OAuth.");
+    console.log(`  Team: ${info.teamName}`);
+    console.log(`  Channel: #${info.channel}`);
+    console.log(`  Webhook: ${maskWebhookUrl(info.url)}`);
+    console.log(`\nThe webhook URL is stored in ${SLACK_WEBHOOK_FILE} (gitignored).`);
+    console.log("The CLI will use it for --notify when its env var is unset.");
+    console.log("For live Figma pings, set the same URL as the worker's SLACK_WEBHOOK_URL secret.");
+    console.log("Run \`elf-tokens settings\` to configure notification preferences.");
+    return 0;
+  } catch (error) {
+    console.error(`Slack connection failed: ${(error as Error).message}`);
+    return 1;
+  }
+}
+
+async function runDisconnectSlackCommand(args: CliArgs): Promise<number> {
+  const configPath = args.config ?? "elf.config.json";
+  const removed = await disconnectSlack(configPath);
+  if (removed) {
+    console.log("Slack webhook removed.");
+  } else {
+    console.log("No Slack webhook was stored.");
+  }
+  return 0;
+}
+
+async function runSettingsCommand(args: CliArgs): Promise<number> {
+  const configPath = args.config
+    ? resolve(args.config)
+    : findConfigPath();
+  if (!configPath) {
+    console.error(
+      "No elf.config.json found in this folder or any parent folder. " +
+        "Run this from your project, or pass --config <path>.",
+    );
+    return 1;
+  }
+  loadSettingsEnv(configPath);
+  await runSettingsServer(configPath);
   return 0;
 }
 

@@ -47,6 +47,8 @@ export interface NotifyConfig {
   webhookEnv: string;
   /** `"slack"` posts Block Kit JSON (Slack, or Discord with a `/slack` suffix); `"text"` posts a plain body (e.g. ntfy). */
   format: "slack" | "text";
+  /** When false, notify after every run instead of only when the drift fingerprint changes. Defaults to true. */
+  onlyOnChange?: boolean;
   /** Optional file for the dedupe state; defaults to drift-status.json next to the report. */
   stateFile?: string;
 }

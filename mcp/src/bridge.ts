@@ -16,6 +16,15 @@ import {
   type BridgePluginInfo,
   type BridgeResponseMessage,
 } from "./protocol.js";
+import {
+  PAIRING_CODE_TTL_MS,
+  SESSION_TTL_MS,
+  createPairingCode,
+  issueSession,
+  pairingCodeDigest,
+  verifySession,
+  type SessionSecret,
+} from "./pairing.js";
 
 const HOST = "127.0.0.1";
 const MAX_PAYLOAD_BYTES = 4 * 1024 * 1024;
@@ -26,6 +35,15 @@ export interface BridgeOptions {
   port: number;
   timeoutMs?: number;
   logger?: Logger;
+  /** How long the one-time pairing code stays valid. */
+  pairingCodeTtlMs?: number;
+  /** How long a session secret issued by pairing stays valid. */
+  sessionTtlMs?: number;
+}
+
+export interface BridgePairing {
+  code: string;
+  expiresAt: string;
 }
 
 export interface BridgeStatus {
@@ -54,8 +72,11 @@ export type StatusListener = (status: BridgeStatus) => void;
 
 /**
  * Local WebSocket bridge between the MCP server (Node) and the Figma plugin's
- * UI iframe. Binds to 127.0.0.1 only and requires the shared token as a query
- * parameter in the handshake — browsers can't set headers on a WebSocket.
+ * UI iframe. Binds to 127.0.0.1 only.
+ *
+ * Plugin handshakes use a one-time pairing code (`?code=`) or the longer-lived
+ * session secret it returns (`?session=`). The shared token (`?token=`) stays
+ * supported for existing panels and for the local /control lane.
  */
 export class Bridge {
   private server: WebSocketServer | null = null;
@@ -71,10 +92,15 @@ export class Bridge {
   private readonly pending = new Map<string, PendingRequest>();
   private readonly listeners = new Set<StatusListener>();
   private readonly timeoutMs: number;
+  private readonly pairingTtlMs: number;
+  private readonly sessionTtlMs: number;
   private readonly logger: Logger;
+  private pairing: { code: string; hash: Buffer; expiresAt: number } | null = null;
 
   constructor(private readonly options: BridgeOptions) {
     this.timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+    this.pairingTtlMs = options.pairingCodeTtlMs ?? PAIRING_CODE_TTL_MS;
+    this.sessionTtlMs = options.sessionTtlMs ?? SESSION_TTL_MS;
     this.logger = options.logger ?? silentLogger;
   }
 
@@ -91,6 +117,13 @@ export class Bridge {
 
   get isConnected(): boolean {
     return this.socket !== null;
+  }
+
+  /** The one-time code, while it is unused and unexpired. Safe to print once. */
+  get pairingCode(): BridgePairing | null {
+    const pairing = this.pairing;
+    if (!pairing || Date.now() >= pairing.expiresAt) return null;
+    return { code: pairing.code, expiresAt: new Date(pairing.expiresAt).toISOString() };
   }
 
   /** Starts listening. Resolves with the bound port (port 0 picks a free one). */
@@ -119,6 +152,8 @@ export class Bridge {
     const address = server.address() as AddressInfo | null;
     this.port = address?.port ?? this.options.port;
     this.boundAddress = address?.address ?? HOST;
+    const pairing = createPairingCode(Date.now(), this.pairingTtlMs);
+    this.pairing = { ...pairing, hash: pairingCodeDigest(pairing.code) };
     server.on("connection", (socket, request) => this.accept(socket, request.url ?? ""));
     this.logger.log(`bridge listening on ws://${HOST}:${this.port}`);
 
@@ -132,6 +167,7 @@ export class Bridge {
     this.keepalive = null;
     if (this.socket) this.socket.close(1001, "bridge shutting down");
     this.socket = null;
+    this.pairing = null;
     for (const control of this.controls) control.close(1001, "bridge shutting down");
     this.controls.clear();
     this.rejectAll("bridge shut down");
@@ -195,17 +231,52 @@ export class Bridge {
   }
 
   private accept(socket: WebSocket, url: string): void {
-    if (!this.tokenMatches(tokenFromUrl(url))) {
-      this.logger.log("rejected connection: bad or missing handshake token");
-      socket.close(AUTH_FAILED_CODE, "unauthorized");
-      return;
-    }
+    const params = queryFromUrl(url);
 
     if (pathFromUrl(url) === CONTROL_PATH) {
+      if (!this.tokenMatches(params.get("token"))) {
+        this.logger.log("rejected control connection: bad or missing handshake token");
+        socket.close(AUTH_FAILED_CODE, "unauthorized");
+        return;
+      }
       this.acceptControl(socket);
       return;
     }
 
+    const code = params.get("code");
+    const session = params.get("session");
+    let issued: SessionSecret | null = null;
+    let auth: "code" | "session" | "token" = "token";
+
+    if (code) {
+      if (!this.consumePairingCode(code)) {
+        this.logger.log("rejected connection: invalid, expired or already-used pairing code");
+        socket.close(AUTH_FAILED_CODE, "unauthorized");
+        return;
+      }
+      issued = issueSession(this.options.token, Date.now(), this.sessionTtlMs);
+      auth = "code";
+    } else if (session) {
+      if (verifySession(this.options.token, session) === null) {
+        this.logger.log("rejected connection: invalid or expired session");
+        socket.close(AUTH_FAILED_CODE, "unauthorized");
+        return;
+      }
+      auth = "session";
+    } else if (!this.tokenMatches(params.get("token"))) {
+      this.logger.log("rejected connection: bad or missing handshake credentials");
+      socket.close(AUTH_FAILED_CODE, "unauthorized");
+      return;
+    }
+
+    this.acceptPlugin(socket, issued, auth);
+  }
+
+  private acceptPlugin(
+    socket: WebSocket,
+    issued: SessionSecret | null,
+    auth: "code" | "session" | "token",
+  ): void {
     const previous = this.socket;
     this.socket = socket;
     if (previous) {
@@ -217,8 +288,19 @@ export class Bridge {
     this.connectedAt = new Date().toISOString();
     this.file = null;
     this.plugin = null;
-    this.logger.log("plugin connected");
+    if (auth === "code") this.logger.log("plugin paired with a one-time code");
+    else if (auth === "session") this.logger.log("plugin reconnected with its saved session");
+    else this.logger.log("plugin connected with the handshake token");
     this.emitStatus();
+
+    socket.send(
+      JSON.stringify({
+        type: "ready",
+        ...(issued
+          ? { session: issued.session, sessionExpiresAt: new Date(issued.expiresAt).toISOString() }
+          : {}),
+      }),
+    );
 
     socket.on("pong", () => {
       this.alive = true;
@@ -230,6 +312,20 @@ export class Bridge {
     socket.on("error", (error) => {
       this.logger.log(`socket error: ${error.message}`);
     });
+  }
+
+  private consumePairingCode(candidate: string): boolean {
+    const pairing = this.pairing;
+    if (!pairing) return false;
+    if (Date.now() >= pairing.expiresAt) {
+      this.pairing = null;
+      this.logger.log("pairing code expired");
+      return false;
+    }
+    if (!safeEqual(pairingCodeDigest(candidate), pairing.hash)) return false;
+    // Single-use: consume before accepting, so two racing clients cannot both pair.
+    this.pairing = null;
+    return true;
   }
 
   /**
@@ -360,13 +456,14 @@ export class Bridge {
   }
 }
 
-function tokenFromUrl(url: string): string | null {
+function queryFromUrl(url: string): URLSearchParams {
   const query = url.includes("?") ? url.slice(url.indexOf("?") + 1) : "";
-  return new URLSearchParams(query).get("token");
+  return new URLSearchParams(query);
 }
 
 function pathFromUrl(url: string): string {
-  return new URL(url, "ws://localhost").pathname;
+  const path = url.split("?")[0];
+  return path.startsWith("/") ? path : "/";
 }
 
 function sendControlResult(socket: WebSocket, message: BridgeControlResultMessage): void {
