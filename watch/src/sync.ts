@@ -171,7 +171,7 @@ function selectComponents(
   manifest: Manifest,
   force: Set<string>,
 ): SelectedComponent[] {
-  const parsed = parseComponents(config.componentsDir);
+  const parsed = parseComponents(config.componentsDir, config.componentFiles);
   if (parsed.length === 0) return [];
 
   const byKey = new Map(parsed.map((component) => [component.codeKey, component]));
@@ -240,7 +240,7 @@ async function includeMissingDependencies(
   bridge: WatchBridge,
 ): Promise<{ selected: SelectedComponent[]; repair: Set<string> }> {
   const parsedByKey = new Map(
-    parseComponents(config.componentsDir).map((component) => [component.codeKey, component]),
+    parseComponents(config.componentsDir, config.componentFiles).map((component) => [component.codeKey, component]),
   );
   const byKey = new Map(selected.map((entry) => [entry.parsed.codeKey, entry]));
   const result = [...selected];

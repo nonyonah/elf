@@ -2,7 +2,7 @@
 
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
-import { detectCodebaseSource, parseCodebaseTokens } from "./codebase/index.js";
+import { detectCodebaseSource, parseProjectTokens } from "./codebase/index.js";
 import { diffComponents } from "./components.js";
 import { findConfigPath, loadConfig } from "./config.js";
 import { loadSettingsEnv } from "./env.js";
@@ -317,7 +317,7 @@ async function runCheckCore(
 
   const codebaseSource =
     config.codebase.source === "auto" ? detectCodebaseSource(config.codebase.path) : config.codebase.source;
-  const codeTokens = await parseCodebaseTokens(codebaseSource, config.codebase.path);
+  const codeTokens = await parseProjectTokens(config.codebase);
 
   let result = diffTokens(figmaTokens, codeTokens, config.nameMapping);
 
@@ -327,6 +327,7 @@ async function runCheckCore(
       config.components.path,
       config.components.manifest,
       await getBridge(),
+      config.components.files,
     );
     codeComponents = componentDiff.codeComponents;
     result = {

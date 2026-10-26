@@ -1,3 +1,4 @@
+import { discoverProject } from "./discovery.js";
 import { constants, existsSync, lstatSync, openSync, closeSync, readFileSync, realpathSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { randomBytes } from "node:crypto";
@@ -40,18 +41,18 @@ export function projectResource(root: string, input: unknown, directory = false)
 }
 
 export function detectProjectSources(root: string): string[] {
-  return ["tokens.json", "src/tokens.json", "src/app/globals.css", "app/globals.css", "src/index.css", "src/styles/globals.css", "styles/globals.css", "tailwind.config.ts", "tailwind.config.js"].filter(path => {
-    try { projectResource(root, path); return true; } catch { return false; }
-  });
+  return discoverProject(root).tokens.map(path => relative(realpathSync(root), path));
 }
 
 export function validateProjectSources(configPath: string, input: unknown): SetupInput {
   if (typeof input !== "object" || input === null || Array.isArray(input)) throw new Error("Invalid project setup.");
-  const data = input as SetupInput;
+  const incoming = input as Partial<SetupInput>;
+  const data: SetupInput = {tokenPath: incoming.tokenPath ?? "auto", source: incoming.source ?? "auto", autoSync: incoming.autoSync ?? false, componentsPath: incoming.componentsPath};
   if (!["auto", "css", "tailwind", "tokens-json"].includes(data.source) || typeof data.autoSync !== "boolean") throw new Error("Choose a token format and watching preference.");
   const root = dirname(resolve(configPath));
-  projectResource(root, data.tokenPath);
-  if (data.source === "auto") detectCodebaseSource(data.tokenPath);
+  if (data.tokenPath !== "auto") projectResource(root, data.tokenPath);
+  else discoverProject(root);
+  if (data.source === "auto" && data.tokenPath !== "auto") detectCodebaseSource(data.tokenPath);
   if (data.componentsPath) projectResource(root, data.componentsPath, true);
   return data;
 }
@@ -74,7 +75,7 @@ export function saveProjectSetup(configPath: string, input: unknown, status: Bri
     ...existing,
     figma: { ...existing.figma, fileKey: status.file.key, source: "bridge" },
     codebase: { source: data.source, path: data.tokenPath },
-    components: data.componentsPath ? { path: data.componentsPath, manifest: existing.components?.manifest ?? "elf.manifest.json" } : undefined,
+    components: data.componentsPath ? { path: data.componentsPath, manifest: existing.components?.manifest ?? "elf.manifest.json" } : existing.components,
     runtime: { ...existing.runtime, autoSync: false, projectConfigured: true, setupComplete: false },
   };
   writeProjectConfig(configPath, next);

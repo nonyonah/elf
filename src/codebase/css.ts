@@ -2,11 +2,11 @@ import { readFileSync } from "node:fs";
 import { categoryFromName, cssColorToHex, normalizeShadow, slugify, toPx } from "../core/normalize.js";
 import type { Category, Token } from "../core/types.js";
 
-export function parseCss(cssPath: string): Token[] {
-  const text = readFileSync(cssPath, "utf8");
+export function parseCss(cssPath: string, contents?: string): Token[] {
+  const text = contents ?? readFileSync(cssPath, "utf8");
   const tokens: Token[] = [];
 
-  for (const match of text.matchAll(/:root\s*\{([\s\S]*?)\}/g)) {
+  for (const match of text.matchAll(/(?:\:root|@theme(?:\s+inline|\s+static)?)\s*\{([\s\S]*?)\}/g)) {
     const propertyRe = /(--[a-zA-Z0-9-]+)\s*:\s*([^;]+);/g;
     let property: RegExpExecArray | null;
     while ((property = propertyRe.exec(match[1])) !== null) {

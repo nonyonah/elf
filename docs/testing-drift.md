@@ -9,9 +9,17 @@ correcting it. Use **Check now**, then **View report** to inspect the result.
 
 ## Components
 
-In **Component monitoring**, save your project-relative component folder.
-For this repository use `batch/test/fixtures/components`. Saving pauses
-automatic writes and invalidates previously reviewed sync plans.
+Elf discovers component files automatically, including components across multiple
+source folders. Onboarding shows discovered token sources and the component
+count. Settings has no component-folder control. Newly added source files are
+discovered while monitoring.
+
+Discovery skips dependencies, generated output, hidden files, test/fixture/example
+trees, stories, and symlinks, and respects `.gitignore` files. Component identities
+are relative to the project root and stay stable when new folders are added.
+Existing explicit config mappings remain supported for projects with sync history.
+The bundled `batch/test/fixtures` directory is excluded from automatic discovery;
+it remains usable through an explicit test configuration.
 
 Components without a managed sync baseline appear as not yet synced. Review
 and apply a sync plan to establish a baseline. Components need valid Figma
@@ -25,6 +33,12 @@ After a successful component sync, edit its TSX implementation or description
 and save. The report identifies that component. Implementation edits require
 description review; Elf does not infer a rendered layout from arbitrary JSX.
 Edit the linked Figma component to test drift in the other direction.
+
+Token sources can be split across CSS and token JSON files. Equal duplicate
+values are merged; conflicting values fail the check with the two source paths.
+Tailwind themes are read statically without running config code or plugins.
+Dynamic themes must expose their resolved tokens in CSS or JSON.
+An empty project can finish setup and add design resources later.
 
 ## Notifications
 

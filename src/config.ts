@@ -1,5 +1,6 @@
+import { discoverProject } from "./discovery.js";
 import { existsSync, readFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { dirname, join, resolve, relative } from "node:path";
 import type { ComponentsConfig, DashboardConfig, Deprecation, DriftConfig, ModeStrategy, NotifyConfig } from "./core/types.js";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -38,9 +39,12 @@ export function loadConfig(configPath: string): DriftConfig {
   if (!config.figma?.fileKey) {
     throw new Error(`Config "${configPath}" is missing "figma.fileKey".`);
   }
-  if (!config.codebase?.path) {
-    throw new Error(`Config "${configPath}" is missing "codebase.path".`);
-  }
+  const autoTokens = !config.codebase?.path || config.codebase.path === "auto";
+  const discovered = autoTokens || !components ? discoverProject(configDir) : undefined;
+  const componentConfig = components ?? (discovered?.componentRoot ? {
+    path: discovered.componentRoot, manifest: config.sync?.manifest ?? "elf.manifest.json",
+    files: discovered.components.map(path => relative(discovered.componentRoot!, path)),
+  } : undefined);
 
   return {
     figma: {
@@ -50,13 +54,14 @@ export function loadConfig(configPath: string): DriftConfig {
       teamId: config.figma.teamId ?? "",
     },
     codebase: {
-      path: config.codebase.path,
-      source: config.codebase.source ?? "auto",
+      path: autoTokens ? discovered!.tokens[0] ?? resolve(configPath) : config.codebase!.path,
+      source: autoTokens ? "auto" : config.codebase!.source ?? "auto",
+      ...(autoTokens ? {paths: discovered!.tokens} : {}),
     },
     modeName: config.modeName ?? null,
     modeStrategy: parseModeStrategy(config.modeStrategy),
     nameMapping: config.nameMapping ?? {},
-    components: parseComponents(components, configDir, configPath),
+    components: parseComponents(componentConfig, configDir, configPath),
     intentionalDifferences: parseIntentionalDifferences(config.intentionalDifferences),
     deprecations: parseDeprecations(config.deprecations, configPath),
     notify: parseNotify(config.notify, configDir, configPath),
@@ -87,6 +92,7 @@ function parseComponents(value: unknown, configDir: string, configPath: string):
   }
   return {
     path: resolve(configDir, record.path),
+    ...(Array.isArray(record.files) ? {files: record.files} : {}),
     manifest: resolve(configDir, record.manifest),
   };
 }

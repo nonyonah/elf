@@ -18,6 +18,7 @@ export interface BatchConfig {
   root: string;
   tokensFile: string;
   componentsDir: string;
+  componentFiles?: string[];
   manifestFile: string;
   modeStrategy: ModeStrategy;
   /** Figma mode names used for the semantic collection(s). */

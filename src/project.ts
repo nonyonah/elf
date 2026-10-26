@@ -8,7 +8,7 @@ import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "nod
 import { runElfCheck } from "../watch/src/check.js";
 import { loadConfig } from "./config.js";
 import { projectResource, writeProjectConfig } from "./onboarding.js";
-import { parseCodebaseTokens } from "./codebase/index.js";
+import { parseCodebaseTokens, parseProjectTokens } from "./codebase/index.js";
 import { hashSpec, loadManifest, saveManifest, stableStringify } from "../batch/src/manifest.js";
 import { planTokens, type TokenIndex } from "../batch/src/tokens.js";
 import { componentSourceHash, componentSpecHash, planComponent, processComponent, syncTokens } from "../batch/src/sync.js";
@@ -57,17 +57,6 @@ export class ProjectService {
   setMonitoring(): void {
     const raw = this.raw(); writeProjectConfig(this.configPath, { ...raw, runtime: { ...raw.runtime, autoSync: false } });
     this.record("sync", "Automatic sync paused. Monitoring continues.");
-  }
-  configureComponents(path: string): void {
-    const raw = this.raw(); const root = realpathSync(dirname(resolve(this.configPath)));
-    const folder = this.resource(root, path, true);
-    parseComponents(folder);
-    const manifest = raw.sync?.manifest ?? raw.components?.manifest ?? "elf.manifest.json";
-    this.outputPath(manifest);
-    const componentPath = relative(root, folder) || ".";
-    writeProjectConfig(this.configPath, { ...raw, components: { path: componentPath, manifest }, ...(raw.sync ? {sync: {...raw.sync, components: componentPath}} : {}), runtime: {...raw.runtime, autoSync: false} });
-    this.reviewed.clear();
-    this.record("check", "Component monitoring configured. Automatic sync paused; review a new plan before applying changes.");
   }
   async check(): Promise<Record<string, unknown>> {
     return this.serial(async () => {
@@ -146,18 +135,19 @@ export class ProjectService {
   watchPaths(): string[] {
     const { config, hasComponents } = this.batchConfig();
     const drift = loadConfig(this.configPath);
-    return [...new Set([this.resource(config.root, drift.codebase.path), config.tokensFile, ...(hasComponents ? [config.componentsDir] : [])])];
+    return [...new Set([config.root, ...(drift.codebase.paths ?? []), this.resource(config.root, drift.codebase.path), config.tokensFile, ...(hasComponents ? [config.componentsDir] : [])])];
   }
   private batchConfig(): { config: BatchConfig; hasComponents: boolean; structured: boolean } {
     this.migrate();
     const raw = this.raw(); const drift = loadConfig(this.configPath); const root = realpathSync(dirname(resolve(this.configPath)));
     const sync = raw.sync ?? {};
     const tokenPath = sync.tokens ?? drift.codebase.path;
-    const components = sync.components ?? raw.components?.path;
+    const components = sync.components ?? raw.components?.path ?? drift.components?.path;
     const manifest = sync.manifest ?? raw.components?.manifest ?? "elf.manifest.json";
     const config: BatchConfig = {
       configPath: this.configPath, root, tokensFile: this.resource(root, tokenPath),
       componentsDir: components ? this.resource(root, components, true) : root,
+      ...(drift.components?.files ? {componentFiles: drift.components.files} : {}),
       manifestFile: this.outputPath(manifest), modeStrategy: sync.modeStrategy ?? drift.modeStrategy,
       semanticModes: sync.semanticModes ?? ["Light", "Dark"], chunkSize: sync.chunkSize ?? 5,
       collections: { primitives: sync.collections?.primitives ?? "Primitives", semantic: sync.collections?.semantic ?? "Semantic" },
@@ -182,11 +172,11 @@ export class ProjectService {
   private async tokens(config: BatchConfig, structured: boolean): Promise<{ plan: TokensPlan; index: TokenIndex; unsupported: PlanIssue[] }> {
     if (structured) return { ...planTokens(config.tokensFile, config), unsupported: [] };
     // Preserve rich token aliases/modes when the source already uses the batch format.
-    if (config.tokensFile.endsWith(".json")) {
+    if (config.tokensFile.endsWith(".json") && !loadConfig(this.configPath).codebase.paths?.slice(1).length) {
       try { const planned = planTokens(config.tokensFile, config); if (planned.index.size) return { ...planned, unsupported: [] }; } catch {}
     }
     const drift = loadConfig(this.configPath);
-    const source = await parseCodebaseTokens(drift.codebase.source, config.tokensFile);
+    const source = drift.codebase.paths ? await parseProjectTokens(drift.codebase) : await parseCodebaseTokens(drift.codebase.source, config.tokensFile);
     const variables: TokensPlan["primitives"]["variables"] = []; const index: TokenIndex = new Map(); const unsupported: PlanIssue[] = [];
     for (const token of source) {
       const number = Number(token.value.replace(/px$/, ""));
@@ -212,7 +202,7 @@ export class ProjectService {
   private async build(client: BridgeCaller): Promise<InternalPlan> {
     const { config, hasComponents, structured } = this.batchConfig();
     const tokens = await this.tokens(config, structured);
-    const parsed = hasComponents ? orderComponents(parseComponents(config.componentsDir)) : [];
+    const parsed = hasComponents ? orderComponents(parseComponents(config.componentsDir, config.componentFiles)) : [];
     const components = parsed.map(component => planComponent(config, tokens.index, component));
     const manifest = loadManifest(config.manifestFile);
     const snapshot = await this.snapshot(client, components, tokens.plan.textStyles.length + tokens.plan.effectStyles.length > 0, hasComponents || Object.keys(manifest.components).length > 0);
@@ -271,7 +261,7 @@ export class ProjectService {
       if (!known || known.valueHash !== hashSpec(style.params) || !remote || issues.some(issue => issue.kind === "conflict" && issue.key === key)) entries.push({ kind: "style", key, name: style.key, action: remote ? "update" : "create" });
     }
     const view: SyncPlan = { id: randomUUID(), fileKey: loadConfig(this.configPath).figma.fileKey, entries, issues, expiresAt: new Date(Date.now() + 10 * 60_000).toISOString() };
-    const fingerprint = createHash("sha256").update(stableStringify({ config: this.raw(), tokens: tokens.plan, source: readFileSync(config.tokensFile, "utf8"), components: components.map(component => ({ ...component, source: readFileSync(resolve(config.componentsDir, component.parsed.file), "utf8"), raw: existsSync(sidecarPathFor(config.componentsDir, component.parsed)) ? readFileSync(sidecarPathFor(config.componentsDir, component.parsed), "utf8") : null })), manifest, snapshot })).digest("hex");
+    const fingerprint = createHash("sha256").update(stableStringify({ config: this.raw(), tokens: tokens.plan, source: [...new Set([config.tokensFile, ...(loadConfig(this.configPath).codebase.paths ?? [])])].map(path => readFileSync(path, "utf8")), components: components.map(component => ({ ...component, source: readFileSync(resolve(config.componentsDir, component.parsed.file), "utf8"), raw: existsSync(sidecarPathFor(config.componentsDir, component.parsed)) ? readFileSync(sidecarPathFor(config.componentsDir, component.parsed), "utf8") : null })), manifest, snapshot })).digest("hex");
     return { view, fingerprint, config, manifest, tokens: tokens.plan, components, snapshot };
   }
   private async execute(plan: InternalPlan, client: BridgeCaller): Promise<Record<string, unknown>> {
@@ -354,8 +344,8 @@ export class ProjectService {
 
   async prepareComponent(name: string): Promise<Record<string, unknown>> {
     const { config, hasComponents, structured } = this.batchConfig();
-    if (!hasComponents) throw new Error("Choose a component folder in project configuration first.");
-    const component = parseComponents(config.componentsDir).find(item => item.name === name || item.codeKey === name);
+    if (!hasComponents) throw new Error("No component source files were discovered in this project. Add a component and try again.");
+    const component = parseComponents(config.componentsDir, config.componentFiles).find(item => item.name === name || item.codeKey === name);
     if (!component) throw new Error("That component is not in this project.");
     const sidecar = loadSidecar(config.componentsDir, component) ?? { layoutMode: "HORIZONTAL", size: { width: 120, height: 40 }, text: { characters: component.name, fontSize: 14 } };
     const source = readFileSync(resolve(config.componentsDir, component.file), "utf8");
@@ -365,8 +355,8 @@ export class ProjectService {
   async saveDescription(name: string, description: unknown): Promise<Record<string, unknown>> {
     return this.serial(() => this.runtime.transaction(loadConfig(this.configPath).figma.fileKey, async () => {
       const { config, hasComponents, structured } = this.batchConfig();
-      if (!hasComponents) throw new Error("Choose a component folder first.");
-      const component = parseComponents(config.componentsDir).find(item => item.name === name || item.codeKey === name);
+      if (!hasComponents) throw new Error("No component source files were discovered in this project. Add a component and try again.");
+      const component = parseComponents(config.componentsDir, config.componentFiles).find(item => item.name === name || item.codeKey === name);
       if (!component) throw new Error("That component is not in this project.");
       const sidecar = validateSidecar(description as any, component.name);
       const tokenPlan = await this.tokens(config, structured);

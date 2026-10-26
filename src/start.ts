@@ -1,5 +1,6 @@
+import { discoverProject } from "./discovery.js";
 import { deliverSyncNotifications } from "./sync-notifications.js";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, relative, resolve } from "node:path";
 import { watch } from "chokidar";
 import { fileURLToPath } from "node:url";
@@ -9,7 +10,7 @@ import { loadWatchEnv } from "../watch/src/bridge.js";
 import { runElfCheck } from "../watch/src/check.js";
 import { findConfigPath, loadConfig } from "./config.js";
 import { createSettingsServer, DEFAULT_SETTINGS_PORT, openSettingsBrowser, reopenCompatibleSettingsServer } from "./settings.js";
-import { completeProjectSetup, detectProjectSources, projectResource, saveProjectSetup, validateProjectSources, type OnboardingController } from "./onboarding.js";
+import { completeProjectSetup, projectResource, saveProjectSetup, validateProjectSources, type OnboardingController } from "./onboarding.js";
 import { createHash } from "node:crypto";
 import { SyncAlerts } from "./sync-alerts.js";
 import { ProjectService } from "./project.js";
@@ -113,12 +114,16 @@ export async function main(argv: string[]): Promise<number> {
       } while (rerun && !stopping);
     })().catch(error => { lastError = (error as Error).message; console.error(`elf: ${lastError}`); }).finally(() => { checking = null; });
   };
+  const discoveredStatus = (): Record<string, unknown> => {
+    const sources = discoverProject(root);
+    return {sources: sources.tokens.map(path => relative(realpathSync(root), path)), discoveredComponents: sources.components.length};
+  };
   const controller: OnboardingController = {
     status: () => ({
       active: !running,
       configured: configured(),
       root,
-      sources: detectProjectSources(root),
+      ...discoveredStatus(),
       bridge: runtime.connection.status,
       running,
       mode: project.automatic() ? "automatic" : "monitor",
@@ -147,11 +152,6 @@ export async function main(argv: string[]): Promise<number> {
       }
       if (action === "disconnect-figma") {
         await runtime.revoke(loadConfig(configPath).figma.fileKey); project.setMonitoring(); return { ok: true };
-      }
-      if (action === "configure-components") {
-        if (typeof body.path !== "string" || !body.path.trim()) throw new Error("Enter a component folder relative to your project.");
-        project.configureComponents(body.path.trim());
-        watcher?.add(project.watchPaths()); check(); return {ok: true};
       }
       if (action === "resources") return project.resources();
       if (action === "show-plugin") {
@@ -191,7 +191,7 @@ export async function main(argv: string[]): Promise<number> {
         if (!runtime.connection.status.connected || runtime.connection.status.file?.key !== config.figma.fileKey) throw new Error("Open the configured Figma file and connect its Elf plugin first.");
         const paths = project.watchPaths();
         const generated = new Set(project.generatedPaths());
-        watcher = watch([...paths, configPath], { ignoreInitial: true, ignored: /(^|[/\\])(node_modules|\.git|dist|build|\.next|\.elf)([/\\]|$)|\.tmp$/, awaitWriteFinish: { stabilityThreshold: 150, pollInterval: 50 } });
+        watcher = watch([...paths, configPath], { ignoreInitial: true, followSymlinks: false, ignored: /(^|[/\\])(node_modules|\.git|dist|build|\.next|\.elf)([/\\]|$)|\.tmp$/, awaitWriteFinish: { stabilityThreshold: 150, pollInterval: 50 } });
         watcher.on("all", (_event, path) => {
           if (generated.has(resolve(path)) && resolve(path) !== resolve(configPath)) return;
           if (resolve(path) === resolve(configPath)) {

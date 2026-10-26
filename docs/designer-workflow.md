@@ -11,7 +11,7 @@ Open the intended Figma file and launch Elf Bridge. After its first pairing,
 the plugin reconnects with its saved credential. Keep this terminal and Figma
 file open. A saved pairing does not automatically launch a closed plugin.
 
-On first setup, choose your token file and optionally your component folder.
+On first setup, Elf scans the project for token sources and component files. Review the discovered sources; no folder paths are required.
 Connect Slack if you want alerts. Setup starts in monitoring mode. To write to
 Figma, choose **Review sync**, inspect the plan, then **Apply sync**. Enable
 **Automatic sync** through the reviewed plan when you want saves to push supported

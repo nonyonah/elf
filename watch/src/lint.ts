@@ -78,7 +78,7 @@ export function lintFiles(files: string[], config: BatchConfig): LintResult {
 /** Default lint target: every parsed component file. */
 export function componentFiles(config: BatchConfig): string[] {
   try {
-    return parseComponents(config.componentsDir).map((component) =>
+    return parseComponents(config.componentsDir, config.componentFiles).map((component) =>
       resolve(config.componentsDir, component.file),
     );
   } catch {

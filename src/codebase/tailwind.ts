@@ -20,7 +20,10 @@ export async function parseTailwindConfig(configPath: string): Promise<Token[]> 
   const raw = (module.default ?? module) as Record<string, unknown>;
   const config = (raw ?? {}) as { theme?: TailwindTheme };
 
-  const theme = (config.theme ?? {}) as TailwindTheme;
+  return tokensFromTailwindTheme(config.theme ?? {});
+}
+
+export function tokensFromTailwindTheme(theme: TailwindTheme): Token[] {
   const tokens = new Map<string, Token>();
 
   const push = (token: Token) => tokens.set(token.name, token);

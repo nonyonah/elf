@@ -37,6 +37,8 @@ export interface Deprecation {
 export interface ComponentsConfig {
   /** Folder holding component files + sidecars. */
   path: string;
+  /** Discovered source files, relative to path. */
+  files?: string[];
   /** Path to elf.manifest.json — the code↔Figma map. */
   manifest: string;
 }
@@ -72,6 +74,8 @@ export interface DriftConfig {
   codebase: {
     path: string;
     source: CodebaseSource;
+    /** Automatically discovered token source files. */
+    paths?: string[];
   };
   modeName: ModeName;
   modeStrategy: ModeStrategy;

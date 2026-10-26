@@ -1,10 +1,10 @@
-import { existsSync, lstatSync, readdirSync, readFileSync, statSync } from "node:fs";
-import { basename, dirname, extname, relative, resolve, sep } from "node:path";
+import { existsSync, lstatSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
+import { basename, dirname, extname, isAbsolute, relative, resolve, sep } from "node:path";
 import ts from "typescript";
 import type { ParsedComponent } from "./types.js";
 
 /** Every file with one of these extensions is treated as one component. */
-export const COMPONENT_EXTENSIONS = [".tsx", ".jsx", ".vue", ".svelte", ".astro"];
+export const COMPONENT_EXTENSIONS = [".tsx", ".jsx", ".js", ".vue", ".svelte", ".astro"];
 const SFC_EXTENSIONS = new Set([".vue", ".svelte"]);
 
 /** `<relative/path.tsx>#<Name>` — the identity used across runs and sidecars. */
@@ -13,8 +13,12 @@ export function codeKeyFor(relativePath: string, name: string): string {
 }
 
 /** Walks the components folder (recursively) and parses every component file. */
-export function parseComponents(componentsDir: string): ParsedComponent[] {
-  const files = collectFiles(componentsDir).sort();
+export function parseComponents(componentsDir: string, selectedFiles?: string[]): ParsedComponent[] {
+  const files = selectedFiles ? selectedFiles.map(file => {
+    const path = resolve(componentsDir, file); const rel = relative(resolve(componentsDir), path);
+    if (rel === ".." || rel.startsWith(`..${sep}`) || isAbsolute(rel) || realpathSync(path) !== path || lstatSync(path).isSymbolicLink() || !lstatSync(path).isFile()) throw new Error("Component sources must be regular files inside the component root.");
+    return path;
+  }).sort() : collectFiles(componentsDir).sort();
   return files.map((file) => parseComponent(componentsDir, file));
 }
 
@@ -44,7 +48,7 @@ export function parseComponent(componentsDir: string, file: string): ParsedCompo
   }
 
   let deprecated: string | undefined;
-  if (extension === ".tsx" || extension === ".jsx") {
+  if (extension === ".tsx" || extension === ".jsx" || extension === ".js") {
     const tree = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, extension === ".tsx" ? ts.ScriptKind.TSX : ts.ScriptKind.JSX);
     for (const statement of tree.statements) {
       const named = (ts.isFunctionDeclaration(statement) || ts.isClassDeclaration(statement)) && statement.name?.text === name;
@@ -251,6 +255,7 @@ function collectFiles(dir: string): string[] {
     if (statSync(path).isDirectory()) {
       found.push(...collectFiles(path));
     } else if (COMPONENT_EXTENSIONS.includes(extname(entry))) {
+      if (extname(entry) === ".js" && !/<[A-Za-z>]/.test(readFileSync(path, "utf8"))) continue;
       found.push(path);
     }
   }

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -65,9 +65,9 @@ test("startup pairs, saves setup, monitors edits, and restarts a configured proj
     const refreshBody = await refresh.text();
     assert.equal(refreshBody.includes("code"), false, "the browser must not receive the pairing code");
     await eventually(() => logs, value => value.includes("New pairing code:"), () => logs);
-    const input = { tokenPath: "tokens.css", source: "css", autoSync: false };
+    const input = { tokenPath: "auto", source: "auto", autoSync: false };
     assert.equal((await post("/api/onboarding", input)).status, 400, "unpaired setup cannot be saved");
-    plugin = await FakePlugin.connect({ port, token, handlers: { list_collections: () => ({ collections: [] }), list_variables: () => ({ variables: [] }) } });
+    plugin = await FakePlugin.connect({ port, token, handlers: { list_collections: () => ({ collections: [] }), list_variables: () => ({ variables: [] }), list_components: () => ({components: []}) } });
     plugin.sendStatus({ key: "startup-test-file", name: "Startup design system" });
     await eventually(async () => (await request(url + "/api/onboarding")).json(), value => value.bridge.file?.key === "startup-test-file", () => logs);
     assert.equal((await post("/api/onboarding", input)).status, 200);
@@ -79,11 +79,15 @@ test("startup pairs, saves setup, monitors edits, and restarts a configured proj
     writeFileSync(join(root, "tokens.css"), ":root { --color-primary: #123456; }\n");
     const drift = await eventually(async () => (await request(url + "/api/onboarding")).json(), value => value.lastCheck?.status === "drift", () => logs);
     assert.equal(drift.lastCheck.total, 1);
+    mkdirSync(join(root, "components"));
+    writeFileSync(join(root, "components", "Button.tsx"), "export function Button() { return <button>Save</button>; }");
+    const discovered = await eventually(async () => (await request(url + "/api/onboarding")).json(), value => value.lastCheck?.total === 2, () => logs);
+    assert.equal(discovered.lastCheck.status, "drift");
     assert.equal(plugin.requests.some(request => /upsert|create|delete|rename/.test(request.method)), false, "monitoring must not mutate Figma");
     assert.equal(JSON.parse(readFileSync(configPath, "utf8")).runtime.setupComplete, true);
     await stop();
     const restarted = await launch();
-    plugin = await FakePlugin.connect({ port: restarted.port, token, handlers: { list_collections: () => ({ collections: [] }), list_variables: () => ({ variables: [] }) } });
+    plugin = await FakePlugin.connect({ port: restarted.port, token, handlers: { list_collections: () => ({ collections: [] }), list_variables: () => ({ variables: [] }), list_components: () => ({components: []}) } });
     plugin.sendStatus({ key: "startup-test-file", name: "Startup design system" });
     // A configured project resumes automatically when the plugin reconnects.
     await eventually(async () => (await request(restarted.url + "/api/onboarding")).json(), value => value.bridge.file?.key === "startup-test-file", () => logs);

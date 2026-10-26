@@ -188,14 +188,14 @@ test("completed sync records before and after values and exposes live managed re
   } finally {p.cleanup();}
 });
 
-test("component configuration validates paths, enables checking and pauses automatic writes", () => {
+test("project monitoring discovers components without a configured folder", async () => {
   const p = project(true);
   try {
-    const raw = JSON.parse(readFileSync(p.path, "utf8")); raw.runtime = {autoSync: true}; writeFileSync(p.path, JSON.stringify(raw));
-    assert.throws(() => p.service.configureComponents("../"));
-    p.service.configureComponents("components");
-    assert.equal(p.service.automatic(), false);
-    assert.ok(p.service.watchPaths().includes(realpathSync(join(p.root, "components"))));
+    const raw = JSON.parse(readFileSync(p.path, "utf8")); delete raw.components; raw.codebase = {path: "auto", source: "auto"}; writeFileSync(p.path, JSON.stringify(raw));
+    const plan = await p.service.plan();
+    assert.ok(plan.entries.some(item => item.key === "components/Button.tsx#Button"));
+    assert.ok(p.service.watchPaths().includes(realpathSync(p.root)));
+    assert.equal(p.calls.some(method => /upsert|create|delete/.test(method)), false);
   } finally {p.cleanup();}
 });
 

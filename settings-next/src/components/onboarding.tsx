@@ -14,6 +14,7 @@ export interface OnboardingStatus extends ProjectRuntime {
   configured: boolean;
   root: string;
   sources: string[];
+  discoveredComponents?: number;
   bridge: { connected: boolean; file: { key: string; name: string } | null };
   running: boolean;
   pluginManifest: string;
@@ -24,7 +25,6 @@ export interface OnboardingStatus extends ProjectRuntime {
 }
 
 const card = "gap-0 rounded-2xl border-[0.5px] border-border bg-card shadow-none before:hidden";
-const input = "mt-1.5 h-9 w-full rounded-lg border-[0.5px] border-input bg-card px-2.5 text-[12px] text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50";
 const smallButton = "h-7 shrink-0 rounded-lg px-3 text-xs shadow-none sm:text-xs";
 
 async function api(path: string, body?: unknown): Promise<any> {
@@ -41,9 +41,6 @@ async function api(path: string, body?: unknown): Promise<any> {
 export function Onboarding({ initial, onFinished }: { initial: OnboardingStatus; onFinished: () => void }) {
   const [status, setStatus] = useState(initial);
   const [step, setStep] = useState(initial.configured ? 2 : 0);
-  const [tokenPath, setTokenPath] = useState(initial.project?.tokenPath ?? initial.sources[0] ?? "");
-  const [source, setSource] = useState(initial.project?.source ?? "auto");
-  const [componentsPath, setComponentsPath] = useState(initial.project?.componentsPath ?? "");
   const [slack, setSlack] = useState<{ connected: boolean; teamName?: string; channel?: string }>({ connected: false });
   const [notify, setNotify] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -90,7 +87,7 @@ export function Onboarding({ initial, onFinished }: { initial: OnboardingStatus;
   const validateProject = async () => {
     setBusy(true); setError(null);
     try {
-      await api("/api/onboarding/validate", { tokenPath: tokenPath.trim(), source, componentsPath: componentsPath.trim() || undefined, autoSync: false });
+      await api("/api/onboarding/validate", { tokenPath: "auto", source: "auto", autoSync: false });
       setStep(1);
     } catch (cause) { setError((cause as Error).message); }
     finally { setBusy(false); }
@@ -98,7 +95,7 @@ export function Onboarding({ initial, onFinished }: { initial: OnboardingStatus;
   const saveProject = async () => {
     setBusy(true); setError(null);
     try {
-      await api("/api/onboarding", { tokenPath: tokenPath.trim(), source, componentsPath: componentsPath.trim() || undefined, autoSync: false });
+      await api("/api/onboarding", { tokenPath: "auto", source: "auto", autoSync: false });
       setStep(2);
     } catch (cause) { setError((cause as Error).message); }
     finally { setBusy(false); }
@@ -156,7 +153,7 @@ export function Onboarding({ initial, onFinished }: { initial: OnboardingStatus;
       </ol>
       <h1 ref={heading} tabIndex={-1} className="mb-1 text-[15px] font-medium leading-[1.55] outline-none">{titles[step]}</h1>
       <p className="mb-4 text-[12px] leading-[1.55] text-muted-foreground">
-        {step === 0 ? "Choose the design tokens elf should compare with Figma." : step === 1 ? "Pair this project with the file you want to check." : "Get a message when your code and Figma drift apart."}
+        {step === 0 ? "Elf discovers design tokens and components in your project automatically." : step === 1 ? "Pair this project with the file you want to check." : "Get a message when your code and Figma drift apart."}
       </p>
 
       {step === 0 && <>
@@ -166,20 +163,11 @@ export function Onboarding({ initial, onFinished }: { initial: OnboardingStatus;
             <div className="min-w-0"><p className="text-[13px] font-medium leading-[1.55]">Local project</p><p className="mt-0.5 break-all text-[12px] leading-[1.55] text-muted-foreground">{status.root}</p></div>
           </div>
           <div className="space-y-3 px-3.5 py-3">
-            <div><label htmlFor="token-path" className="text-[12px] font-medium">Token source</label>
-              <input id="token-path" className={input} value={tokenPath} onChange={event => setTokenPath(event.target.value)} placeholder="e.g. src/styles/globals.css" list="token-sources" autoComplete="off" spellCheck={false} aria-describedby="token-help" />
-              <datalist id="token-sources">{status.sources.map(path => <option value={path} key={path} />)}</datalist>
-              <p id="token-help" className="mt-1.5 text-[11.5px] leading-[1.55] text-faint">A path inside this project. CSS variables, Tailwind config, or token JSON.</p>
-            </div>
-            <div><label htmlFor="token-format" className="text-[12px] font-medium">Format</label>
-              <select id="token-format" value={source} onChange={event => setSource(event.target.value)} className={input}>
-                <option value="auto">Detect automatically</option><option value="css">CSS variables</option><option value="tailwind">Tailwind config</option><option value="tokens-json">Token JSON</option>
-              </select>
-            </div>
-            <div><label htmlFor="component-path" className="text-[12px] font-medium">Component folder <span className="font-normal text-faint">· optional</span></label>
-              <input id="component-path" className={input} value={componentsPath} onChange={event => setComponentsPath(event.target.value)} placeholder="e.g. src/components" autoComplete="off" spellCheck={false} aria-describedby="component-help" />
-              <p id="component-help" className="mt-1.5 text-[11.5px] leading-[1.55] text-faint">For components already linked with elf. Leave blank to check tokens only.</p>
-            </div>
+            <p className="text-[13px] font-medium">Found in your project</p>
+            <p className="text-[12px] leading-[1.55] text-muted-foreground">Elf scans for CSS variables, token JSON, Tailwind themes, and component source files. New files are discovered while you work.</p>
+            {status.sources.length > 0 ? <ul className="space-y-1 text-[12px] leading-[1.55] text-muted-foreground">{status.sources.map(path => <li key={path} className="break-all">{path}</li>)}</ul> : <p className="text-[12px] leading-[1.55] text-muted-foreground">No token sources found yet. You can continue and add them as you work.</p>}
+            <p className="text-[12px] leading-[1.55] text-muted-foreground">{status.discoveredComponents ?? 0} component {(status.discoveredComponents ?? 0) === 1 ? "file" : "files"} found</p>
+            <p className="text-[11.5px] leading-[1.55] text-faint">Dependencies, generated files, tests, and symlinks are excluded. Scanning does not change your files or Figma.</p>
           </div>
         </Card>
         <p className="mb-5 text-[11.5px] leading-[1.55] text-faint">Wrong folder? Stop elf and run it from your project folder.</p>
@@ -221,7 +209,7 @@ export function Onboarding({ initial, onFinished }: { initial: OnboardingStatus;
       {(error || offline) && <div role="alert" className="mb-4 flex items-start gap-2 text-[12px] leading-[1.55] text-destructive"><CircleAlert className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" /><p>{error ?? "Couldn’t reach elf. Check that its terminal is still running."}</p></div>}
       <div className="mb-6 flex items-center justify-between gap-2">
         {step > 0 ? <Button variant="ghost" size="sm" className={smallButton} disabled={busy} onClick={() => setStep(step - 1)}><ArrowLeft className="size-3" aria-hidden="true" />Back</Button> : <span />}
-        <Button size="sm" className={smallButton} loading={busy} disabled={busy || offline || (step === 0 && !tokenPath.trim()) || (step > 0 && !connected)} onClick={() => { if (step === 0) void validateProject(); else if (step === 1) void saveProject(); else void start(); }}>
+        <Button size="sm" className={smallButton} loading={busy} disabled={busy || offline || (step > 0 && !connected)} onClick={() => { if (step === 0) void validateProject(); else if (step === 1) void saveProject(); else void start(); }}>
           {step === 2 ? "Start watching" : "Continue"}{step < 2 && <ArrowRight className="size-3" aria-hidden="true" />}
         </Button>
       </div>

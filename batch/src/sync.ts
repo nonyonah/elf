@@ -330,7 +330,7 @@ export function componentSpecHash(componentsDir: string, parsed: ParsedComponent
 
 /** Parses, validates sidecars, orders by dependency, applies --only. */
 export function planComponents(config: BatchConfig, index: TokenIndex, only?: string): PlannedComponent[] {
-  const parsed = parseComponents(config.componentsDir);
+  const parsed = parseComponents(config.componentsDir, config.componentFiles);
   if (parsed.length === 0) {
     throw new Error(
       `No components found in ${config.componentsDir} (looked for ${COMPONENT_EXTENSIONS.join(", ")}).`,

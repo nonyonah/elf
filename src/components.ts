@@ -30,8 +30,9 @@ export async function diffComponents(
   componentsDir: string,
   manifestPath: string,
   client: BridgeCaller,
+  files?: string[],
 ): Promise<ComponentDiff> {
-  const parsed = parseComponents(componentsDir);
+  const parsed = parseComponents(componentsDir, files);
   const manifest = loadManifest(manifestPath);
   const figmaComponents = await listBridgeComponents(client);
 

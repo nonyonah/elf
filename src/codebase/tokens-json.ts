@@ -20,8 +20,8 @@ const TYPE_TO_CATEGORY: Record<string, Category> = {
   shadow: "shadow",
 };
 
-export function parseTokensJson(jsonPath: string): Token[] {
-  const data = JSON.parse(readFileSync(jsonPath, "utf8")) as Record<string, unknown>;
+export function parseTokensJson(jsonPath: string, contents?: string): Token[] {
+  const data = JSON.parse(contents ?? readFileSync(jsonPath, "utf8")) as Record<string, unknown>;
   const tokens: Token[] = [];
 
   const walk = (node: Record<string, unknown>, path: string[]): void => {

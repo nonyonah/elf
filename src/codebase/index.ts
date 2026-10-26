@@ -1,3 +1,6 @@
+import { readSource } from "../discovery.js";
+import { parseStaticTailwind } from "./static-tailwind.js";
+import type { DriftConfig } from "../core/types.js";
 import { basename, resolve } from "node:path";
 import type { CodebaseSource, Token } from "../core/types.js";
 import { parseCss } from "./css.js";
@@ -26,4 +29,20 @@ export async function parseCodebaseTokens(source: CodebaseSource, path: string):
   if (source === "css") return parseCss(resolved);
   if (source === "tokens-json") return parseTokensJson(resolved);
   return parseCodebaseTokens(detectCodebaseSource(path), path);
+}
+
+/** Merge discovered files deterministically; ambiguous values need review. */
+export async function parseProjectTokens(codebase: DriftConfig["codebase"]): Promise<Token[]> {
+  if (!codebase.paths) return parseCodebaseTokens(codebase.source, codebase.path);
+  const tokens = new Map<string, Token>(); const origins = new Map<string, string>();
+  for (const path of codebase.paths) {
+    const source = detectCodebaseSource(path);
+    const entries = source === "tailwind" ? parseStaticTailwind(path) : source === "css" ? parseCss(path, readSource(path)) : parseTokensJson(path, readSource(path));
+    for (const token of entries) {
+      const previous = tokens.get(token.name);
+      if (previous && (previous.value !== token.value || previous.category !== token.category)) throw new Error(`Conflicting token "${token.name}" in ${origins.get(token.name)} and ${path}. Use one value for this token or separate its names.`);
+      tokens.set(token.name, token); origins.set(token.name, path);
+    }
+  }
+  return [...tokens.values()];
 }

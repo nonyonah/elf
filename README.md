@@ -79,8 +79,9 @@ npx elf-tokens
 ```
 
 Elf starts the local bridge, prints a temporary pairing code, and opens setup in
-the same interface as Settings. Choose the token source, open the Elf bridge
-plugin in the target Figma file, and paste the terminal code into the plugin.
+the same interface as Settings. Elf finds token sources and components
+automatically. Open the Elf bridge plugin in the target Figma file, and paste
+the terminal code into the plugin.
 You can then connect Slack or continue without it.
 
 Click **Start watching** to monitor source saves and write drift reports in the
