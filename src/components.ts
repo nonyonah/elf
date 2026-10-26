@@ -15,7 +15,7 @@ export interface ComponentDiff {
   /** Carries an elf codeKey but has no component file anymore. */
   inFigmaNotInCode: ComponentIssue[];
   /** Component names/codeKeys present in code — deprecation bookkeeping. */
-  codeComponents: { name: string; codeKey: string }[];
+  codeComponents: { name: string; codeKey: string; deprecated?: string }[];
   /** codeKeys of components seen in Figma — deprecation bookkeeping. */
   figmaCodeKeys: Set<string>;
 }
@@ -47,6 +47,7 @@ export async function diffComponents(
   for (const component of parsed) {
     const entry = manifest.components[component.codeKey];
     const base: ComponentIssue = {
+      codeHash: componentSourceHash(componentsDir, component),
       name: component.name,
       codeKey: component.codeKey,
       file: component.file,
@@ -74,6 +75,7 @@ export async function diffComponents(
         figmaChanged = true;
         figmaDetail = "the Figma node no longer exists";
       } else if (state.nodeHash !== entry.nodeHash) {
+        base.figmaHash = state.nodeHash ?? undefined;
         figmaChanged = true;
         figmaDetail = "the Figma node changed since the last sync";
       }
@@ -113,7 +115,7 @@ export async function diffComponents(
     changedInFigma,
     inCodeNotInFigma,
     inFigmaNotInCode,
-    codeComponents: parsed.map((component) => ({ name: component.name, codeKey: component.codeKey })),
+    codeComponents: parsed.map((component) => ({ name: component.name, codeKey: component.codeKey, deprecated: component.deprecated })),
     figmaCodeKeys,
   };
 }

@@ -1,3 +1,4 @@
+import { deliverSyncNotifications } from "./sync-notifications.js";
 import { verifyComponentPatch, verifyStylePatch } from "./verify-write.js";
 import { cssColorToHex } from "./core/normalize.js";
 import { readActivity, recordActivity, type Activity, type SyncedChange } from "./activity.js";
@@ -57,11 +58,23 @@ export class ProjectService {
     const raw = this.raw(); writeProjectConfig(this.configPath, { ...raw, runtime: { ...raw.runtime, autoSync: false } });
     this.record("sync", "Automatic sync paused. Monitoring continues.");
   }
+  configureComponents(path: string): void {
+    const raw = this.raw(); const root = realpathSync(dirname(resolve(this.configPath)));
+    const folder = this.resource(root, path, true);
+    parseComponents(folder);
+    const manifest = raw.sync?.manifest ?? raw.components?.manifest ?? "elf.manifest.json";
+    this.outputPath(manifest);
+    const componentPath = relative(root, folder) || ".";
+    writeProjectConfig(this.configPath, { ...raw, components: { path: componentPath, manifest }, ...(raw.sync ? {sync: {...raw.sync, components: componentPath}} : {}), runtime: {...raw.runtime, autoSync: false} });
+    this.reviewed.clear();
+    this.record("check", "Component monitoring configured. Automatic sync paused; review a new plan before applying changes.");
+  }
   async check(): Promise<Record<string, unknown>> {
     return this.serial(async () => {
       const config = loadConfig(this.configPath);
       if (this.runtime.connection.status.file?.key !== config.figma.fileKey) throw new Error("Connect this project's configured Figma file first.");
-      const result = await runElfCheck(this.configPath, dirname(this.configPath), false);
+      const result = await runElfCheck(this.configPath, dirname(this.configPath), Boolean(config.notify));
+      if (result.notificationError) this.record("error", result.notificationError);
       this.record(result.status === "failed" ? "error" : "check", result.status === "clean" ? "No drift found." : result.status === "drift" ? `${result.total ?? "Some"} drift items remain.` : result.message ?? "Check failed.");
       return { ...result, report: join(dirname(this.configPath), "drift-report.md") };
     });
@@ -76,12 +89,13 @@ export class ProjectService {
     }));
   }
   async apply(id: string, options: { enableAuto?: boolean; overwriteConflicts?: boolean } = {}): Promise<Record<string, unknown>> {
-    return this.serial(() => this.runtime.transaction(loadConfig(this.configPath).figma.fileKey, async client => {
+    const result = await this.serial(() => this.runtime.transaction(loadConfig(this.configPath).figma.fileKey, async client => {
       const reviewed = this.reviewed.get(id);
       if (!reviewed || Date.parse(reviewed.view.expiresAt) < Date.now()) throw new Error("This sync plan expired. Review a fresh plan.");
       const fresh = await this.build(client);
       if (fresh.fingerprint !== reviewed.fingerprint) throw new Error("Code, configuration, or Figma changed after review. Review a fresh plan before applying.");
       if (fresh.view.issues.some(issue => issue.kind === "conflict") && !options.overwriteConflicts) throw new Error("Figma has edits. Keep them, or explicitly choose to replace the conflicts in this reviewed plan.");
+      if (options.enableAuto && loadConfig(this.configPath).intentionalDifferences?.length) throw new Error("Intentional differences are configured. Keep monitoring enabled and review writes individually.");
       if (options.enableAuto && fresh.view.issues.some(issue => issue.kind !== "unsupported")) throw new Error("Resolve conflicts and removed resources before enabling automatic sync.");
       this.reviewed.delete(id);
       const result = await this.execute(fresh, client);
@@ -90,10 +104,13 @@ export class ProjectService {
       }
       return result;
     }));
+    try { await deliverSyncNotifications(this.configPath); } catch { this.record("error", "Sync completed, but its notification could not be delivered. Delivery will be retried."); }
+    return result;
   }
   async autoSync(): Promise<Record<string, unknown>> {
     return this.serial(() => this.runtime.transaction(loadConfig(this.configPath).figma.fileKey, async client => {
       if (!this.automatic()) return { synced: 0, paused: false, issues: [] };
+      if (loadConfig(this.configPath).intentionalDifferences?.length) return {synced: 0, paused: true, conflicts: ["Intentional differences require reviewed sync."]};
       const plan = await this.build(client);
       if (!this.automatic()) return { synced: 0, paused: false, issues: [] };
       if (plan.view.issues.some(issue => issue.kind === "conflict" || issue.kind === "removed")) {
@@ -201,9 +218,12 @@ export class ProjectService {
     const snapshot = await this.snapshot(client, components, tokens.plan.textStyles.length + tokens.plan.effectStyles.length > 0, hasComponents || Object.keys(manifest.components).length > 0);
     const entries: PlanEntry[] = []; const issues = [...tokens.unsupported];
     const sections = [tokens.plan.primitives, ...(tokens.plan.semanticCollections ?? [tokens.plan.semantic])];
+    const deprecations = loadConfig(this.configPath).deprecations;
+    const deprecated = (type: "token" | "component", name: string, key: string): boolean => deprecations.some(item => item.type === type && (item.name === name || item.name === key));
     const tokenKeys = new Set<string>();
     for (const section of sections) for (const variable of section.variables) {
       tokenKeys.add(variable.codeKey);
+      if (deprecated("token", variable.name, variable.codeKey)) { issues.push({kind: "unsupported", key: variable.codeKey, message: `${variable.name}: deprecated; retained without automatic writes.`}); continue; }
       const known = manifest.tokens[variable.codeKey];
       const remote = snapshot.variables.find(item => item.codeKey === variable.codeKey || (item.collectionName === section.collection && item.name === variable.name));
       if (remote?.codeKey && remote.codeKey !== variable.codeKey) { issues.push({ kind: "conflict", key: variable.codeKey, message: `${variable.name}: this name is already owned by another code token.` }); continue; }
@@ -213,6 +233,7 @@ export class ProjectService {
       if (!known || known.valueHash !== hashSpec(variable) || !remote || issues.some(issue => issue.kind === "conflict" && issue.key === variable.codeKey)) entries.push({ kind: "token", key: variable.codeKey, name: variable.name, action: remote ? "update" : "create" });
     }
     for (const component of components) {
+      if (component.parsed.deprecated !== undefined || deprecated("component", component.parsed.name, component.parsed.codeKey)) { issues.push({kind: "unsupported", key: component.parsed.codeKey, message: `${component.parsed.name}: deprecated; retained without automatic writes.`}); continue; }
       const known = manifest.components[component.parsed.codeKey];
       const remote = snapshot.components.find(item => item.codeKey === component.parsed.codeKey || item.id === known?.figmaNodeId || item.name === component.parsed.name);
       const key = component.parsed.codeKey;
@@ -240,7 +261,9 @@ export class ProjectService {
     const codeKeys = new Set(parsed.map(item => item.codeKey));
     for (const [key, known] of Object.entries(manifest.components)) if (!codeKeys.has(key) && snapshot.components.some(item => item.id === known.figmaNodeId)) issues.push({ kind: "removed", key, message: `${key}: removed or renamed in code. Retained in Figma; review and remove it explicitly in Figma.` });
     for (const [kind, styles] of [["text", tokens.plan.textStyles], ["effect", tokens.plan.effectStyles]] as const) for (const style of styles) {
-      const key = `${kind}:${style.key}`; const known = manifest.styles?.[key];
+      const key = `${kind}:${style.key}`;
+      if (deprecated("token", typeof style.params.name === "string" ? style.params.name : style.key, style.key) || deprecated("token", style.key, key)) { issues.push({kind: "unsupported", key, message: `${style.key}: deprecated; retained without automatic writes.`}); continue; }
+      const known = manifest.styles?.[key];
       const remote = snapshot.styles.find(item => item.kind === kind && ((style.params.codeKey && item.codeKey === style.params.codeKey) || item.name === style.params.name));
       if (remote && (!known || !known.remoteHash)) issues.push({ kind: "conflict", key, message: `${style.key}: an existing Figma style has no managed baseline.` });
       if (known && !remote) issues.push({ kind: "conflict", key, message: `${style.key}: deleted in Figma. Review before recreating it.` });

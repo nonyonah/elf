@@ -5,7 +5,8 @@ import { dirname, join } from "node:path";
 /** Persist only a dedupe key, never webhook credentials or message contents. */
 export class SyncAlerts {
   private readonly path: string;
-  constructor(configPath: string) { this.path = join(dirname(configPath), ".elf", "sync-alert.json"); }
+  constructor(configPath: string, filename = "sync-alert.json") { this.path = join(dirname(configPath), ".elf", filename); }
+  current(): string | null { this.directory(); return this.read(); }
   private directory(): void {
     mkdirSync(dirname(this.path), { recursive: true, mode: 0o700 });
     const stat = lstatSync(dirname(this.path));

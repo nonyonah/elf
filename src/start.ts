@@ -1,3 +1,4 @@
+import { deliverSyncNotifications } from "./sync-notifications.js";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, relative, resolve } from "node:path";
 import { watch } from "chokidar";
@@ -51,6 +52,7 @@ export async function main(argv: string[]): Promise<number> {
   let starting: Promise<void> | null = null;
   let stopping = false;
   let timer: NodeJS.Timeout | undefined;
+  let polling: NodeJS.Timeout | undefined;
   let checking: Promise<void> | null = null;
   let rerun = false;
   let lastCheck: Record<string, unknown> | null = null;
@@ -90,7 +92,7 @@ export async function main(argv: string[]): Promise<number> {
             const sync = await project.autoSync();
             if (sync.paused && notify) {
               const alert = createHash("sha256").update(JSON.stringify(sync.conflicts)).digest("hex");
-              await alerts.update(alert, () => postNotification(resolveNotifyWebhook(config.notify, configPath)!.url, config.notify!.format, { text: "Elf paused automatic sync because Figma edits or removed resources need review. Open Elf Settings to resolve them." }));
+              await alerts.update(alert, () => postNotification(resolveNotifyWebhook(config.notify, configPath)!.url, config.notify!.format, { text: "Elf paused automatic sync because conflicts, removed resources, or intentional differences need review. Open Elf Settings to resolve them." }));
             } else if (!sync.paused) await alerts.update(null);
           } catch (error) {
             project.record("error", (error as Error).message);
@@ -100,10 +102,13 @@ export async function main(argv: string[]): Promise<number> {
             }
           }
         }
+        let syncNotificationError: string | null = null;
+        try { await deliverSyncNotifications(configPath); } catch { syncNotificationError = "Sync notification could not be delivered. Check Slack settings; delivery will be retried."; project.record("error", syncNotificationError); }
         const result = await runElfCheck(configPath, root, notify);
         project.record(result.status === "failed" ? "error" : "check", result.status === "clean" ? "No drift found." : result.status === "drift" ? `${result.total ?? "Some"} drift items remain. See drift-report.md.` : result.message ?? "Drift check failed.");
         lastCheck = { ...result, checkedAt: new Date().toISOString() };
-        lastError = result.status === "failed" ? result.message ?? "Drift check failed." : null;
+        lastError = result.status === "failed" ? result.message ?? "Drift check failed." : result.notificationError ?? syncNotificationError;
+        if (result.notificationError) project.record("error", result.notificationError);
         console.log(result.status === "clean" ? "Drift: none." : result.status === "drift" ? `Drift: ${result.total ?? "some"} items. See drift-report.md.` : `Check failed: ${lastError}`);
       } while (rerun && !stopping);
     })().catch(error => { lastError = (error as Error).message; console.error(`elf: ${lastError}`); }).finally(() => { checking = null; });
@@ -143,6 +148,11 @@ export async function main(argv: string[]): Promise<number> {
       if (action === "disconnect-figma") {
         await runtime.revoke(loadConfig(configPath).figma.fileKey); project.setMonitoring(); return { ok: true };
       }
+      if (action === "configure-components") {
+        if (typeof body.path !== "string" || !body.path.trim()) throw new Error("Enter a component folder relative to your project.");
+        project.configureComponents(body.path.trim());
+        watcher?.add(project.watchPaths()); check(); return {ok: true};
+      }
       if (action === "resources") return project.resources();
       if (action === "show-plugin") {
         const key = loadConfig(configPath).figma.fileKey;
@@ -181,8 +191,16 @@ export async function main(argv: string[]): Promise<number> {
         if (!runtime.connection.status.connected || runtime.connection.status.file?.key !== config.figma.fileKey) throw new Error("Open the configured Figma file and connect its Elf plugin first.");
         const paths = project.watchPaths();
         const generated = new Set(project.generatedPaths());
-        watcher = watch(paths, { ignoreInitial: true, ignored: /(^|[/\\])(node_modules|\.git|dist|build|\.next|\.elf)([/\\]|$)|\.tmp$/, awaitWriteFinish: { stabilityThreshold: 150, pollInterval: 50 } });
-        watcher.on("all", (_event, path) => { if (generated.has(resolve(path))) return; if (timer) clearTimeout(timer); timer = setTimeout(check, 1000); });
+        watcher = watch([...paths, configPath], { ignoreInitial: true, ignored: /(^|[/\\])(node_modules|\.git|dist|build|\.next|\.elf)([/\\]|$)|\.tmp$/, awaitWriteFinish: { stabilityThreshold: 150, pollInterval: 50 } });
+        watcher.on("all", (_event, path) => {
+          if (generated.has(resolve(path)) && resolve(path) !== resolve(configPath)) return;
+          if (resolve(path) === resolve(configPath)) {
+            try { watcher?.add(project.watchPaths()); }
+            catch (error) { lastError = (error as Error).message; }
+          }
+          if (timer) clearTimeout(timer);
+          timer = setTimeout(check, 1000);
+        });
         watcher.on("error", error => { lastError = (error as Error).message; console.error(`elf: ${lastError}`); });
         try {
           await new Promise<void>((resolveReady, rejectReady) => {
@@ -197,6 +215,8 @@ export async function main(argv: string[]): Promise<number> {
           throw error;
         }
         running = true;
+        polling = setInterval(check, 60_000);
+        polling.unref();
         console.log(`Watching ${root}. Mode: ${project.automatic() ? "automatic sync" : "monitoring"}.`);
         check();
       })().finally(() => { starting = null; });
@@ -217,6 +237,7 @@ export async function main(argv: string[]): Promise<number> {
     if (closed) return;
     closed = true; stopping = true;
     if (timer) clearTimeout(timer);
+    if (polling) clearInterval(polling);
     await watcher?.close();
     await checking;
     offStatus();

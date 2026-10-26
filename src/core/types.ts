@@ -49,7 +49,7 @@ export interface NotifyConfig {
   format: "slack" | "text";
   /** When false, notify after every run instead of only when the drift fingerprint changes. Defaults to true. */
   onlyOnChange?: boolean;
-  /** Optional file for the dedupe state; defaults to drift-status.json next to the report. */
+  /** Optional file for the dedupe state; defaults to .elf/notify-state.json next to the report. */
   stateFile?: string;
   /** Optional absolute URL to the full report, used for Slack's "see the full report" link. */
   reportUrl?: string;
@@ -79,6 +79,8 @@ export interface DriftConfig {
   /** Opt-in component diff; absent means tokens only. */
   components?: ComponentsConfig;
   deprecations: Deprecation[];
+  /** Exact token value pairs accepted temporarily; unrelated changes still drift. */
+  intentionalDifferences?: {name: string; mode?: string; figmaValue: string; codeValue: string; reason: string; expires?: string}[];
   /** Opt-in drift alerts; used when the CLI runs with `--notify`. */
   notify?: NotifyConfig;
   /** Opt-in snapshot pushes; used by `elf push`. */

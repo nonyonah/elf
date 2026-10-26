@@ -6,12 +6,13 @@ import { detectCodebaseSource, parseCodebaseTokens } from "./codebase/index.js";
 import { diffComponents } from "./components.js";
 import { findConfigPath, loadConfig } from "./config.js";
 import { loadSettingsEnv } from "./env.js";
-import { applyDeprecations } from "./core/deprecations.js";
+import { applyDeprecations, applyIntentionalDifferences } from "./core/deprecations.js";
 import { diffTokens, hasDrift, type DriftResult } from "./core/diff.js";
 import { connectBridge, type BridgeCaller } from "./figma/bridge.js";
 import { FigmaClient, type FigmaApi } from "./figma/client.js";
 import { fetchFigmaTokens } from "./figma/source.js";
 import {
+  notificationItems,
   buildNotifyMessage,
   decideNotification,
   driftFingerprint,
@@ -320,7 +321,7 @@ async function runCheckCore(
 
   let result = diffTokens(figmaTokens, codeTokens, config.nameMapping);
 
-  let codeComponents: { name: string; codeKey: string }[] = [];
+  let codeComponents: { name: string; codeKey: string; deprecated?: string }[] = [];
   if (config.components) {
     const componentDiff = await diffComponents(
       config.components.path,
@@ -340,10 +341,12 @@ async function runCheckCore(
 
   result = applyDeprecations(
     result,
-    config.deprecations,
+    [...config.deprecations, ...codeComponents.filter(item => item.deprecated !== undefined && !config.deprecations.some(rule => rule.type === "component" && (rule.name === item.name || rule.name === item.codeKey))).map(item => ({type: "component" as const, name: item.codeKey, reason: item.deprecated || "Marked @deprecated in source"}))],
     { codeTokens, codeComponents },
     new Date().toISOString().slice(0, 10),
   );
+
+  result = applyIntentionalDifferences(result, config.intentionalDifferences, new Date().toISOString().slice(0, 10));
 
   const meta = {
     fileKey: config.figma.fileKey,
@@ -381,7 +384,7 @@ async function runDriftCheck(
 
   if (args.notify && config.notify) {
     const notifyConfig = config.notify;
-    const statePath = notifyConfig.stateFile ?? statusPath;
+    const statePath = notifyConfig.stateFile ?? join(dirname(statusPath), ".elf", "notify-state.json");
     const previousState = readNotifyState(statePath);
     const decision = decideNotification(previousState, result, notifyConfig.onlyOnChange !== false);
     const reportUrl = resolveReportUrl(config);
@@ -412,12 +415,8 @@ async function runDriftCheck(
 
     // Keep the old state on a failed post so the next run retries.
     const persist: NotifyState | null =
-      decision.send && !posted ? previousState : { fingerprint: decision.fingerprint, driftFound: result.driftFound };
-    if (notifyConfig.stateFile) {
-      if (persist) writeNotifyState(notifyConfig.stateFile, persist);
-    } else {
-      statusFingerprint = persist?.fingerprint ?? "";
-    }
+      decision.send && !posted ? previousState : { fingerprint: decision.fingerprint, driftFound: result.driftFound, items: notificationItems(result) };
+    if (persist) writeNotifyState(statePath, persist);
   }
 
   writeFileSync(

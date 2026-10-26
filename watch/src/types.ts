@@ -32,6 +32,7 @@ export interface CheckResult {
   message?: string;
   /** True when the check posted a Slack/webhook alert. */
   notified?: boolean;
+  notificationError?: string;
 }
 
 export interface SyncSummary {

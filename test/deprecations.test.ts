@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { applyDeprecations } from "../src/core/deprecations.js";
+import { applyDeprecations, applyIntentionalDifferences } from "../src/core/deprecations.js";
 import { diffTokens, type DriftResult } from "../src/core/diff.js";
 import type { Token } from "../src/core/types.js";
 
@@ -136,4 +136,19 @@ test("an empty deprecations list changes nothing", () => {
   const result = base([token("color/only-code")]);
   const updated = applyDeprecations(result, [], { codeTokens: [], codeComponents: [] }, TODAY);
   assert.equal(updated, result, "same object, no recomputation");
+});
+
+test("accepted differences require the exact pair and expire without hiding new edits", () => {
+  const result = diffTokens([token("a", "#111111")], [token("a", "#222222")], {});
+  const rules = [{name: "a", figmaValue: "#111111", codeValue: "#222222", reason: "Platform exception", expires: TODAY}];
+  assert.equal(applyIntentionalDifferences(result, rules, TODAY).driftFound, false);
+  assert.equal(applyIntentionalDifferences(result, rules, "2026-06-02").driftFound, true);
+  const changed = diffTokens([token("a", "#111111")], [token("a", "#333333")], {});
+  assert.equal(applyIntentionalDifferences(changed, rules, TODAY).driftFound, true);
+});
+
+test("deprecated resources still present only in Figma are not declared fully retired", () => {
+  const result = applyDeprecations(diffTokens([token("legacy")], [], {}), [{type: "token", name: "legacy"}], {codeTokens: [], codeComponents: []}, TODAY);
+  assert.equal(result.safeToRemoveFromDeprecations.length, 0);
+  assert.equal(result.missingInCode.length, 1);
 });

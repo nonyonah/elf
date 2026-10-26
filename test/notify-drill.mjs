@@ -59,7 +59,7 @@ const run = (args, env = {}) =>
 
 const fingerprint = () => {
   try {
-    return JSON.parse(readFileSync(statusPath, "utf8")).fingerprint ?? null;
+    return JSON.parse(readFileSync(join(scratch, ".elf", "notify-state.json"), "utf8")).fingerprint ?? null;
   } catch {
     return null;
   }
@@ -68,6 +68,8 @@ const fingerprint = () => {
 try {
   console.log(`Drill webhook: ${webhook}\n`);
 
+  // A normal check writes status but must not acknowledge a notification.
+  await run(["--sample", "--out", out]);
   // 1. First report with drift → one delivery with the full summary.
   let r = await run(["--sample", "--notify", "--out", out], { ELF_NOTIFY_WEBHOOK: webhook });
   check("first report with drift posts an alert", r.status === 0 && deliveries.length === 1, r.stdout + r.stderr);
@@ -86,10 +88,11 @@ try {
 
   // 4. Webhook down → warning, exit stays 0, state kept retryable.
   mode = "fail";
+  const beforeFailure = fingerprint();
   rmSync(statusPath, { force: true });
   r = await run(["--sample", "--notify", "--out", out], { ELF_NOTIFY_WEBHOOK: webhook });
   check("a failing webhook warns without failing the run", r.status === 0 && /Notification failed/.test(r.stdout + r.stderr));
-  check("failed post keeps the state retryable", fingerprint() === "");
+  check("failed post keeps the state retryable", fingerprint() === beforeFailure);
 
   // 5. Webhook back up → next run retries.
   mode = "ok";

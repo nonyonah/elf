@@ -185,3 +185,16 @@ test("implementation-only edits are reported even when parsed props and sidecars
     assert.ok(diff.outOfDate.some(item => item.name === "Button" && item.detail?.includes("implementation changed")));
   } finally { scratch.cleanup(); }
 });
+
+test("named component @deprecated annotations are recorded without treating strings as annotations", async () => {
+  const scratch = await syncedScratch();
+  try {
+    const file = join(scratch.componentsDir, "Button.tsx");
+    const source = readFileSync(file, "utf8");
+    const {parseComponents} = await import("../batch/src/parser.js");
+    // Fixture exports can have preceding imports: place the annotation directly on the declaration.
+    writeFileSync(file, source.replace(/export (default )?function Button/, "/** @deprecated Use ActionButton instead */\n$&"));
+    const parsed = parseComponents(scratch.componentsDir).find(item => item.name === "Button");
+    assert.equal(parsed?.deprecated, "Use ActionButton instead");
+  } finally {scratch.cleanup();}
+});

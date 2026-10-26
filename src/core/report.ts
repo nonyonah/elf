@@ -55,7 +55,7 @@ export function buildReport(result: DriftResult, meta: ReportMeta): string {
   ];
 
   const hasInformational =
-    result.deprecatedStillInCode.length > 0 || result.safeToRemoveFromDeprecations.length > 0;
+    result.deprecatedStillInCode.length > 0 || result.safeToRemoveFromDeprecations.length > 0 || Boolean(result.intentionalDifferences?.length);
 
   if (!result.driftFound) {
     lines.push("", "✅ **No drift detected.** Figma and codebase tokens are in agreement.");
@@ -130,6 +130,7 @@ export function buildReport(result: DriftResult, meta: ReportMeta): string {
   renderComponents(lines, "Components in code, not in Figma", "These components exist in code but have no Figma counterpart.", result.componentsInCodeNotInFigma);
   renderComponents(lines, "Components in Figma, not in code", "These nodes carry an elf codeKey but no matching component file.", result.componentsInFigmaNotInCode);
 
+  renderDeprecations(lines, "Accepted intentional differences", result.intentionalDifferences ?? []);
   renderDeprecations(lines, "Deprecated (still in code)", result.deprecatedStillInCode);
   renderDeprecations(lines, "Deprecation overdue", result.deprecationOverdue);
   renderDeprecations(lines, "Safe to remove from the deprecations list", result.safeToRemoveFromDeprecations);

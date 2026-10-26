@@ -59,6 +59,8 @@ export interface SidecarSpec {
 
 /** What the parser found in a component file, whatever the framework. */
 export interface ParsedComponent {
+  /** Explicit JSDoc @deprecated on the named component export. */
+  deprecated?: string;
   /** Component name — the file's basename in v1. */
   name: string;
   /** `<relative/path.tsx>#<Name>` — the stable identity across runs. */

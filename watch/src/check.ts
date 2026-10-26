@@ -59,8 +59,9 @@ export async function runElfCheck(
 
     child.on("close", (code) => {
       const notified = /Notification posted/.test(stdout);
+      const notificationError = stderr.split(/\r?\n/).find(line => /Notification failed:/.test(line))?.trim();
       if (code === 0) {
-        resolveResult({ status: "clean", notified });
+        resolveResult({ status: "clean", notified, notificationError });
         return;
       }
       if (code === 2) {
@@ -68,6 +69,7 @@ export async function runElfCheck(
           status: "drift",
           total: readTotal(resolve(reportDir, STATUS_FILE)),
           notified,
+          notificationError,
         });
         return;
       }

@@ -43,7 +43,18 @@ export function parseComponent(componentsDir: string, file: string): ParsedCompo
     if (!dependencies.includes(dependency)) dependencies.push(dependency);
   }
 
-  return { name, codeKey, file: relativePath, variantProps, dependencies };
+  let deprecated: string | undefined;
+  if (extension === ".tsx" || extension === ".jsx") {
+    const tree = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, extension === ".tsx" ? ts.ScriptKind.TSX : ts.ScriptKind.JSX);
+    for (const statement of tree.statements) {
+      const named = (ts.isFunctionDeclaration(statement) || ts.isClassDeclaration(statement)) && statement.name?.text === name;
+      const variable = ts.isVariableStatement(statement) && statement.declarationList.declarations.some(item => ts.isIdentifier(item.name) && item.name.text === name);
+      if (!named && !variable) continue;
+      const tag = ts.getJSDocDeprecatedTag(statement);
+      if (tag) deprecated = typeof tag.comment === "string" ? tag.comment : "Marked @deprecated in source";
+    }
+  }
+  return { name, codeKey, file: relativePath, variantProps, dependencies, ...(deprecated !== undefined ? {deprecated} : {}) };
 }
 
 interface Extraction {

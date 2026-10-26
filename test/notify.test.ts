@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { diffTokens, type DriftResult } from "../src/core/diff.js";
 import {
+  notificationItems,
   buildNotifyMessage,
   decideNotification,
   driftFingerprint,
@@ -15,6 +16,8 @@ import {
   writeNotifyState,
   type NotifyMeta,
 } from "../src/notify.js";
+import { recordActivity } from "../src/activity.js";
+import { deliverSyncNotifications } from "../src/sync-notifications.js";
 import { SLACK_WEBHOOK_FILE } from "../src/slack.js";
 import type { NotifyConfig, Token } from "../src/core/types.js";
 
@@ -277,5 +280,49 @@ test("notify falls back to the Slack connection saved by settings", () => {
     assert.equal(resolveNotifyWebhook(undefined, configPath, {}), null);
   } finally {
     rmSync(dir, { recursive: true });
+  }
+});
+
+test("notification deltas include only the changed item among unchanged drift", () => {
+  const figma = Array.from({length: 135}, (_, i) => token(`token/${i}`, "1"));
+  const code = figma.map(item => ({...item, value: "2"}));
+  const previous = diffTokens(figma, code, {});
+  code[34]!.value = "3";
+  const next = diffTokens(figma, code, {});
+  const message = buildNotifyMessage(next, meta, "slack", {fingerprint: driftFingerprint(previous), driftFound: true, items: notificationItems(previous)});
+  assert.match(message.text, /0 new · 1 changed · 0 no longer reported · 134 unchanged/);
+  assert.match(message.text, /token\/34/);
+  assert.doesNotMatch(message.text, /token\/35/);
+  assert.equal((message.blocks?.[1]?.text as {type: string}).type, "plain_text");
+});
+
+test("repeated edits to an already drifting component change its fingerprint", () => {
+  const result = diffTokens([], [], {});
+  result.componentsOutOfDate = [{name: "Button", codeKey: "Button.tsx#Button", codeHash: "first"}];
+  const previous = driftFingerprint(result);
+  result.componentsOutOfDate[0]!.codeHash = "second";
+  assert.notEqual(driftFingerprint(result), previous);
+});
+
+test("verified sync notifications retry failed delivery and do not repeat applied changes", async () => {
+  const root = mkdtempSync(join(tmpdir(), "elf-sync-delivery-"));
+  const path = join(root, "elf.config.json");
+  const originalFetch = globalThis.fetch;
+  const prior = process.env.ELF_TEST_SYNC_WEBHOOK;
+  process.env.ELF_TEST_SYNC_WEBHOOK = "https://example.invalid/webhook";
+  writeFileSync(path, JSON.stringify({figma: {fileKey: "test"}, codebase: {path: "tokens.css"}, notify: {webhookEnv: "ELF_TEST_SYNC_WEBHOOK", format: "slack"}}));
+  recordActivity(path, "sync", "Synced", [{kind: "token", key: "color/a", name: "color/a", action: "update", before: "#111111", after: "#222222"}]);
+  let posts = 0;
+  try {
+    globalThis.fetch = (async () => {posts++; return new Response("failed", {status: 500});}) as typeof fetch;
+    await assert.rejects(deliverSyncNotifications(path));
+    globalThis.fetch = (async (_url: unknown, init: RequestInit) => {posts++; assert.match(String(init.body), /color\/a/); return new Response("ok");}) as typeof fetch;
+    await deliverSyncNotifications(path);
+    await deliverSyncNotifications(path);
+    assert.equal(posts, 2);
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (prior === undefined) delete process.env.ELF_TEST_SYNC_WEBHOOK; else process.env.ELF_TEST_SYNC_WEBHOOK = prior;
+    rmSync(root, {recursive: true, force: true});
   }
 });

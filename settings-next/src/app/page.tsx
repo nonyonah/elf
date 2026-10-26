@@ -455,7 +455,7 @@ export default function SettingsPage() {
       )}
 
       <p className="mb-6 text-[11.5px] leading-[1.55] text-faint">
-        Overdue deprecations always notify, regardless of these switches.
+        Overdue deprecations count as drift. Alerts follow these notification preferences.
       </p>
 
       <SupportFooter />

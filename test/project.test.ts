@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -185,5 +185,26 @@ test("completed sync records before and after values and exposes live managed re
     assert.match(updated.changes![0].after, /#334455/);
     p.variables[0].valuesByMode.Value.value = "#abcdef";
     assert.equal(((await p.service.resources()) as any).resources[0].verified, false);
+  } finally {p.cleanup();}
+});
+
+test("component configuration validates paths, enables checking and pauses automatic writes", () => {
+  const p = project(true);
+  try {
+    const raw = JSON.parse(readFileSync(p.path, "utf8")); raw.runtime = {autoSync: true}; writeFileSync(p.path, JSON.stringify(raw));
+    assert.throws(() => p.service.configureComponents("../"));
+    p.service.configureComponents("components");
+    assert.equal(p.service.automatic(), false);
+    assert.ok(p.service.watchPaths().includes(realpathSync(join(p.root, "components"))));
+  } finally {p.cleanup();}
+});
+
+test("deprecated resources are not recreated by managed sync", async () => {
+  const p = project(true);
+  try {
+    const raw = JSON.parse(readFileSync(p.path, "utf8")); raw.deprecations = [{type: "component", name: "Button"}]; writeFileSync(p.path, JSON.stringify(raw));
+    const plan = await p.service.plan();
+    assert.ok(!plan.entries.some(item => item.name === "Button"));
+    assert.ok(plan.issues.some(item => item.message.includes("deprecated")));
   } finally {p.cleanup();}
 });

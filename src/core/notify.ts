@@ -19,7 +19,10 @@ export interface NotifyMeta {
 export interface NotifyState {
   fingerprint: string;
   driftFound: boolean;
+  items?: NotifyItem[];
 }
+
+export interface NotifyItem { key: string; signature: string; text: string; }
 
 export interface NotifyMessage {
   /** Plain-text fallback — required by Slack, and the whole body for the "text" format. */
@@ -49,15 +52,15 @@ export function hasNotes(result: DriftResult): boolean {
 export function driftFingerprint(result: DriftResult): string {
   const groups = [
     result.valueMismatches.map((m) => `${m.name}\u0000${m.mode ?? ""}\u0000${m.figmaValue}\u0000${m.codeValue}`),
-    result.missingInCode.map((t) => `${t.name}\u0000${t.value}`),
-    result.missingInFigma.map((t) => `${t.name}\u0000${t.value}`),
-    result.componentsOutOfDate.map((c) => `${c.name}\u0000${c.codeKey ?? ""}\u0000${c.detail ?? ""}`),
-    result.componentsChangedInFigma.map((c) => `${c.name}\u0000${c.codeKey ?? ""}\u0000${c.detail ?? ""}`),
-    result.componentsInCodeNotInFigma.map((c) => `${c.name}\u0000${c.codeKey ?? ""}\u0000${c.detail ?? ""}`),
-    result.componentsInFigmaNotInCode.map((c) => `${c.name}\u0000${c.codeKey ?? ""}\u0000${c.detail ?? ""}`),
-    result.deprecatedStillInCode.map((d) => `${d.kind}\u0000${d.name}`),
-    result.deprecationOverdue.map((d) => `${d.kind}\u0000${d.name}`),
-    result.safeToRemoveFromDeprecations.map((d) => `${d.kind}\u0000${d.name}`),
+    result.missingInCode.map((t) => `${t.name}\u0000${t.mode ?? ""}\u0000${t.value}`),
+    result.missingInFigma.map((t) => `${t.name}\u0000${t.mode ?? ""}\u0000${t.value}`),
+    result.componentsOutOfDate.map((c) => `${c.name}\u0000${c.codeKey ?? ""}\u0000${c.detail ?? ""}\u0000${c.codeHash ?? ""}\u0000${c.figmaHash ?? ""}`),
+    result.componentsChangedInFigma.map((c) => `${c.name}\u0000${c.codeKey ?? ""}\u0000${c.detail ?? ""}\u0000${c.codeHash ?? ""}\u0000${c.figmaHash ?? ""}`),
+    result.componentsInCodeNotInFigma.map((c) => `${c.name}\u0000${c.codeKey ?? ""}\u0000${c.detail ?? ""}\u0000${c.codeHash ?? ""}\u0000${c.figmaHash ?? ""}`),
+    result.componentsInFigmaNotInCode.map((c) => `${c.name}\u0000${c.codeKey ?? ""}\u0000${c.detail ?? ""}\u0000${c.codeHash ?? ""}\u0000${c.figmaHash ?? ""}`),
+    result.deprecatedStillInCode.map((d) => `${d.kind}\u0000${d.name}\u0000${d.detail ?? ""}`),
+    result.deprecationOverdue.map((d) => `${d.kind}\u0000${d.name}\u0000${d.detail ?? ""}`),
+    result.safeToRemoveFromDeprecations.map((d) => `${d.kind}\u0000${d.name}\u0000${d.detail ?? ""}`),
   ];
   const canonical = groups.map((group) => [...group].sort().join("\n")).join("\n--\n");
   return sha256Hex(canonical).slice(0, 16);
@@ -145,6 +148,7 @@ export function buildNotifyMessage(
   format: "slack" | "text",
   previous: NotifyState | null,
 ): NotifyMessage {
+  if (previous?.items) return buildDeltaMessage(result, meta, format, previous.items);
   const resolved = !result.driftFound && previous?.driftFound === true;
   const notes = result.deprecatedStillInCode.length + result.safeToRemoveFromDeprecations.length;
 
@@ -167,7 +171,7 @@ export function buildNotifyMessage(
     fallback = `Design token drift resolved: Figma and code tokens agree (file ${meta.fileKey})`;
   }
 
-  const items = itemLines(result);
+  const items = itemLines(result).map(line => format === "slack" ? line.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;") : line);
   if (items.length > 0) {
     if (body.length > 0) body.push("");
     body.push(...items.slice(0, MAX_ITEMS));
@@ -195,8 +199,40 @@ export function buildNotifyMessage(
     { type: "header", text: { type: "plain_text", text: headline } },
   ];
   if (body.length > 0) {
-    blocks.push({ type: "section", text: { type: "mrkdwn", text: body.join("\n") } });
+    blocks.push({ type: "section", text: { type: "mrkdwn", text: body.join("\n").slice(0, 2900) } });
   }
   blocks.push({ type: "context", elements: [{ type: "mrkdwn", text: context }] });
   return { text: fallback, blocks };
+}
+
+
+/** Stable per-resource snapshots, separate from the report's aggregate counts. */
+export function notificationItems(result: DriftResult): NotifyItem[] {
+  const groups: [string, any[]][] = [
+    ["value", result.valueMismatches], ["missing-code", result.missingInCode], ["missing-figma", result.missingInFigma],
+    ["component-code", result.componentsOutOfDate], ["component-figma", result.componentsChangedInFigma],
+    ["component-missing-figma", result.componentsInCodeNotInFigma], ["component-missing-code", result.componentsInFigmaNotInCode],
+    ["deprecated", result.deprecatedStillInCode], ["overdue", result.deprecationOverdue], ["retired", result.safeToRemoveFromDeprecations],
+  ];
+  const collected = new Map<string, {values: string[]; lines: string[]}>();
+  for (const [group, entries] of groups) for (const entry of entries) {
+    const key = JSON.stringify([group, entry.codeKey ?? entry.name, entry.mode ?? ""]);
+    const value = collected.get(key) ?? {values: [], lines: []};
+    value.values.push(JSON.stringify(entry));
+    const detail = group === "value" ? `${entry.figmaValue} (Figma) → ${entry.codeValue} (code)` : entry.detail ?? entry.value ?? group;
+    value.lines.push(`${entry.name}${entry.mode ? ` (${entry.mode})` : ""}: ${detail}`.slice(0, 400)); collected.set(key, value);
+  }
+  return [...collected].sort(([a], [b]) => a.localeCompare(b)).map(([key, entry]) => ({key, signature: sha256Hex(entry.values.sort().join("\n")), text: entry.lines.sort().join("; ").slice(0, 800)}));
+}
+function buildDeltaMessage(result: DriftResult, meta: NotifyMeta, format: "slack" | "text", previous: NotifyItem[]): NotifyMessage {
+  const current = notificationItems(result); const old = new Map(previous.map(item => [item.key, item])); const next = new Map(current.map(item => [item.key, item]));
+  const added = current.filter(item => !old.has(item.key));
+  const changed = current.filter(item => old.has(item.key) && old.get(item.key)!.signature !== item.signature);
+  const removed = previous.filter(item => !next.has(item.key));
+  const lines = [...added.map(item => `New: ${item.text}`), ...changed.map(item => `Changed: ${item.text}`), ...removed.map(item => `No longer reported: ${item.text}`)];
+  const headline = result.driftFound ? "Design drift update" : "Drift resolved or accepted";
+  const summary = `${added.length} new · ${changed.length} changed · ${removed.length} no longer reported · ${current.length - added.length - changed.length} unchanged`;
+  const text = [headline, summary, ...lines.slice(0, MAX_ITEMS), ...(lines.length > MAX_ITEMS ? [`${lines.length - MAX_ITEMS} more changes; open the full report.`] : []), `File: ${meta.fileKey}`, ...(meta.url ? [meta.url] : [])].join("\n");
+  if (format === "text") return {text};
+  return {text, blocks: [{type: "header", text: {type: "plain_text", text: headline}}, {type: "section", text: {type: "plain_text", text: [summary, ...lines.slice(0, MAX_ITEMS), ...(lines.length > MAX_ITEMS ? [`${lines.length - MAX_ITEMS} more changes; open the full report.`] : [])].join("\n").slice(0, 2900)}}, {type: "context", elements: [{type: "plain_text", text: `File: ${meta.fileKey} · ${meta.checkedAt}`}]}]};
 }

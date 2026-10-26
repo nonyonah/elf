@@ -11,6 +11,8 @@ export interface ValueMismatch {
 
 /** One entry of the component-diff sections. */
 export interface ComponentIssue {
+  codeHash?: string;
+  figmaHash?: string;
   name: string;
   codeKey?: string;
   file?: string;
@@ -26,6 +28,7 @@ export interface DriftItem {
 }
 
 export interface DriftResult {
+  intentionalDifferences?: DriftItem[];
   valueMismatches: ValueMismatch[];
   missingInCode: Token[];
   missingInFigma: Token[];

@@ -27,8 +27,13 @@ export function loadConfig(configPath: string): DriftConfig {
     throw new Error(`Could not read config "${configPath}": ${(error as Error).message}`);
   }
 
-  const config = raw as Partial<DriftConfig>;
+  const config = raw as Partial<DriftConfig> & { sync?: { components?: string; manifest?: string } };
   const configDir = dirname(resolve(configPath));
+  const components = config.components || config.sync?.components ? {
+    ...config.components,
+    ...(config.sync?.components ? {path: config.sync.components} : {}),
+    manifest: config.sync?.manifest ?? config.components?.manifest ?? "elf.manifest.json",
+  } : undefined;
 
   if (!config.figma?.fileKey) {
     throw new Error(`Config "${configPath}" is missing "figma.fileKey".`);
@@ -51,7 +56,8 @@ export function loadConfig(configPath: string): DriftConfig {
     modeName: config.modeName ?? null,
     modeStrategy: parseModeStrategy(config.modeStrategy),
     nameMapping: config.nameMapping ?? {},
-    components: parseComponents(config.components, configDir, configPath),
+    components: parseComponents(components, configDir, configPath),
+    intentionalDifferences: parseIntentionalDifferences(config.intentionalDifferences),
     deprecations: parseDeprecations(config.deprecations, configPath),
     notify: parseNotify(config.notify, configDir, configPath),
     dashboard: parseDashboard(config.dashboard, configPath),
@@ -176,4 +182,13 @@ function parseDeprecations(value: unknown, configPath: string): Deprecation[] {
       ...(record.removeBy === undefined ? {} : { removeBy: String(record.removeBy) }),
     };
   });
+}
+
+function parseIntentionalDifferences(value: unknown): DriftConfig["intentionalDifferences"] {
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value)) throw new Error("intentionalDifferences must be an array.");
+  for (const item of value) {
+    if (!item || ["name", "figmaValue", "codeValue", "reason"].some(key => typeof item[key] !== "string" || !item[key].trim()) || (item.mode !== undefined && typeof item.mode !== "string") || (item.expires !== undefined && (typeof item.expires !== "string" || !DATE_RE.test(item.expires) || (!Number.isFinite(Date.parse(item.expires)) || new Date(item.expires).toISOString().slice(0, 10) !== item.expires)))) throw new Error("Each intentional difference needs a name, exact Figma and code values, a reason, and an optional expiry date.");
+  }
+  return value;
 }

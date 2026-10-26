@@ -42,7 +42,7 @@ export function applyDeprecations(
           name: token.name,
           detail: describe(deprecation, token),
         });
-      } else if (!inputs.codeTokens.some((token) => token.name === deprecation.name)) {
+      } else if (!inputs.codeTokens.some((token) => token.name === deprecation.name) && !result.missingInCode.some(token => token.name === deprecation.name)) {
         // Not in Figma and not in code: the removal is complete.
         safeToRemoveFromDeprecations.push({
           kind: "token",
@@ -67,6 +67,8 @@ export function applyDeprecations(
     } else if (
       !inputs.codeComponents.some(
         (component) => component.name === deprecation.name || component.codeKey === deprecation.name,
+      ) && !result.componentsInFigmaNotInCode.some(
+        issue => issue.name === deprecation.name || issue.codeKey === deprecation.name,
       )
     ) {
       safeToRemoveFromDeprecations.push({
@@ -104,4 +106,16 @@ function describe(
   if (item?.value !== undefined) parts.push(`still in code as \`${item.value}\``);
   if (item?.file !== undefined) parts.push(`still in ${item.file}`);
   return parts.length > 0 ? parts.join("; ") : undefined;
+}
+
+/** Accept only the reviewed pair; a new value on either side reopens drift. */
+export function applyIntentionalDifferences(result: DriftResult, rules: import("./types.js").DriftConfig["intentionalDifferences"], today: string): DriftResult {
+  const accepted: DriftItem[] = [];
+  const valueMismatches = result.valueMismatches.filter(item => {
+    const rule = rules?.find(rule => rule.name === item.name && rule.mode === item.mode && rule.figmaValue === item.figmaValue && rule.codeValue === item.codeValue && (!rule.expires || rule.expires >= today));
+    if (!rule) return true;
+    accepted.push({kind: "token", name: item.name, detail: `${rule.reason}${rule.expires ? `; accepted until ${rule.expires}` : ""}; Figma: ${item.figmaValue}; code: ${item.codeValue}`}); return false;
+  });
+  const updated = {...result, valueMismatches, intentionalDifferences: accepted};
+  updated.driftFound = hasDrift(updated); return updated;
 }

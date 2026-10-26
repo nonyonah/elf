@@ -3,10 +3,12 @@
  * post. Message building is pure and lives in core/notify.ts — the CLI and
  * the elf console post from the same code.
  */
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname } from "node:path";
+import { closeSync, constants, fstatSync, openSync, mkdirSync, readFileSync, writeFileSync, lstatSync, renameSync, rmSync } from "node:fs";
+import { randomBytes } from "node:crypto";
+import { dirname, join } from "node:path";
 
 export {
+  notificationItems,
   buildNotifyMessage,
   decideNotification,
   driftFingerprint,
@@ -25,9 +27,15 @@ import { readSlackWebhook, SLACK_WEBHOOK_FILE } from "./slack.js";
 /** Missing, unreadable, or pre-fingerprint state files count as a first report. */
 export function readNotifyState(path: string): NotifyState | null {
   try {
-    const raw = JSON.parse(readFileSync(path, "utf8")) as Partial<NotifyState>;
+    const fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
+    let raw: Partial<NotifyState>;
+    try {
+      const stat = fstatSync(fd);
+      if (!stat.isFile() || stat.nlink !== 1 || stat.size > 8 * 1024 * 1024) return null;
+      raw = JSON.parse(readFileSync(fd, "utf8")) as Partial<NotifyState>;
+    } finally { closeSync(fd); }
     if (typeof raw.fingerprint === "string" && raw.fingerprint && typeof raw.driftFound === "boolean") {
-      return { fingerprint: raw.fingerprint, driftFound: raw.driftFound };
+      return { fingerprint: raw.fingerprint, driftFound: raw.driftFound, ...(Array.isArray(raw.items) ? {items: raw.items.filter(item => item && typeof item.key === "string" && typeof item.signature === "string" && typeof item.text === "string").slice(0, 5000)} : {}) };
     }
   } catch {
     // No state yet or unreadable — treated as a first report.
@@ -36,8 +44,12 @@ export function readNotifyState(path: string): NotifyState | null {
 }
 
 export function writeNotifyState(path: string, state: NotifyState): void {
-  mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, `${JSON.stringify(state, null, 2)}\n`);
+  mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
+  const directory = lstatSync(dirname(path)); const existing = lstatSync(path, {throwIfNoEntry: false});
+  if (!directory.isDirectory() || directory.isSymbolicLink() || (process.platform !== "win32" && ((directory.mode & 0o022) !== 0 || directory.uid !== process.getuid?.())) || (existing && (!existing.isFile() || existing.isSymbolicLink() || existing.nlink !== 1))) throw new Error("Notification state must use a regular file, not a link.");
+  const temporary = join(dirname(path), `.notify-${randomBytes(12).toString("hex")}.tmp`);
+  try {writeFileSync(temporary, `${JSON.stringify(state)}\n`, {flag: "wx", mode: 0o600}); renameSync(temporary, path);}
+  finally {rmSync(temporary, {force: true});}
 }
 
 export interface ResolvedNotifyWebhook {
