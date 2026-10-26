@@ -376,9 +376,10 @@
     <main>
       <section data-panel="loading" aria-label="Loading">
         <div class="card pairing-box">
-          <div class="spinner" aria-hidden="true"></div>
-          <h2>Reading this file…</h2>
-          <p class="sub">Bridge state is kept in Figma, not in the document.</p>
+          <div class="spinner" id="context-spinner" aria-hidden="true"></div>
+          <h2 id="context-heading">Reading this file…</h2>
+          <p class="sub" id="context-detail">Bridge state is kept in Figma, not in the document.</p>
+          <button class="secondary" id="retry-context" hidden>Try again</button>
         </div>
       </section>
 
@@ -744,7 +745,7 @@ function pairingHmac(key, text) {
           if (message.session) {
             state.session = message.session;
             state.sessionSaved = false;
-            parent.postMessage({ pluginMessage: { type: "save-session", session: message.session } }, "*");
+            postPluginMessage({ type: "save-session", session: message.session });
           } else {
             state.sessionSaved = true;
           }
@@ -764,7 +765,7 @@ function pairingHmac(key, text) {
         if (message.type === "request" && state.ready) {
           state.requestCount += 1;
           renderConnected();
-          parent.postMessage({ pluginMessage: message }, "*");
+          postPluginMessage(message);
         }
       };
 
@@ -783,7 +784,7 @@ function pairingHmac(key, text) {
           if (modeUsed === "session") {
             state.session = "";
             state.sessionSaved = true;
-            parent.postMessage({ pluginMessage: { type: "forget-session" } }, "*");
+            postPluginMessage({ type: "forget-session" });
             showPairing("The saved session is no longer valid. Pair this file again.");
           } else {
             showPairing("That pairing code is invalid, expired, or already used.");
@@ -840,7 +841,7 @@ function pairingHmac(key, text) {
       state.requestCount = 0;
       state.attempts = 0;
       clearReconnectTimer();
-      parent.postMessage({ pluginMessage: { type: "forget-session" } }, "*");
+      postPluginMessage({ type: "forget-session" });
       if (state.socket) {
         state.socket.close(1000, "disconnected from the plugin panel");
       } else {
@@ -882,16 +883,41 @@ function pairingHmac(key, text) {
     $("save-host").addEventListener("click", () => {
       state.host = $("host").value.trim() || "localhost:8765";
       $("host").value = state.host;
-      parent.postMessage({ pluginMessage: { type: "save-host", host: state.host } }, "*");
+      postPluginMessage({ type: "save-host", host: state.host });
       toast("Bridge address saved");
     });
 
+    // Figma Desktop can relay MessageEvents without a browser Window source.
+    // Authenticate the plugin channel rather than relying on event.source.
+    const uiChannel = Array.from(crypto.getRandomValues(new Uint8Array(32)), b => b.toString(16).padStart(2, "0")).join("");
+    let contextTimer = null;
+    function postPluginMessage(message) {
+      parent.postMessage({ pluginMessage: { ...message, channel: uiChannel } }, "*");
+    }
+    function contextError(detail) {
+      clearTimeout(contextTimer);
+      $("context-spinner").hidden = true;
+      $("context-heading").textContent = "Could not read this file";
+      $("context-detail").textContent = detail;
+      $("retry-context").hidden = false;
+    }
+    function requestContext() {
+      clearTimeout(contextTimer);
+      $("context-spinner").hidden = false;
+      $("context-heading").textContent = "Reading this file…";
+      $("context-detail").textContent = "Bridge state is kept in Figma, not in the document.";
+      $("retry-context").hidden = true;
+      contextTimer = setTimeout(() => contextError("Figma did not respond. Try again, or close and reopen the plugin."), 10000);
+      postPluginMessage({ type: "context" });
+    }
+    $("retry-context").addEventListener("click", requestContext);
     window.onmessage = (event) => {
-      if (event.source !== parent) return;
-      const message = event.data.pluginMessage;
-      if (!message) return;
+      const message = event.data && event.data.pluginMessage;
+      if (!message || message.channel !== uiChannel) return;
+      if (message.type === "context-error") { contextError(message.message || "Could not load saved bridge settings. Try again."); return; }
 
       if (message.type === "context") {
+        clearTimeout(contextTimer);
         state.file = message.file || null;
         state.plugin = message.plugin || null;
         state.host = (message.bridge && message.bridge.host) || "localhost:8765";
@@ -937,7 +963,7 @@ function pairingHmac(key, text) {
       }
     };
 
-    parent.postMessage({ pluginMessage: { type: "context" } }, "*");
+    requestContext();
   </script>
 </body>
 </html>

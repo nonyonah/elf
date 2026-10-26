@@ -351,7 +351,7 @@ async function main() {
   socket.on("message", (raw) => {
     const message = JSON.parse(raw.toString());
     if (message.type === "request" && typeof figma.ui.onmessage === "function") {
-      void figma.ui.onmessage(message);
+      void figma.ui.onmessage({ ...message, channel: "a".repeat(64) });
     }
   });
 
@@ -366,6 +366,7 @@ async function main() {
 
   const pluginUrl = pathToFileURL(codePath).href;
   await import(pluginUrl);
+  await figma.ui.onmessage({ type: "context", channel: "a".repeat(64) });
 
   const call = async (method, params = {}) => {
     try {

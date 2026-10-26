@@ -183,7 +183,7 @@ async function loadBridgeState(): Promise<BridgeState> {
   }
 
   return {
-    host: (storedHost ?? legacy?.host ?? DEFAULT_HOST).trim() || DEFAULT_HOST,
+    host: (typeof storedHost === "string" ? storedHost : typeof legacy?.host === "string" ? legacy.host : DEFAULT_HOST).trim() || DEFAULT_HOST,
     session: typeof session === "string" ? session : "",
   };
 }
@@ -1464,21 +1464,38 @@ async function handle(method: string, params: Record<string, unknown>): Promise<
 }
 
 figma.showUI(__html__, { width: 320, height: 480, themeColors: true });
+let uiChannel: string | null = null;
+function postUi(message: Record<string, unknown>): void {
+  figma.ui.postMessage({ ...message, channel: uiChannel });
+}
 
-async function announceContext(): Promise<void> {
-  figma.ui.postMessage({
-    type: "context",
-    file: { name: figma.root.name, key: figma.fileKey ?? "draft" },
-    bridge: await loadBridgeState(),
-    plugin: { name: PLUGIN_NAME, apiVersion: figma.apiVersion },
-  });
+async function announceContext(channel: string): Promise<void> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const bridge = await Promise.race([
+      loadBridgeState(),
+      new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error("Figma’s saved settings did not respond. Try again or reopen the plugin.")), 8000); }),
+    ]);
+    if (uiChannel !== channel) return;
+    postUi({
+      type: "context",
+      file: { name: figma.root.name, key: figma.fileKey ?? "draft" },
+      bridge,
+      plugin: { name: PLUGIN_NAME, apiVersion: figma.apiVersion },
+    });
+  } catch (error) {
+    if (uiChannel === channel) postUi({ type: "context-error", message: (error as Error).message });
+  } finally { if (timer !== undefined) clearTimeout(timer); }
 }
 
 figma.ui.onmessage = async (message: UiMessage) => {
+  if (!message || typeof message.channel !== "string" || !/^[a-f0-9]{64}$/.test(message.channel)) return;
+  if (message.type === "context") { uiChannel = message.channel; await announceContext(uiChannel); return; }
+  if (message.channel !== uiChannel) return;
   try {
     if (message.type === "save-host") {
       await saveHost(String(message.host ?? ""));
-      figma.ui.postMessage({ type: "host-saved" });
+      postUi({ type: "host-saved" });
       return;
     }
 
@@ -1486,18 +1503,13 @@ figma.ui.onmessage = async (message: UiMessage) => {
       const session = String(message.session ?? "");
       if (!session) throw new Error("Cannot save an empty session.");
       await saveSession(session);
-      figma.ui.postMessage({ type: "session-saved" });
+      postUi({ type: "session-saved" });
       return;
     }
 
     if (message.type === "forget-session") {
       await forgetSession();
-      figma.ui.postMessage({ type: "session-forgotten" });
-      return;
-    }
-
-    if (message.type === "context") {
-      await announceContext();
+      postUi({ type: "session-forgotten" });
       return;
     }
 
@@ -1505,10 +1517,10 @@ figma.ui.onmessage = async (message: UiMessage) => {
       const request = message as unknown as UiRequest;
       try {
         const result = await handle(request.method, request.params ?? {});
-        figma.ui.postMessage({ type: "response", id: request.id, ok: true, result });
+        postUi({ type: "response", id: request.id, ok: true, result });
       } catch (error) {
         // Figma's own message — plan limits included — is relayed unchanged.
-        figma.ui.postMessage({
+        postUi({
           type: "response",
           id: request.id,
           ok: false,
@@ -1517,8 +1529,6 @@ figma.ui.onmessage = async (message: UiMessage) => {
       }
     }
   } catch (error) {
-    figma.ui.postMessage({ type: "log", level: "error", message: (error as Error).message });
+    postUi({ type: "log", level: "error", message: (error as Error).message });
   }
 };
-
-void announceContext();
