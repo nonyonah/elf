@@ -46,6 +46,7 @@ export class SessionStore {
     return this.bindKey(this.key(session), fileKey);
   }
   bindKey(key: string, fileKey: string): boolean {
+    if (!fileKey.trim() || fileKey === "draft") return false;
     const records = this.read(); const entry = records[key];
     if (!entry || (entry.fileKey && entry.fileKey !== fileKey)) return false;
     if (!entry.fileKey) { entry.fileKey = fileKey; this.save(records); }

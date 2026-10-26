@@ -307,6 +307,7 @@ test("setup rejects escapes, symlink escapes, mismatched files and implicit auto
     assert.throws(() => projectResource(dir, join(outside, "outside.css")), /relative/);
     const input = { tokenPath: "tokens.css", source: "css", autoSync: false };
     assert.throws(() => saveProjectSetup(configPath, input, { ...setupBridge, connected: false }), /Connect/);
+    assert.throws(() => saveProjectSetup(configPath, input, { ...setupBridge, file: { key: "draft", name: "Unknown" } }), /real file identity/);
     assert.throws(() => saveProjectSetup(configPath, input, { ...setupBridge, file: { key: "other-file", name: "Other" } }), /does not match/);
     assert.throws(() => saveProjectSetup(configPath, { ...input, autoSync: true }, setupBridge), /reviewing a sync plan/);
     assert.equal(readFileSync(configPath, "utf8"), original);

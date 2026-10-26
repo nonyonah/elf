@@ -60,6 +60,7 @@ export function validateProjectSources(configPath: string, input: unknown): Setu
 export function saveProjectSetup(configPath: string, input: unknown, status: BridgeStatus): void {
   const data = validateProjectSources(configPath, input);
   if (!status.connected || !status.file?.key) throw new Error("Connect the Figma file before saving setup.");
+  if (status.file.key === "draft" || !status.file.key.trim()) throw new Error("Figma did not expose a real file identity. Reload the updated Elf Bridge plugin and pair this file again.");
   // Automatic writes need an existing, reviewed batch description, not guessed output.
   if (data.autoSync) throw new Error("Start with monitoring. Automatic sync will be enabled after reviewing a sync plan.");
   let existing: Record<string, any> = {};
@@ -68,7 +69,7 @@ export function saveProjectSetup(configPath: string, input: unknown, status: Bri
     if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink !== 1) throw new Error("Project config must be a regular file, not a link.");
     existing = JSON.parse(readFileSync(configPath, "utf8"));
   }
-  if (existing.figma?.fileKey && existing.figma.fileKey !== status.file.key) throw new Error("The connected Figma file does not match this project's configured file.");
+  if (existing.figma?.fileKey && existing.figma.fileKey !== status.file.key) throw new Error(`The connected Figma file (${status.file.key}) does not match this project's configured file (${existing.figma.fileKey}). Open the configured file before continuing.`);
   const next = {
     ...existing,
     figma: { ...existing.figma, fileKey: status.file.key, source: "bridge" },

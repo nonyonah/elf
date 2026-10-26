@@ -267,3 +267,15 @@ test("persistent reconnect rejects bearer URLs and forged challenge responses", 
     const resumed = await resumeVerified(port, session); resumed.socket.close();
   } finally { await bridge.stop(); rmSync(dir, {recursive: true}); }
 });
+
+test("persistent pairing refuses shared placeholder identities and remains pinned to a real file", () => {
+  const dir = mkdtempSync(join(tmpdir(), "elf-pairing-identity-"));
+  try {
+    const store = new SessionStore(join(dir, "sessions.json"));
+    const session = store.issue();
+    assert.equal(store.bind(session, "draft"), false);
+    assert.equal(store.bind(session, " "), false);
+    assert.equal(store.bind(session, "real-file"), true);
+    assert.equal(store.bind(session, "other-file"), false);
+  } finally { rmSync(dir, {recursive: true}); }
+});

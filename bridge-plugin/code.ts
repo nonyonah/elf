@@ -1413,6 +1413,15 @@ async function getNode(params: Record<string, unknown>): Promise<unknown> {
   return { node: await nodePayload(node as SceneNode, depth) };
 }
 
+/** Never substitute a shared placeholder for a document identity. */
+function currentFile(): { name: string; key: string } {
+  const key = figma.fileKey;
+  if (typeof key !== "string" || !key.trim() || key === "draft") {
+    throw new Error("Figma did not expose this file’s identity. Reload the Elf Bridge development plugin using its updated manifest, then reopen it. Local plugins require enablePrivatePluginApi.");
+  }
+  return { name: figma.root.name, key };
+}
+
 // ---------------------------------------------------------------------------
 // Dispatch
 // ---------------------------------------------------------------------------
@@ -1421,7 +1430,7 @@ async function handle(method: string, params: Record<string, unknown>): Promise<
   switch (method) {
     case "status":
       return {
-        file: { name: figma.root.name, key: figma.fileKey ?? "draft" },
+        file: currentFile(),
         plugin: { name: PLUGIN_NAME, apiVersion: figma.apiVersion },
         collections: (await localCollections()).length,
         variables: (await figma.variables.getLocalVariablesAsync()).length,
@@ -1472,6 +1481,7 @@ function postUi(message: Record<string, unknown>): void {
 async function announceContext(channel: string): Promise<void> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
+    const file = currentFile();
     const bridge = await Promise.race([
       loadBridgeState(),
       new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error("Figma’s saved settings did not respond. Try again or reopen the plugin.")), 8000); }),
@@ -1479,7 +1489,7 @@ async function announceContext(channel: string): Promise<void> {
     if (uiChannel !== channel) return;
     postUi({
       type: "context",
-      file: { name: figma.root.name, key: figma.fileKey ?? "draft" },
+      file,
       bridge,
       plugin: { name: PLUGIN_NAME, apiVersion: figma.apiVersion },
     });

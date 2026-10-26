@@ -93,3 +93,10 @@ IPv4 and IPv6 loopback addresses before displaying a pairing code. Saved pairing
 credentials never appear in reconnect URLs. An older plugin session requires one
 fresh pairing after this security upgrade. These protections do not isolate Elf
 from processes running as your own OS user.
+
+The bundled development plugin enables `enablePrivatePluginApi` so Figma exposes
+its real file key. A missing key stops pairing setup; `draft` is never a document
+identity. Sessions created with the former placeholder need one fresh pairing.
+Figma limits this API to development/private plugins. A future Community plugin
+needs a separate explicit file-link verification flow before it can replace the
+development plugin; do not enable writes using a shared placeholder or file name.

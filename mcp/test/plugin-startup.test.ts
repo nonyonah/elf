@@ -77,3 +77,15 @@ test("plugin context surfaces rejected and stalled storage reads", async () => {
   assert.equal(stalled.messages[0].type, "context-error");
   assert.match(stalled.messages[0].message, /did not respond/);
 });
+
+
+test("development manifest enables real file identity and missing identity never becomes draft", async () => {
+  const manifest = JSON.parse(readFileSync(new URL("../../bridge-plugin/manifest.json", import.meta.url), "utf8"));
+  assert.equal(manifest.enablePrivatePluginApi, true);
+  const plugin = main(async () => undefined);
+  plugin.figma.fileKey = undefined;
+  await plugin.figma.ui.onmessage({type: "context", channel});
+  assert.equal(plugin.messages[0].type, "context-error");
+  assert.match(plugin.messages[0].message, /file’s identity/);
+  assert.equal(plugin.messages.some(message => message.file?.key === "draft"), false);
+});

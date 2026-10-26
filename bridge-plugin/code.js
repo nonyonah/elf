@@ -1115,6 +1115,14 @@ async function getNode(params) {
     const depth = Number.isFinite(requested) ? Math.max(0, Math.min(3, Math.trunc(requested))) : 1;
     return { node: await nodePayload(node, depth) };
 }
+/** Never substitute a shared placeholder for a document identity. */
+function currentFile() {
+    const key = figma.fileKey;
+    if (typeof key !== "string" || !key.trim() || key === "draft") {
+        throw new Error("Figma did not expose this file’s identity. Reload the Elf Bridge development plugin using its updated manifest, then reopen it. Local plugins require enablePrivatePluginApi.");
+    }
+    return { name: figma.root.name, key };
+}
 // ---------------------------------------------------------------------------
 // Dispatch
 // ---------------------------------------------------------------------------
@@ -1122,7 +1130,7 @@ async function handle(method, params) {
     switch (method) {
         case "status":
             return {
-                file: { name: figma.root.name, key: figma.fileKey ?? "draft" },
+                file: currentFile(),
                 plugin: { name: PLUGIN_NAME, apiVersion: figma.apiVersion },
                 collections: (await localCollections()).length,
                 variables: (await figma.variables.getLocalVariablesAsync()).length,
@@ -1171,6 +1179,7 @@ function postUi(message) {
 async function announceContext(channel) {
     let timer;
     try {
+        const file = currentFile();
         const bridge = await Promise.race([
             loadBridgeState(),
             new Promise((_, reject) => { timer = setTimeout(() => reject(new Error("Figma’s saved settings did not respond. Try again or reopen the plugin.")), 8000); }),
@@ -1179,7 +1188,7 @@ async function announceContext(channel) {
             return;
         postUi({
             type: "context",
-            file: { name: figma.root.name, key: figma.fileKey ?? "draft" },
+            file,
             bridge,
             plugin: { name: PLUGIN_NAME, apiVersion: figma.apiVersion },
         });
