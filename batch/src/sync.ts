@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { orderComponents } from "./graph.js";
 import { hashSpec, loadManifest, saveManifest } from "./manifest.js";
 import { NODE_STATE_DEPTH, nodeStateHash } from "./nodestate.js";
@@ -126,25 +128,42 @@ export async function runSync(options: SyncOptions): Promise<SyncResult> {
 // Tokens phase
 // ---------------------------------------------------------------------------
 
-interface TokenPhase {
+export interface TokenPhase {
   counts: SyncResult["tokens"];
   manifest: Manifest;
   aborted?: string;
 }
 
-async function syncTokens(
+/**
+ * Narrow a token sync to the variables/styles a watcher already knows changed.
+ * Style keys are `text:<key>` and `effect:<key>`; omitting `styles` syncs all
+ * styles (the batch CLI's normal behavior).
+ */
+export interface TokenSyncFilter {
+  variables?: ReadonlySet<string>;
+  styles?: ReadonlySet<string>;
+}
+
+export async function syncTokens(
   plan: TokensPlan,
   manifest: Manifest,
   client: BridgeCaller | null,
   force: boolean,
   dryRun: boolean,
   log: (line: string) => void,
+  filter?: TokenSyncFilter,
 ): Promise<TokenPhase> {
+  const textStyles = filter?.styles
+    ? plan.textStyles.filter((style) => filter.styles?.has(`text:${style.key}`))
+    : plan.textStyles;
+  const effectStyles = filter?.styles
+    ? plan.effectStyles.filter((style) => filter.styles?.has(`effect:${style.key}`))
+    : plan.effectStyles;
   const counts: SyncResult["tokens"] = {
     primitives: { planned: plan.primitives.variables.length, upserted: 0, unchanged: 0 },
     semantic: { planned: 0, upserted: 0, unchanged: 0 },
-    textStyles: plan.textStyles.length,
-    effectStyles: plan.effectStyles.length,
+    textStyles: textStyles.length,
+    effectStyles: effectStyles.length,
   };
   for (const entry of plan.semanticCollections ?? [plan.semantic]) counts.semantic.planned += entry.variables.length;
 
@@ -156,6 +175,7 @@ async function syncTokens(
 
   for (const section of sections) {
     const changed = section.variables.filter((variable) => {
+      if (filter?.variables && !filter.variables.has(variable.codeKey)) return false;
       const known = manifest.tokens[variable.codeKey];
       return force || !known || known.valueHash !== hashSpec(variable);
     });
@@ -192,6 +212,14 @@ async function syncTokens(
         defaultMode: section.defaultMode,
       });
 
+      let confirmed = 0;
+      for (const variable of changed) {
+        const stored = response.variables.find(entry => entry.name === variable.name);
+        if (!stored || response.errors.some(error => error.name === variable.name)) continue;
+        manifest.tokens[variable.codeKey] = { ...manifest.tokens[variable.codeKey], figmaVariableId: stored.id, valueHash: hashSpec(variable) };
+        confirmed += 1;
+      }
+      bucket.upserted += confirmed;
       if (response.errors.length > 0) {
         return {
           counts,
@@ -203,12 +231,7 @@ async function syncTokens(
         };
       }
 
-      for (const variable of changed) {
-        const stored = response.variables.find((entry) => entry.name === variable.name);
-        if (!stored) continue;
-        manifest.tokens[variable.codeKey] = { figmaVariableId: stored.id, valueHash: hashSpec(variable) };
-      }
-      bucket.upserted += changed.length;
+      if (confirmed !== changed.length) return { counts, manifest, aborted: "Figma did not confirm every variable write. Review a fresh plan before retrying." };
       log(`  ${section.collection}: ${changed.length} variable(s) upserted (${collection.collection.id})`);
     } catch (error) {
       return { counts, manifest, aborted: describeCallError(error, "tokens") };
@@ -217,12 +240,12 @@ async function syncTokens(
 
   // Styles re-upsert every run: they are not part of the v1 manifest, and
   // upserts are idempotent (matched by codeKey, then name).
-  if (!dryRun && (plan.textStyles.length > 0 || plan.effectStyles.length > 0)) {
+  if (!dryRun && (textStyles.length > 0 || effectStyles.length > 0)) {
     try {
-      for (const style of plan.textStyles) {
+      for (const style of textStyles) {
         await (client as BridgeCaller).call("upsert_text_style", style.params);
       }
-      for (const style of plan.effectStyles) {
+      for (const style of effectStyles) {
         await (client as BridgeCaller).call("upsert_effect_style", style.params);
       }
     } catch (error) {
@@ -290,6 +313,10 @@ function buildTokenSections(plan: TokensPlan): TokenSection[] {
  * covers. A sidecar that fails validation counts as null, exactly as a
  * failed sync records it.
  */
+export function componentSourceHash(componentsDir: string, parsed: ParsedComponent): string {
+  return hashSpec(readFileSync(resolve(componentsDir, parsed.file), "utf8"));
+}
+
 export function componentSpecHash(componentsDir: string, parsed: ParsedComponent): string {
   let sidecar: SidecarSpec | null = null;
   try {
@@ -339,9 +366,9 @@ function withDependencies(all: ParsedComponent[], root: ParsedComponent): Parsed
   return [...picked.values()];
 }
 
-function planComponent(config: BatchConfig, index: TokenIndex, parsed: ParsedComponent): PlannedComponent {
+export function planComponent(config: BatchConfig, index: TokenIndex, parsed: ParsedComponent): PlannedComponent {
   const variants = variantMatrix(parsed);
-  const planned: PlannedComponent = { parsed, sidecar: null, variants };
+  const planned: PlannedComponent = { parsed, sidecar: null, variants, sourceHash: componentSourceHash(config.componentsDir, parsed) };
   const sidecarPath = sidecarPathFor(config.componentsDir, parsed);
 
   let sidecar: SidecarSpec | null;
@@ -381,6 +408,7 @@ function planComponent(config: BatchConfig, index: TokenIndex, parsed: ParsedCom
 export function variantMatrix(parsed: ParsedComponent): Variant[] {
   let combos: Record<string, string>[] = [{}];
   for (const prop of parsed.variantProps) {
+    if (combos.length * prop.values.length > 256) throw new Error(`${parsed.name} has more than 256 variants. Narrow the supported variant props before syncing.`);
     combos = combos.flatMap((combo) => prop.values.map((value) => ({ ...combo, [prop.name]: value })));
   }
   if (parsed.variantProps.length === 0) return [];
@@ -392,7 +420,7 @@ export function variantMatrix(parsed: ParsedComponent): Variant[] {
   }));
 }
 
-async function processComponent(
+export async function processComponent(
   component: PlannedComponent,
   outcomes: Map<string, ComponentOutcome>,
   context: {
@@ -478,10 +506,11 @@ async function processComponent(
       figmaNodeId: node.id,
       specHash,
       nodeHash,
+      sourceHash: component.sourceHash,
       status: "synced",
       updatedAt: new Date().toISOString(),
     };
-    context.log(`${node.created ? "+" : "↻"} ${parsed.file} (${node.id})`);
+    context.log(`✓ ${parsed.file} ${node.created ? "created" : "updated"} (node ${node.id})`);
   } catch (error) {
     base.action = "failed";
     base.error = (error as Error).message;

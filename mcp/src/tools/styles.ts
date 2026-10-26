@@ -43,8 +43,8 @@ export const upsertTextStyleTool: ToolDefinition<{
   fontFamily: z.ZodOptional<z.ZodString>;
   fontStyle: z.ZodOptional<z.ZodString>;
   fontSize: z.ZodOptional<z.ZodNumber>;
-  lineHeight: z.ZodOptional<z.ZodUnion<[z.ZodNumber, z.ZodObject<{ percent: z.ZodNumber }>, z.ZodLiteral<"auto">]>>;
-  letterSpacing: z.ZodOptional<z.ZodUnion<[z.ZodNumber, z.ZodObject<{ percent: z.ZodNumber }>]>>;
+  lineHeight: z.ZodOptional<z.ZodUnion<readonly [z.ZodNumber, z.ZodObject<{ percent: z.ZodNumber }>, z.ZodLiteral<"auto">]>>;
+  letterSpacing: z.ZodOptional<z.ZodUnion<readonly [z.ZodNumber, z.ZodObject<{ percent: z.ZodNumber }>]>>;
 }> = {
   name: "upsert_text_style",
   title: "Elf: upsert text style",

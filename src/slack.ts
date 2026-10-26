@@ -21,7 +21,7 @@
  */
 import { createServer, IncomingMessage, Server, ServerResponse } from "node:http";
 import { randomBytes, createHash } from "node:crypto";
-import { mkdirSync, readFileSync, writeFileSync, rmSync } from "node:fs";
+import { closeSync, constants, fchmodSync, fstatSync, lstatSync, mkdirSync, openSync, readFileSync, renameSync, writeFileSync, rmSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
@@ -263,7 +263,17 @@ export function readSlackWebhook(configPath: string): SlackWebhookInfo | null {
   const configDir = dirname(resolve(configPath));
   const file = join(configDir, SLACK_WEBHOOK_FILE);
   try {
-    const raw = JSON.parse(readFileSync(file, "utf8")) as Partial<SlackWebhookInfo>;
+    assertSlackDirectory(dirname(file));
+    const fd = openSync(file, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
+    let contents: string;
+    try {
+      const stat = fstatSync(fd);
+      if (!stat.isFile() || stat.nlink !== 1 || stat.size > 16 * 1024 ||
+          (process.platform !== "win32" && stat.uid !== process.getuid?.())) return null;
+      if (process.platform !== "win32" && (stat.mode & 0o077) !== 0) fchmodSync(fd, 0o600);
+      contents = readFileSync(fd, "utf8");
+    } finally { closeSync(fd); }
+    const raw = JSON.parse(contents) as Partial<SlackWebhookInfo>;
     if (typeof raw.url === "string" && raw.url && typeof raw.channel === "string") {
       return raw as SlackWebhookInfo;
     }
@@ -277,8 +287,23 @@ export function readSlackWebhook(configPath: string): SlackWebhookInfo | null {
 export function writeSlackWebhook(configPath: string, info: SlackWebhookInfo): void {
   const configDir = dirname(resolve(configPath));
   const file = join(configDir, SLACK_WEBHOOK_FILE);
-  mkdirSync(dirname(file), { recursive: true });
-  writeFileSync(file, `${JSON.stringify(info, null, 2)}\n`);
+  mkdirSync(dirname(file), { recursive: true, mode: 0o700 });
+  assertSlackDirectory(dirname(file));
+  const target = lstatSync(file, { throwIfNoEntry: false });
+  if (target && (!target.isFile() || target.isSymbolicLink() || target.nlink !== 1)) throw new Error("Slack credentials must be a regular file, not a link.");
+  const temporary = join(dirname(file), `.slack-${randomBytes(12).toString("hex")}.tmp`);
+  try {
+    writeFileSync(temporary, `${JSON.stringify(info, null, 2)}\n`, { flag: "wx", mode: 0o600 });
+    renameSync(temporary, file);
+  } finally { rmSync(temporary, { force: true }); }
+}
+
+function assertSlackDirectory(path: string): void {
+  const stat = lstatSync(path);
+  if (!stat.isDirectory() || stat.isSymbolicLink() ||
+      (process.platform !== "win32" && ((stat.mode & 0o022) !== 0 || stat.uid !== process.getuid?.()))) {
+    throw new Error("Slack credentials need a directory owned by you that other users cannot modify.");
+  }
 }
 
 /** Remove the stored webhook info */
@@ -286,6 +311,7 @@ export function removeSlackWebhook(configPath: string): boolean {
   const configDir = dirname(resolve(configPath));
   const file = join(configDir, SLACK_WEBHOOK_FILE);
   try {
+    assertSlackDirectory(dirname(file));
     rmSync(file);
     return true;
   } catch {

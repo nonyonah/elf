@@ -11,6 +11,7 @@ import {
   postNotification,
   readNotifyState,
   resolveNotifyWebhook,
+  resolveReportUrl,
   writeNotifyState,
   type NotifyMeta,
 } from "../src/notify.js";
@@ -114,7 +115,7 @@ test("drift messages carry the counts and cap the item list", () => {
   const section = (slack.blocks?.[1] as { text: { text: string } }).text.text;
   assert.match(section, /Value mismatches: 12/);
   assert.match(section, /Missing in code: 0/);
-  assert.match(section, /… and 2 more — see the full report\./);
+  assert.match(section, /… and 2 more — run `elf check` to see the full report\./);
   assert.equal(section.split("\n").filter((line) => line.startsWith("• ")).length, 10);
 
   const context = (slack.blocks?.[2] as { elements: { text: string }[] }).elements[0].text;
@@ -122,15 +123,38 @@ test("drift messages carry the counts and cap the item list", () => {
   assert.match(context, /variables \(bridge\) vs tailwind/);
 });
 
-test("an optional url lands in the context line — Slack link, plain text for text format", () => {
+test("an optional url lands in the context and full-report link — Slack link, plain text for text format", () => {
   const withUrl: NotifyMeta = { ...meta, url: "https://console.elf.dev/#/p/prj_1" };
-  const slack = buildNotifyMessage(drifting(), withUrl, "slack", null);
+  const many = diffTokens(
+    Array.from({ length: 12 }, (_, i) => token(`color/t${i}`, "#FFFFFF")),
+    Array.from({ length: 12 }, (_, i) => token(`color/t${i}`, "#000000")),
+    {},
+  );
+  const slack = buildNotifyMessage(many, withUrl, "slack", null);
   const context = (slack.blocks?.[2] as { elements: { text: string }[] }).elements[0].text;
   assert.match(context, /<https:\/\/console\.elf\.dev\/#\/p\/prj_1\|Open the report>/);
+  const section = (slack.blocks?.[1] as { text: { text: string } }).text.text;
+  assert.match(section, /<https:\/\/console\.elf\.dev\/#\/p\/prj_1\|see the full report>/);
 
-  const text = buildNotifyMessage(drifting(), withUrl, "text", null);
-  assert.match(text.text, /· https:\/\/console\.elf\.dev\/#\/p\/prj_1$/m);
+  const text = buildNotifyMessage(many, withUrl, "text", null);
+  assert.match(text.text, /see the full report: https:\/\/console\.elf\.dev\/#\/p\/prj_1/);
   assert.doesNotMatch(text.text, /Open the report/);
+});
+
+test("the report link prefers notify.reportUrl, then the console project page", () => {
+  assert.equal(
+    resolveReportUrl({
+      notify: { webhookEnv: "X", format: "slack", reportUrl: "https://reports.example.com/r/1" },
+      dashboard: { url: "https://console.elf.dev", projectId: "prj_1" },
+    }),
+    "https://reports.example.com/r/1",
+  );
+  assert.equal(
+    resolveReportUrl({ dashboard: { url: "https://console.elf.dev/", projectId: "prj 1" } }),
+    "https://console.elf.dev/#/p/prj%201",
+  );
+  assert.equal(resolveReportUrl({ dashboard: { url: "https://console.elf.dev" } }), undefined);
+  assert.equal(resolveReportUrl({}), undefined);
 });
 
 test("mode labels and component keys appear in the item lines", () => {

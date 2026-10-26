@@ -48,12 +48,16 @@ export interface BridgeFetchOptions {
  * with an actionable message instead of a stack trace when the server or the
  * plugin is not there.
  */
-export async function connectBridge(): Promise<BridgeCaller> {
+export async function connectBridge(fileKey?: string): Promise<BridgeCaller> {
   const here = dirname(fileURLToPath(import.meta.url));
   loadDotEnvFile(resolve(here, "../../mcp/.env"));
 
   try {
-    return await createBridgeClient();
+    const client = await createBridgeClient();
+    try {
+      if (fileKey) await client.call("__elf_lock", { fileKey }, { timeoutMs: 30_000 });
+      return client;
+    } catch (error) { client.close(); throw error; }
   } catch (error) {
     throw new Error(
       `The Figma bridge is not connected (${(error as Error).message}). ` +
@@ -104,7 +108,8 @@ export async function fetchBridgeVariables(
   }
 
   if (skipped.length > 0) {
-    console.warn(`Skipped ${skipped.length} variable(s) (unsupported type or category): ${skipped.join(", ")}`);
+    const detail = process.env.ELF_DEBUG ? `: ${skipped.join(", ")}` : "";
+    console.warn(`Skipped ${skipped.length} unsupported Figma variable(s)${detail}.`);
   }
 
   return tokens;

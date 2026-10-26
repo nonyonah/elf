@@ -1,0 +1,28 @@
+{
+  "name": "elf-watch",
+  "version": "0.1.0",
+  "description": "Keep Figma in sync while you code: watch components and tokens, push only what changed, and check drift.",
+  "type": "module",
+  "license": "MIT",
+  "private": true,
+  "engines": {
+    "node": ">=20"
+  },
+  "bin": {
+    "elf-watch": "./bin/elf-watch.mjs",
+    "elf-bridge": "./bin/elf-bridge.mjs"
+  },
+  "scripts": {
+    "start": "node bin/elf-watch.mjs",
+    "test": "node --import tsx --test test/sync.test.ts test/lint.test.ts test/hooks.test.ts test/watcher.test.ts test/cli.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "chokidar": "^4.0.3",
+    "typescript": "^5.6.3"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "tsx": "^4.19.2"
+  }
+}

@@ -30,7 +30,25 @@ npm install
 
 The MCP server is its own package — it has no effect on the root `elf-tokens` install.
 
-### 2. Create a server secret
+### Unified npm package
+
+Use `npx elf-tokens mcp --project /absolute/project/path`. Settings supplies
+configuration snippets for Cursor, Claude Code, and Codex. See
+[client setup](../docs/mcp-setup.md) for the project-aware tools and agent workflow.
+
+The adapter authenticates to a shared host rather than owning its lifetime.
+Closing one adapter does not stop another client's Figma connection. The normal
+host stores private pairing hashes and saved file pairings remain valid until
+revoked from Settings. The temporary terminal code remains single-use and expires
+after five minutes. Older saved sessions require one fresh pairing to adopt
+the verified reconnect handshake. Rotating the machine identity invalidates the old pairing namespace.
+
+Without an explicit `ELF_MCP_TOKEN`, Elf uses the private identity at
+`~/.elf/bridge-secret`. Explicit credentials remain supported. `elf bridge --stop`
+stops an unused shared host. Project-local tools are available over stdio; the
+HTTP adapter exposes only Figma tools, not arbitrary local project file operations.
+
+### 2. Optional: supply your own server secret
 
 ```bash
 export ELF_MCP_TOKEN=$(openssl rand -hex 24)     # min 8 chars; keep it out of git
@@ -55,7 +73,7 @@ Environment variables:
 | `ELF_MCP_HTTP_PORT` | `8788` | Port for the Streamable HTTP transport (`npm run start:http`). Tunnel this port for web clients. |
 | `ELF_MCP_TIMEOUT_MS` | `10000` | Per-request timeout. |
 
-The server refuses to start without a secret, so a stray bridge is never open to the network.
+The server always authenticates connections, using either the explicit secret or its private stored identity.
 
 ### 3. Build the plugin
 
@@ -74,8 +92,8 @@ npm run build:bridge-plugin      # writes bridge-plugin/code.js from code.ts
    (per file, per machine) — it is **not** written into the Figma document, so reopening the file
    reconnects automatically.
 
-The pairing code is single-use and expires **5 minutes after the server starts**. Once used (or
-expired), restart the server to print a fresh code. Disconnecting from the panel deletes the stored
+Pairing codes are single-use and expire **five minutes after generation**. Request
+a fresh terminal code from Elf Settings when needed. Disconnecting from the panel deletes the stored
 session and returns the file to the pairing screen.
 
 If your MCP client launches the server for you, the code goes to that client's MCP logs (Cursor:
@@ -145,7 +163,7 @@ it until you're on Plus.
 
 ```bash
 cd mcp
-npm run start:http          # stop any running `npm run start` first — both own the bridge port
+npm run start:http          # reuses the same authenticated shared bridge
 ngrok http 8788             # keep this running next to it; note the https://….ngrok-free.app URL
 ```
 

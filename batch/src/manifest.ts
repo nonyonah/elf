@@ -1,5 +1,5 @@
-import { createHash } from "node:crypto";
-import { readFileSync, renameSync, writeFileSync } from "node:fs";
+import { createHash, randomBytes } from "node:crypto";
+import { lstatSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import type { Manifest, ManifestComponent } from "./types.js";
 
 export function emptyManifest(): Manifest {
@@ -31,6 +31,7 @@ export function loadManifest(path: string): Manifest {
     version: 1,
     components: manifest.components ?? {},
     tokens: manifest.tokens ?? {},
+    ...(manifest.styles ? { styles: manifest.styles } : {}),
   };
 }
 
@@ -45,12 +46,18 @@ export function saveManifest(path: string, manifest: Manifest): void {
     tokens: sortByKey(manifest.tokens, (entry) => ({
       figmaVariableId: entry.figmaVariableId,
       valueHash: entry.valueHash,
+      ...(entry.remoteHash ? { remoteHash: entry.remoteHash } : {}),
     })),
+    ...(manifest.styles ? { styles: sortByKey(manifest.styles, entry => entry) } : {}),
   };
 
-  const tmp = `${path}.tmp`;
-  writeFileSync(tmp, `${JSON.stringify(ordered, null, 2)}\n`);
-  renameSync(tmp, path);
+  const existing = lstatSync(path, { throwIfNoEntry: false });
+  if (existing && (!existing.isFile() || existing.isSymbolicLink() || existing.nlink !== 1)) throw new Error("Manifest must be a regular file, not a link.");
+  const tmp = `${path}.${randomBytes(12).toString("hex")}.tmp`;
+  try {
+    writeFileSync(tmp, `${JSON.stringify(ordered, null, 2)}\n`, { flag: "wx", mode: 0o600 });
+    renameSync(tmp, path);
+  } finally { rmSync(tmp, { force: true }); }
 }
 
 /** 16 hex chars of sha256 over a canonical JSON — enough to spot a change. */
@@ -79,6 +86,7 @@ function canonicalComponent(entry: ManifestComponent): ManifestComponent {
   return {
     figmaNodeId: entry.figmaNodeId,
     specHash: entry.specHash,
+    ...(entry.sourceHash ? { sourceHash: entry.sourceHash } : {}),
     ...(entry.nodeHash === undefined ? {} : { nodeHash: entry.nodeHash }),
     status: entry.status,
     updatedAt: entry.updatedAt,

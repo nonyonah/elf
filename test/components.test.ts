@@ -174,3 +174,14 @@ test("never-synced components and stale Figma nodes land in their own buckets", 
   assert.equal(diff.inFigmaNotInCode[0]?.codeKey, "Ghost.tsx#Ghost");
   scratch.cleanup();
 });
+
+test("implementation-only edits are reported even when parsed props and sidecars are unchanged", async () => {
+  const scratch = await syncedScratch();
+  try {
+    const file = join(scratch.componentsDir, "Button.tsx");
+    writeFileSync(file, readFileSync(file, "utf8") + "\n// implementation changed\n");
+    const bridge = new ComponentBridge(figmaRefs(scratch.config.manifestFile));
+    const diff = await diffComponents(scratch.componentsDir, scratch.config.manifestFile, bridge);
+    assert.ok(diff.outOfDate.some(item => item.name === "Button" && item.detail?.includes("implementation changed")));
+  } finally { scratch.cleanup(); }
+});

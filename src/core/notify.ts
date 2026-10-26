@@ -171,7 +171,16 @@ export function buildNotifyMessage(
   if (items.length > 0) {
     if (body.length > 0) body.push("");
     body.push(...items.slice(0, MAX_ITEMS));
-    if (items.length > MAX_ITEMS) body.push(`… and ${items.length - MAX_ITEMS} more — see the full report.`);
+    if (items.length > MAX_ITEMS) {
+      const more = `… and ${items.length - MAX_ITEMS} more`;
+      if (!meta.url) {
+        body.push(`${more} — run \`elf check\` to see the full report.`);
+      } else if (format === "slack") {
+        body.push(`${more} — <${meta.url}|see the full report>.`);
+      } else {
+        body.push(`${more} — see the full report: ${meta.url}`);
+      }
+    }
   }
 
   const contextBase = `${meta.figmaSource} vs ${meta.codebaseSource} · file \`${meta.fileKey}\` · checked ${meta.checkedAt}`;

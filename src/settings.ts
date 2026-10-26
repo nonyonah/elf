@@ -9,10 +9,14 @@
  * enough: it has no /api routes and will show a 404.
  */
 import { createServer, IncomingMessage, Server, ServerResponse } from "node:http";
-import { readFileSync, writeFileSync, existsSync, statSync } from "node:fs";
+import { readFileSync, existsSync, realpathSync, statSync } from "node:fs";
 import { resolve as resolvePath, extname, sep } from "node:path";
 import { fileURLToPath } from "node:url";
-import { randomBytes } from "node:crypto";
+import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { loadWatchEnv } from "../watch/src/bridge.js";
+import { dirname } from "node:path";
+import { loadRuntimeBridgeConfig } from "../mcp/src/config.js";
+import { postNotification } from "./notify.js";
 import { loadConfig } from "./config.js";
 import {
   buildAuthorizeUrl,
@@ -28,6 +32,7 @@ import {
   type SlackWebhookInfo,
 } from "./slack.js";
 import { spawn } from "node:child_process";
+import { writeProjectConfig, type OnboardingController } from "./onboarding.js";
 
 /** Path to the built Next.js static settings page, resolved from this package. */
 const DEFAULT_SETTINGS_DIST_PATH = fileURLToPath(new URL("../dist/settings", import.meta.url));
@@ -78,11 +83,18 @@ function serveStaticFile(res: ServerResponse, distPath: string, filePath: string
 
 async function readBody(req: IncomingMessage): Promise<string> {
   let body = "";
-  for await (const chunk of req) body += chunk;
+  let bytes = 0;
+  for await (const chunk of req) {
+    bytes += Buffer.byteLength(chunk);
+    if (bytes > 16 * 1024) throw new Error("Request body is too large.");
+    body += chunk;
+  }
   return body;
 }
 
 export interface SettingsServerOptions {
+  identityToken?: string;
+  onboarding?: OnboardingController;
   /** Folder holding the built Next.js settings page. Defaults to the package's dist/settings. */
   distPath?: string;
   /** Port to listen on. Defaults to 0 (ephemeral) for tests. */
@@ -95,6 +107,7 @@ export interface SettingsServerHandle {
   url: string;
   publicUrl: string;
   close: () => Promise<void>;
+  fetch: (path: string, init?: RequestInit) => Promise<Response>;
 }
 
 /** Create the settings HTTP server without opening a browser. Useful for tests. */
@@ -103,6 +116,19 @@ export async function createSettingsServer(
   options: SettingsServerOptions = {},
 ): Promise<SettingsServerHandle> {
   const distPath = resolvePath(options.distPath ?? DEFAULT_SETTINGS_DIST_PATH);
+  const serverInstance = randomBytes(32).toString("hex");
+  const bootstrapTokens = new Map<string, number>();
+  const sessions = new Set<string>();
+  const usedOpenNonces = new Set<string>();
+  const issueBootstrap = (): string => {
+    for (const [token, expiry] of bootstrapTokens) if (expiry < Date.now()) bootstrapTokens.delete(token);
+    if (bootstrapTokens.size >= 32) bootstrapTokens.delete(bootstrapTokens.keys().next().value!);
+    const token = randomBytes(32).toString("hex"); bootstrapTokens.set(token, Date.now() + 60_000); return token;
+  };
+  const initialBootstrap = issueBootstrap();
+  const nativeSession = randomBytes(32).toString("hex"); sessions.add(nativeSession);
+  const canonicalPath = (): string => { try { return realpathSync(configPath); } catch { return resolvePath(configPath); } };
+  const validProof = (supplied: unknown, expected: Buffer): boolean => typeof supplied === "string" && /^[a-f0-9]{64}$/.test(supplied) && timingSafeEqual(expected, Buffer.from(supplied, "hex"));
   let pendingSlack: {
     state: string;
     verifier: string | null;
@@ -114,27 +140,134 @@ export async function createSettingsServer(
     const url = new URL(req.url ?? "", "http://127.0.0.1");
     const path = url.pathname;
 
-    res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader("Access-Control-Allow-Methods", "GET, POST, PATCH, OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+    const port = req.socket.localPort;
+    const allowedHosts = new Set([`127.0.0.1:${port}`, `localhost:${port}`]);
+    const origin = req.headers.origin;
+    const allowedOrigins = new Set([`http://127.0.0.1:${port}`, `http://localhost:${port}`]);
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("Referrer-Policy", "no-referrer");
+    res.setHeader("Cross-Origin-Resource-Policy", "same-origin");
+    res.setHeader("X-Frame-Options", "DENY");
+    res.setHeader("Cache-Control", "no-store");
+    if (!allowedHosts.has(req.headers.host ?? "") || (origin && !allowedOrigins.has(origin)) ||
+        (path.startsWith("/api/") && path !== "/api/slack/callback" && req.headers["sec-fetch-site"] === "cross-site")) {
+      res.writeHead(403, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Open Elf settings from its local address." }));
+      return;
+    }
+    if (!["GET", "HEAD"].includes(req.method ?? "") && req.headers["x-elf-request"] !== "1") {
+      res.writeHead(403, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "This action must come from Elf settings." }));
+      return;
+    }
+    if (path === "/api/identity" && req.method === "GET") {
+      const challenge = req.headers["x-elf-challenge"];
+      if (options.identityToken && typeof challenge === "string" && /^[a-f0-9]{64}$/.test(challenge)) {
+        res.setHeader("X-Elf-Instance", serverInstance);
+        res.setHeader("X-Elf-Server-Proof", createHmac("sha256", options.identityToken).update("identity\n" + challenge + "\n" + canonicalPath() + "\n" + serverInstance).digest("hex"));
+        res.writeHead(200); res.end("{}");
+      } else { res.writeHead(401); res.end("{}"); }
+      return;
+    }
+    if (path === "/api/session/open" && req.method === "POST") {
+      const nonce = req.headers["x-elf-challenge"];
+      if (!options.identityToken || typeof nonce !== "string" || !/^[a-f0-9]{64}$/.test(nonce) || usedOpenNonces.has(nonce) ||
+          !validProof(req.headers["x-elf-machine-proof"], createHmac("sha256", options.identityToken).update("open\n" + nonce + "\n" + canonicalPath() + "\n" + serverInstance).digest())) {
+        res.writeHead(401); res.end("{}"); return;
+      }
+      if (usedOpenNonces.size >= 1000) { res.writeHead(429); res.end("{}"); return; }
+      usedOpenNonces.add(nonce);
+      const token = issueBootstrap();
+      res.writeHead(200, { "Content-Type": "application/json" }); res.end(JSON.stringify({ url: `http://127.0.0.1:${port}/#elf=${token}` })); return;
+    }
+    if (path === "/api/session" && req.method === "POST") {
+      const token = req.headers["x-elf-bootstrap"];
+      const expiry = typeof token === "string" ? bootstrapTokens.get(token) : undefined;
+      if (!expiry || expiry < Date.now()) { res.writeHead(401); res.end("{}"); return; }
+      bootstrapTokens.delete(String(token));
+      if (sessions.size >= 64) sessions.delete([...sessions][1]);
+      const session = randomBytes(32).toString("hex"); sessions.add(session);
+      res.writeHead(200, { "Content-Type": "application/json" }); res.end(JSON.stringify({ session })); return;
+    }
+    const callback = (path === "/callback" || path === "/api/slack/callback") && req.method === "GET";
+    if (path.startsWith("/api/") && !callback && (typeof req.headers["x-elf-session"] !== "string" || !sessions.has(req.headers["x-elf-session"]))) {
+      res.writeHead(401, { "Content-Type": "application/json" }); res.end(JSON.stringify({ error: "Open the private Settings link from your terminal." })); return;
+    }
 
-    if (req.method === "OPTIONS") {
-      res.writeHead(204);
-      res.end();
+    if (path.startsWith("/api/project/") && req.method === "POST" && options.onboarding?.projectAction) {
+      try {
+        const body = await readBody(req);
+        const result = await options.onboarding.projectAction(path.slice("/api/project/".length), body ? JSON.parse(body) : {});
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: (error as Error).message }));
+      }
+      return;
+    }
+    if (path === "/api/onboarding" && options.onboarding) {
+      try {
+        if (req.method === "GET") {
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify(options.onboarding.status()));
+        } else if (req.method === "POST") {
+          options.onboarding.save(JSON.parse(await readBody(req)));
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ ok: true }));
+        } else { res.writeHead(405); res.end(); }
+      } catch (error) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: (error as Error).message }));
+      }
+      return;
+    }
+    if (path === "/api/onboarding/validate" && req.method === "POST" && options.onboarding?.validate) {
+      try {
+        options.onboarding.validate(JSON.parse(await readBody(req)));
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ok: true }));
+      } catch (error) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: (error as Error).message }));
+      }
+      return;
+    }
+    if (path === "/api/onboarding/pairing" && req.method === "POST" && options.onboarding?.requestPairingCode) {
+      try {
+        await options.onboarding.requestPairingCode();
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ok: true }));
+      } catch {
+        res.writeHead(503, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Could not request a new code. Check the elf terminal." }));
+      }
+      return;
+    }
+    if (path === "/api/onboarding/start" && req.method === "POST" && options.onboarding) {
+      try {
+        await options.onboarding.start();
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ok: true }));
+      } catch (error) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: (error as Error).message }));
+      }
       return;
     }
 
     if (path === "/api/config" && req.method === "GET") {
       try {
-        const config = loadConfig(configPath);
+        const config = existsSync(configPath) ? loadConfig(configPath) : null;
         const slack = readSlackWebhook(configPath);
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify({
           project: {
             configPath: resolvePath(configPath),
-            fileKey: config.figma.fileKey,
+            fileKey: config?.figma.fileKey ?? "",
           },
-          notify: config.notify ? {
+          onboarding: options.onboarding?.status() ?? null,
+          notify: config?.notify ? {
             webhookEnv: config.notify.webhookEnv,
             format: config.notify.format,
             enabled: !!config.notify.webhookEnv,
@@ -178,7 +311,7 @@ export async function createSettingsServer(
         } else {
           delete parsed.notify;
         }
-        writeFileSync(configFile, `${JSON.stringify(parsed, null, 2)}\n`);
+        writeProjectConfig(configFile, parsed);
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ ok: true }));
       } catch (e) {
@@ -223,14 +356,13 @@ export async function createSettingsServer(
 
     if ((path === "/callback" || path === "/api/slack/callback") && req.method === "GET") {
       const finish = (status: "connected" | "error"): void => {
-        res.writeHead(302, { Location: `/?slack=${status}` });
+        res.writeHead(302, { Location: `http://127.0.0.1:${req.socket.localPort}/?slack=${status}` });
         res.end();
       };
       const state = url.searchParams.get("state") ?? "";
       const code = url.searchParams.get("code");
       const slackError = url.searchParams.get("error");
       const pending = pendingSlack;
-      pendingSlack = null;
 
       if (
         slackError ||
@@ -240,9 +372,11 @@ export async function createSettingsServer(
         pending.expiresAt < Date.now()
       ) {
         if (slackError) console.error(`Slack OAuth failed: ${slackError}`);
+        if (pending && pending.expiresAt < Date.now()) pendingSlack = null;
         finish("error");
         return;
       }
+      pendingSlack = null;
 
       try {
         const token = await exchangeCodeForToken(
@@ -274,6 +408,17 @@ export async function createSettingsServer(
       return;
     }
 
+    if (path === "/api/slack/test" && req.method === "POST") {
+      try {
+        const webhook = readSlackWebhook(configPath);
+        if (!webhook) throw new Error("Connect Slack before sending a test message.");
+        await postNotification(webhook.url, "slack", { text: "Elf is connected. Drift alerts for this project will appear here." });
+        res.writeHead(200, { "Content-Type": "application/json" }); res.end(JSON.stringify({ ok: true }));
+      } catch {
+        res.writeHead(400, { "Content-Type": "application/json" }); res.end(JSON.stringify({ error: "Could not send the test message. Check your Slack connection and try again." }));
+      }
+      return;
+    }
     if (path === "/api/slack/disconnect" && req.method === "POST") {
       try {
         removeSlackWebhook(configPath);
@@ -300,7 +445,10 @@ export async function createSettingsServer(
   };
 
   const server = createServer((req, res) => {
-    void requestHandler(req, res);
+    void requestHandler(req, res).catch(() => {
+      if (!res.headersSent) res.writeHead(500, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "The local request could not be completed." }));
+    });
   });
 
   await new Promise<void>((fulfill, reject) => {
@@ -330,7 +478,13 @@ export async function createSettingsServer(
     server,
     port: address.port,
     url: `http://127.0.0.1:${address.port}`,
-    publicUrl: `http://localhost:${address.port}`,
+    publicUrl: `http://127.0.0.1:${address.port}/#elf=${initialBootstrap}`,
+    fetch: (path, init = {}) => {
+      const target = new URL(path, `http://127.0.0.1:${address.port}`);
+      if (target.origin !== `http://127.0.0.1:${address.port}`) throw new Error("Settings requests must use the local server origin.");
+      const headers = new Headers(init.headers); headers.set("X-Elf-Session", nativeSession);
+      return fetch(target.href, { ...init, headers });
+    },
     close,
   };
 }
@@ -345,14 +499,24 @@ export async function runSettingsServer(configPath: string): Promise<void> {
     process.exit(1);
   }
 
+  loadWatchEnv(dirname(resolvePath(configPath)));
+  const identity = loadRuntimeBridgeConfig();
   let handle: SettingsServerHandle;
   try {
     handle = await createSettingsServer(configPath, {
       distPath,
       port: DEFAULT_SETTINGS_PORT,
+      identityToken: identity.token,
     });
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "EADDRINUSE") {
+      const existing = `http://127.0.0.1:${DEFAULT_SETTINGS_PORT}`;
+      const reopen = await reopenSettingsServer(existing, configPath, identity.token);
+      if (reopen) {
+        console.log(`Settings page: ${reopen}`);
+        if (process.env.ELF_SETTINGS_NO_OPEN !== "1") openSettingsBrowser(reopen);
+        return;
+      }
       throw new Error(
         `Port ${DEFAULT_SETTINGS_PORT} is already in use. Stop the other process (often "next dev") and run the settings page again.`,
       );
@@ -366,11 +530,51 @@ export async function runSettingsServer(configPath: string): Promise<void> {
   console.log("Press Ctrl+C to close.");
 
   if (process.env.ELF_SETTINGS_NO_OPEN !== "1") {
-    const start = process.platform === "darwin" ? "open" : process.platform === "win32" ? "start" : "xdg-open";
-    spawn(start, [publicUrl], { detached: true }).unref();
+    openSettingsBrowser(publicUrl);
   }
 
   await new Promise<void>((fulfill) => {
     server.on("close", () => fulfill());
   });
+}
+
+/** Open without a shell; a missing desktop opener must not terminate the runtime. */
+export function openSettingsBrowser(url: string): void {
+  const command = process.platform === "darwin" ? "open" : process.platform === "win32" ? "explorer.exe" : "xdg-open";
+  const child = spawn(command, [url], { detached: true, stdio: "ignore" });
+  child.on("error", () => console.error(`Open settings in your browser: ${url}`));
+  child.unref();
+}
+
+/** Reusing a local port requires proof of the same machine identity and project. */
+async function settingsIdentity(url: string, configPath: string, token: string): Promise<string | null> {
+  try {
+    const challenge = randomBytes(32).toString("hex");
+    const response = await fetch(`${url}/api/identity`, { headers: { "X-Elf-Challenge": challenge }, signal: AbortSignal.timeout(2000) });
+    const proof = response.headers.get("x-elf-server-proof");
+    const instance = response.headers.get("x-elf-instance");
+    if (!response.ok || !proof || !/^[a-f0-9]{64}$/.test(proof) || !instance || !/^[a-f0-9]{64}$/.test(instance)) return null;
+    let path: string; try { path = realpathSync(configPath); } catch { path = resolvePath(configPath); }
+    const expected = createHmac("sha256", token).update("identity\n" + challenge + "\n" + path + "\n" + instance).digest();
+    return timingSafeEqual(expected, Buffer.from(proof, "hex")) ? instance : null;
+  } catch { return null; }
+}
+
+export async function verifySettingsServer(url: string, configPath: string, token: string): Promise<boolean> {
+  return Boolean(await settingsIdentity(url, configPath, token));
+}
+
+export async function reopenSettingsServer(url: string, configPath: string, token: string): Promise<string | null> {
+  const instance = await settingsIdentity(url, configPath, token);
+  if (!instance) return null;
+  try {
+    const challenge = randomBytes(32).toString("hex");
+    let path: string; try { path = realpathSync(configPath); } catch { path = resolvePath(configPath); }
+    const proof = createHmac("sha256", token).update("open\n" + challenge + "\n" + path + "\n" + instance).digest("hex");
+    const response = await fetch(`${url}/api/session/open`, { method: "POST", headers: { "X-Elf-Request": "1", "X-Elf-Challenge": challenge, "X-Elf-Machine-Proof": proof }, signal: AbortSignal.timeout(2000) });
+    if (!response.ok) return null;
+    const result = await response.json();
+    const target = new URL(result.url);
+    return target.origin === new URL(url).origin && /^#elf=[a-f0-9]{64}$/.test(target.hash) ? target.href : null;
+  } catch { return null; }
 }

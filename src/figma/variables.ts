@@ -91,7 +91,8 @@ export async function fetchVariables(
   }
 
   if (skipped.length > 0) {
-    console.warn(`Skipped ${skipped.length} variable(s) (unsupported type or category): ${skipped.join(", ")}`);
+    const detail = process.env.ELF_DEBUG ? `: ${skipped.join(", ")}` : "";
+    console.warn(`Skipped ${skipped.length} unsupported Figma variable(s)${detail}.`);
   }
 
   return tokens;

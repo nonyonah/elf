@@ -18,7 +18,7 @@ export {
   type NotifyState,
 } from "./core/notify.js";
 
-import type { NotifyConfig } from "./core/types.js";
+import type { DashboardConfig, NotifyConfig } from "./core/types.js";
 import type { NotifyMessage, NotifyState } from "./core/notify.js";
 import { readSlackWebhook, SLACK_WEBHOOK_FILE } from "./slack.js";
 
@@ -65,6 +65,19 @@ export function resolveNotifyWebhook(
   return stored ? { url: stored.url, source: SLACK_WEBHOOK_FILE } : null;
 }
 
+/** Resolve the link Slack uses for the full report: explicit config, then the console project page. */
+export function resolveReportUrl(config: {
+  notify?: NotifyConfig;
+  dashboard?: DashboardConfig;
+}): string | undefined {
+  const explicit = config.notify?.reportUrl?.trim();
+  if (explicit) return explicit;
+  const projectId = config.dashboard?.projectId?.trim();
+  if (!projectId) return undefined;
+  const base = (config.dashboard?.url ?? "").replace(/\/+$/, "");
+  return base ? `${base}/#/p/${encodeURIComponent(projectId)}` : undefined;
+}
+
 export async function postNotification(
   webhookUrl: string,
   format: "slack" | "text",
@@ -72,6 +85,7 @@ export async function postNotification(
 ): Promise<void> {
   const response = await fetch(webhookUrl, {
     method: "POST",
+    signal: AbortSignal.timeout(10_000),
     headers: { "Content-Type": format === "slack" ? "application/json" : "text/plain" },
     body: format === "slack" ? JSON.stringify(message) : message.text,
   });

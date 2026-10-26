@@ -70,6 +70,74 @@ npx elf-tokens --config elf.config.json
 
 `elf-tokens` has no runtime dependencies of its own to worry about — it runs wherever Node ≥ 20 does.
 
+### Set up a project
+
+Run Elf from the project folder:
+
+```bash
+npx elf-tokens
+```
+
+Elf starts the local bridge, prints a temporary pairing code, and opens setup in
+the same interface as Settings. Choose the token source, open the Elf bridge
+plugin in the target Figma file, and paste the terminal code into the plugin.
+You can then connect Slack or continue without it.
+
+Click **Start watching** to monitor source saves and write drift reports in the
+project. Monitoring leaves Figma unchanged. In Settings, review a sync plan to apply changes
+and optionally enable automatic updates for supported resources.
+Restarting Elf resumes monitoring once the saved Figma file reconnects. Keep the
+terminal and plugin open. Existing check-only scripts should use
+`elf-tokens check` explicitly.
+
+Setup accepts paths within the selected project and preserves unrelated config
+fields. The local settings API rejects foreign browser origins, unexpected Host
+headers, and unmarked write requests. Setup progress is saved before Slack
+redirects; watching starts only after you finish setup.
+
+### Sync and assistant workflow
+
+Settings → Sync shows a review before writing to the connected Figma file.
+Plans list supported creates/updates, Figma conflicts, missing descriptions, and
+resources removed or renamed in code. Plans expire and must be reviewed again
+if code or Figma changes. Automatic sync is opt-in after that review; it preserves
+Figma edits and retains removed resources until you resolve them explicitly.
+
+`elf sync --dry-run` prints a connected review without applying it. `elf sync`
+asks before applying; `--yes` applies a freshly printed plan and never overrides
+conflicts. `--automatic` also saves the preference used by `elf` / `elf watch`.
+The standalone batch package retains its offline dry-run for advanced workflows.
+
+The shared host survives individual client exits. `elf bridge --stop` stops it
+when no other clients are attached. `elf settings` reopens a running project's
+page only after verifying the server's identity.
+
+Coding assistants use the same managed engine to check drift, prepare reviewed
+component descriptions, plan changes, and apply them. See
+[assistant setup and tools](docs/mcp-setup.md) and
+[implementation/security boundaries](docs/runtime-workflow.md).
+
+### Unified package commands
+
+The npm package also includes the local bridge, MCP adapter, sync engine, and watcher:
+
+```bash
+npx elf-tokens bridge       # print a temporary pairing code for the Figma plugin
+npx elf-tokens mcp          # stdio MCP adapter for a coding assistant
+npx elf-tokens sync --help  # create/update Figma resources from batch configuration
+npx elf-tokens watch --help # incremental sync and drift checks
+```
+
+The MCP adapter reuses an authenticated bridge if one is running. Without an
+explicit `ELF_MCP_TOKEN`, these commands share a private machine identity in
+`~/.elf/bridge-secret`. The pairing code expires after five minutes; saved plugin
+pairings survive process restarts with the same identity until revoked in Settings. Keep the plugin open while using the connection.
+
+The package includes `bridge-plugin/manifest.json`, `code.js`, and `ui.html` for
+loading the development plugin. The setup screen guides local project selection and pairing. CSS colors and
+dimensions can sync directly; richer token modes and component descriptions use
+the formats described in [batch/README.md](batch/README.md).
+
 ### Option B — run it from this repo
 
 ```bash
@@ -135,7 +203,8 @@ Copy `elf.config.json` and point it at your file and your token source:
   "notify": {                                // optional — where --notify posts alerts
     "webhookEnv": "SLACK_WEBHOOK_URL",       // env var holding the URL (the URL itself never goes here)
     "format": "slack",                       // "slack" (Block Kit) | "text" (plain body, e.g. ntfy)
-    "onlyOnChange": true                     // false → notify after every run (default: true)
+    "onlyOnChange": true,                    // false → notify after every run (default: true)
+    "reportUrl": "https://…/#/p/proj_…"      // optional — links Slack's "see the full report"
   }
 }
 ```
@@ -210,9 +279,9 @@ npx elf-tokens connect slack   # once; stores the webhook locally
 npx elf-tokens --notify
 ```
 
-Slack incoming webhooks are free and one URL is all the setup there is. The same JSON also works with Discord (append `/slack` to the webhook URL); `"format": "text"` posts a plain body anywhere else (ntfy, etc.). `--notify` uses the environment variable named by `notify.webhookEnv` when it is set, otherwise it falls back to the Slack connection stored by `elf connect slack` / `elf settings`. The URL is never stored in the config file or printed in full.
+Slack incoming webhooks are free and one URL is all the setup there is. The same JSON also works with Discord (append `/slack` to the webhook URL); `"format": "text"` posts a plain body anywhere else (ntfy, etc.). `--notify` uses the environment variable named by `notify.webhookEnv` when it is set, otherwise it falls back to the Slack connection stored by `elf connect slack` / `elf settings`. The webhook URL is never stored in the config file or printed in full.
 
-Alerts are deduped by default: a first report with drift (or deprecation notes), any later change, and a "drift resolved" message when it clears — nothing on repeat runs with the same state. Set `"onlyOnChange": false` in `notify` to post after every run instead. The dedupe state lives in `drift-status.json` next to the report; set `notify.stateFile` to keep it somewhere else. If a post fails, the state is not advanced, so the next run retries.
+Alerts are deduped by default: a first report with drift (or deprecation notes), any later change, and a "drift resolved" message when it clears — nothing on repeat runs with the same state. Set `"onlyOnChange": false` in `notify` to post after every run instead. The dedupe state lives in `drift-status.json` next to the report; set `notify.stateFile` to keep it somewhere else. If a post fails, the state is not advanced, so the next run retries. Set `notify.reportUrl` (or `dashboard.url` + `dashboard.projectId`) to make the Slack "see the full report" phrase a real link; without one it tells you to run `elf check` instead.
 
 Want to see the whole alert lifecycle without a Slack workspace? The bundled drill runs real checks against sample data with a local capture server standing in for the webhook:
 
@@ -341,6 +410,28 @@ npm --prefix batch start -- --dry-run     # plan; nothing is written
 ```
 
 Config, token/sidecar formats and manual checklist: **[`batch/README.md`](batch/README.md)**.
+
+---
+
+## While you're coding
+
+1. From this repo: `npm --prefix watch install`; run `node watch/bin/elf-bridge.mjs` and pair the plugin (or let Cursor host the MCP bridge).
+2. Run `node watch/bin/elf-watch.mjs --config batch/elf-batch.config.json`; it debounces saves and pushes only changed components and tokens.
+3. After each sync it writes `drift-report.md`, prints one summary line, and posts the existing Slack alert when the check config has a `notify` section and a webhook is available. Use `--no-notify` to turn alerts off, `--notify` to require them, and `--check-config <path>` when the drift config is not the root `elf.config.json`.
+4. `node watch/bin/elf-watch.mjs lint --strict --config batch/elf-batch.config.json` finds hardcoded values; `install-hook` runs it before commits.
+5. `init-agent-rules` writes Cursor/AGENTS.md rules so agents use tokens and sidecars.
+
+### Test it
+
+```sh
+npm test && npm run typecheck                 # core
+npm run batch:test && npm run batch:typecheck # batch sync
+npm run watch:test && npm run watch:typecheck # watcher, lint, hooks, CLI
+npm run notify:drill                          # local Slack webhook drill
+npm run test:all                              # everything above + MCP/console/settings
+```
+
+The watcher tests use a fake bridge and temp folders, so they never touch Figma. For a live check, start `elf-bridge`, run `elf-watch` with your project's batch config, edit a component, then read `drift-report.md`; Ctrl+C finishes the current chunk and exits cleanly.
 
 ---
 
@@ -481,7 +572,7 @@ If no secret is set, the CLI falls back to PKCE with the built-in client ID. Tha
 
 ## Settings page
 
-`elf settings` (or `npm run settings` in this repo) opens a small local web page served by the CLI at `http://localhost:3000`. The command finds the nearest `elf.config.json` walking up from the current folder, so it also works from a nested folder such as `settings-next/`. The page shows the resolved config path so you can see which project it is editing. If port 3000 is busy, stop the other process (usually `next dev`) and run it again.
+`elf settings` (or `npm run settings` in this repo) opens a small local web page served by the CLI at `http://127.0.0.1:3000` through a private, single-use link. The command finds the nearest `elf.config.json` walking up from the current folder, so it also works from a nested folder such as `settings-next/`. The page shows the resolved config path so you can see which project it is editing. If port 3000 is busy, stop the other process (usually `next dev`) and run it again.
 
 From the page you can:
 

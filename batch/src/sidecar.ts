@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { lstatSync, readFileSync } from "node:fs";
 import { extname, resolve } from "node:path";
 import { normalizeRef, type TokenIndex } from "./tokens.js";
 import type { ParsedComponent, SidecarSpec, SidecarVariant, Variant } from "./types.js";
@@ -40,6 +40,8 @@ const LAYOUT_MODES = new Set(["HORIZONTAL", "VERTICAL", "NONE"]);
 export function loadSidecar(componentsDir: string, parsed: ParsedComponent): SidecarSpec | null {
   const componentPath = resolve(componentsDir, parsed.file);
   const sidecarPath = componentPath.slice(0, -extname(componentPath).length) + ".figma.json";
+  const stat = lstatSync(sidecarPath, { throwIfNoEntry: false });
+  if (stat?.isSymbolicLink()) throw new Error("Figma descriptions must not be symbolic links.");
   let raw: string;
   try {
     raw = readFileSync(sidecarPath, "utf8");

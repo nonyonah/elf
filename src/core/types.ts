@@ -51,6 +51,8 @@ export interface NotifyConfig {
   onlyOnChange?: boolean;
   /** Optional file for the dedupe state; defaults to drift-status.json next to the report. */
   stateFile?: string;
+  /** Optional absolute URL to the full report, used for Slack's "see the full report" link. */
+  reportUrl?: string;
 }
 
 /** Where snapshots go: the elf console dashboard. The token lives in the ELF_DASHBOARD_TOKEN environment variable, never here. */

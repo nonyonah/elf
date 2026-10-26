@@ -18,6 +18,7 @@ import {
   postNotification,
   readNotifyState,
   resolveNotifyWebhook,
+  resolveReportUrl,
   writeNotifyState,
   type NotifyState,
   type ResolvedNotifyWebhook,
@@ -61,6 +62,11 @@ Usage:
 The npm package installs both \`elf\` and \`elf-tokens\` — same CLI, either name.
 
 Commands:
+  start                Open setup and monitor this project (default with no arguments).
+  mcp                  Run the MCP adapter for coding assistants (stdio by default).
+  bridge               Start the local Figma bridge and print a pairing code.
+  sync                 Create/update Figma tokens and components from batch config.
+  watch                Watch local sources, sync changes, and check drift.
   push                 Send a code snapshot (tokens, components, drift) to the
                        elf console dashboard. Needs "dashboard.url" in the
                        config (or --url) and the ELF_DASHBOARD_TOKEN variable.
@@ -222,7 +228,7 @@ async function main(): Promise<number> {
 
   let bridge: BridgeCaller | null = null;
   const getBridge = async (): Promise<BridgeCaller> => {
-    bridge ??= await connectBridge();
+    bridge ??= await connectBridge(config.figma.fileKey);
     return bridge;
   };
 
@@ -378,6 +384,14 @@ async function runDriftCheck(
     const statePath = notifyConfig.stateFile ?? statusPath;
     const previousState = readNotifyState(statePath);
     const decision = decideNotification(previousState, result, notifyConfig.onlyOnChange !== false);
+    const reportUrl = resolveReportUrl(config);
+    const notifyMeta = {
+      fileKey: meta.fileKey,
+      figmaSource: meta.figmaSource,
+      codebaseSource: meta.codebaseSource,
+      checkedAt: meta.checkedAt,
+      ...(reportUrl ? { url: reportUrl } : {}),
+    };
 
     let posted = false;
     if (decision.send) {
@@ -385,7 +399,7 @@ async function runDriftCheck(
         await postNotification(
           webhookUrl,
           notifyConfig.format,
-          buildNotifyMessage(result, meta, notifyConfig.format, previousState),
+          buildNotifyMessage(result, notifyMeta, notifyConfig.format, previousState),
         );
         posted = true;
         console.log(`Notification posted (via ${webhookSource || notifyConfig.webhookEnv}).`);

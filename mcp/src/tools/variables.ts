@@ -75,7 +75,7 @@ const variableSpec = z.object({
     ),
   scopes: z.array(variableScopeSchema).optional().describe("Figma variable scopes."),
   values: z
-    .record(valueSchema)
+    .record(z.string(), valueSchema)
     .describe("Values keyed by mode name or mode id. Modes left out keep their current value."),
 });
 

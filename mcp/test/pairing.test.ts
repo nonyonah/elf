@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { createHash, createHmac, randomBytes } from "node:crypto";
+import { pairingKey, pairingHint, pairingProof, pairingHmac } from "../../src/core/pairing-auth.js";
 import { test } from "node:test";
 import { WebSocket } from "ws";
 import { Bridge } from "../src/bridge.js";
@@ -111,12 +113,12 @@ test("rejects an invalid or expired session", async () => {
 });
 
 test("rejects an expired pairing code", async () => {
-  const bridge = new Bridge({ token: TOKEN, port: 0, logger: silentLogger, pairingCodeTtlMs: 1 });
+  const bridge = new Bridge({ token: TOKEN, port: 0, logger: silentLogger, pairingCodeTtlMs: 50 });
   const port = await bridge.start();
   const pairing = bridge.pairingCode;
   assert.ok(pairing);
 
-  await new Promise((resolve) => setTimeout(resolve, 10));
+  await new Promise((resolve) => setTimeout(resolve, 80));
   assert.equal(bridge.pairingCode, null);
 
   const socket = await connect(port, `code=${encodeURIComponent(pairing.code)}`);
@@ -163,4 +165,105 @@ test("the /control lane still requires the token, not a pairing code", async () 
   const control = new WebSocket(`ws://127.0.0.1:${port}/control?code=${encodeURIComponent(pairing.code)}`);
   assert.equal(await new Promise<number>((resolve) => control.once("close", (code) => resolve(code))), AUTH_FAILED_CODE);
   await bridge.stop();
+});
+
+test("refreshing a pairing code invalidates the old code while preserving saved sessions", async () => {
+  const bridge = new Bridge({ token: TOKEN, port: 0, logger: silentLogger });
+  const port = await bridge.start();
+  try {
+    const old = bridge.pairingCode!;
+    const fresh = bridge.refreshPairingCode();
+    assert.notEqual(fresh.code, old.code);
+    await assert.rejects(connectReady(port, `code=${old.code}`), /closed before ready/);
+    const paired = await connectReady(port, `code=${fresh.code}`);
+    const session = paired.message.session!;
+    paired.socket.close();
+    await waitFor(() => !bridge.isConnected);
+    bridge.refreshPairingCode();
+    const resumed = await connectReady(port, `session=${encodeURIComponent(session)}`);
+    assert.equal(resumed.message.type, "ready");
+    resumed.socket.close();
+  } finally { await bridge.stop(); }
+});
+
+import { mkdtempSync, readFileSync, rmSync, statSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { SessionStore } from "../src/sessions.js";
+import { createBridgeClient } from "../src/client.js";
+
+test("persistent file pairing survives bridge restart and can be revoked individually", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "elf-pairing-store-")); const path = join(dir, "sessions.json");
+  let bridge = new Bridge({ token: TOKEN, port: 0, sessionStore: new SessionStore(path) });
+  let socket: WebSocket | undefined;
+  try {
+    let port = await bridge.start();
+    const paired = await connectReady(port, `code=${bridge.pairingCode!.code}`); socket = paired.socket;
+    const session = paired.message.session!;
+    assert.match(session, /^elfp_/);
+    assert.equal(paired.message.sessionExpiresAt, undefined);
+    socket.send(JSON.stringify({ type: "status", file: { key: "persistent-file", name: "Persistent" } }));
+    await waitFor(() => bridge.status.file?.key === "persistent-file");
+    socket.close(); await bridge.stop();
+    assert.equal(readFileSync(path, "utf8").includes(session), false);
+    if (process.platform !== "win32") assert.equal(statSync(path).mode & 0o777, 0o600);
+    bridge = new Bridge({ token: TOKEN, port: 0, sessionStore: new SessionStore(path) }); port = await bridge.start();
+    const resumed = await resumeVerified(port, session); socket = resumed.socket;
+    socket.send(JSON.stringify({ type: "status", file: { key: "persistent-file", name: "Persistent" } }));
+    await waitFor(() => bridge.status.file?.key === "persistent-file");
+    const client = await createBridgeClient({ port, token: TOKEN });
+    try { await client.call("__elf_revoke", { fileKey: "persistent-file" }); } finally { client.close(); }
+    await waitFor(() => !bridge.isConnected);
+    await assert.rejects(resumeVerified(port, session), /closed before ready/);
+  } finally { socket?.terminate(); await bridge.stop(); rmSync(dir, { recursive: true }); }
+});
+
+function resumeVerified(port: number, session: string, tamper = false): Promise<{socket: WebSocket; message: BridgeReadyMessage}> {
+  const key = pairingKey(session), nonce = randomBytes(32).toString("hex");
+  return new Promise((resolve, reject) => {
+    const socket = new WebSocket(`ws://127.0.0.1:${port}/?hint=${pairingHint(key)}&nonce=${nonce}`);
+    let serverNonce = "", sent = 0, received = 0;
+    const timer = setTimeout(() => { socket.terminate(); reject(new Error("handshake timed out")); }, 2000);
+    socket.on("message", data => {
+      let message = JSON.parse(data.toString());
+      if (message.type === "challenge") {
+        assert.equal(message.proof, pairingProof(key, "server", nonce, message.nonce));
+        serverNonce = message.nonce;
+        const proof = pairingProof(key, "client", nonce, message.nonce);
+        socket.send(JSON.stringify({type: "authenticate", proof: tamper ? "0".repeat(64) : proof}));
+      } else {
+        assert.equal(message.proof, pairingHmac(key, `message-server\n${nonce}\n${serverNonce}\n${++received}\n${message.payload}`));
+        message = JSON.parse(message.payload);
+        const rawSend = socket.send.bind(socket);
+        socket.send = ((data: any) => {
+          const payload = String(data), sequence = ++sent;
+          rawSend(JSON.stringify({type: "authenticated", sequence, payload, proof: pairingHmac(key, `message-client\n${nonce}\n${serverNonce}\n${sequence}\n${payload}`)}));
+        }) as typeof socket.send;
+        clearTimeout(timer); resolve({socket, message});
+      }
+    });
+    socket.once("error", reject);
+    socket.once("close", code => { clearTimeout(timer); reject(new Error(`closed before ready (code ${code})`)); });
+  });
+}
+
+test("pairing proof matches independent HMAC and separates client and server transcripts", () => {
+  const key = pairingKey("elfp_example"), client = "a".repeat(64), server = "b".repeat(64);
+  assert.equal(key, createHash("sha256").update("elfp_example").digest("hex"));
+  assert.equal(pairingProof(key, "server", client, server), createHmac("sha256", Buffer.from(key, "hex")).update(`server\n${client}\n${server}`).digest("hex"));
+  assert.notEqual(pairingProof(key, "server", client, server), pairingProof(key, "client", client, server));
+});
+
+test("persistent reconnect rejects bearer URLs and forged challenge responses", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "elf-pairing-proof-"));
+  const store = new SessionStore(join(dir, "sessions.json"));
+  const session = store.issue();
+  const bridge = new Bridge({token: TOKEN, port: 0, sessionStore: store});
+  try {
+    const port = await bridge.start();
+    await assert.rejects(connectReady(port, `session=${session}`), /closed before ready/);
+    await assert.rejects(resumeVerified(port, session, true), /closed before ready/);
+    assert.equal(bridge.isConnected, false);
+    const resumed = await resumeVerified(port, session); resumed.socket.close();
+  } finally { await bridge.stop(); rmSync(dir, {recursive: true}); }
 });

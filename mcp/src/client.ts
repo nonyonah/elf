@@ -1,7 +1,7 @@
-import { randomUUID } from "node:crypto";
+import { createHash, createHmac, randomBytes, timingSafeEqual, randomUUID } from "node:crypto";
 import WebSocket from "ws";
-import { BRIDGE_HOST, Bridge, type BridgeStatus, type StatusListener } from "./bridge.js";
-import { loadBridgeConfig, type BridgeConfig } from "./config.js";
+import { BRIDGE_HOST, type BridgeStatus, type StatusListener } from "./bridge.js";
+import { loadRuntimeBridgeConfig, type BridgeConfig } from "./config.js";
 import { BridgeError, type BridgeErrorCode } from "./errors.js";
 import {
   AUTH_FAILED_CODE,
@@ -17,8 +17,22 @@ import {
  * see this interface, which keeps them independent of WebSocket details and
  * makes "is the plugin open?" a single place.
  */
+export interface PluginConnection {
+  readonly status: BridgeStatus;
+  readonly isConnected: boolean;
+  onStatus(listener: StatusListener): () => void;
+  request<T = unknown>(method: string, params?: Record<string, unknown>, options?: { timeoutMs?: number }): Promise<T>;
+}
+
 export class PluginClient {
-  constructor(private readonly bridge: Bridge) {}
+  constructor(private readonly bridge: PluginConnection, private readonly transact?: <T>(fileKey: string, work: (client: BridgeClient) => Promise<T>) => Promise<T>) {}
+
+  async mutate<T>(work: (client: PluginClient) => Promise<T>): Promise<T> {
+    if (!this.transact) return work(this);
+    const fileKey = this.status.file?.key;
+    if (!fileKey) throw new Error("Connect the intended Figma file before editing it.");
+    return this.transact(fileKey, connection => work(new PluginClient(connection)));
+  }
 
   get status(): BridgeStatus {
     return this.bridge.status;
@@ -69,12 +83,6 @@ interface PendingCall {
 
 const CONNECT_TIMEOUT_MS = 5_000;
 /**
- * The bridge closes the socket with 4001 right *after* the handshake when the
- * token is wrong, so a successful open only counts after this grace period.
- */
-const AUTH_GRACE_MS = 150;
-
-/**
  * A local client for the bridge's `/control` lane: one WebSocket, many
  * `call(tool, args)` round trips, each matched by its own id. Connecting
  * fails fast with an actionable message instead of hanging when the MCP
@@ -82,22 +90,41 @@ const AUTH_GRACE_MS = 150;
  */
 export class BridgeClient {
   private socket: WebSocket | null = null;
+  private channel: {key: string; context: string; sent: number; received: number} | null = null;
   private readonly pending = new Map<string, PendingCall>();
+  private readonly listeners = new Set<StatusListener>();
+  private bridgeStatus: BridgeStatus = {
+    connected: false, port: null, address: null, file: null, plugin: null, connectedAt: null,
+  };
+
+  get status(): BridgeStatus { return this.bridgeStatus; }
+  get isConnected(): boolean { return this.bridgeStatus.connected; }
+  onStatus(listener: StatusListener): () => void {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
+  request<T = unknown>(method: string, params: Record<string, unknown> = {}, options: BridgeCallOptions = {}): Promise<T> {
+    return this.call<T>(method, params, options);
+  }
+  private updateStatus(status: BridgeStatus): void {
+    this.bridgeStatus = status;
+    for (const listener of this.listeners) listener(status);
+  }
   private readonly timeoutMs: number;
   private readonly address: string;
 
   constructor(private readonly options: Required<BridgeClientOptions>) {
     this.timeoutMs = options.timeoutMs;
-    this.address = `ws://${options.host}:${options.port}`;
+    this.address = `ws://${options.host.includes(":") ? `[${options.host}]` : options.host}:${options.port}`;
   }
 
   /** Opens the connection. Options left out fall back to `ELF_MCP_*` env vars. */
   static async connect(options: BridgeClientOptions = {}): Promise<BridgeClient> {
     // A token passed in-code is authoritative; the environment only fills the
-    // gaps. Without one anywhere, loadBridgeConfig throws its own clear message.
+    // gaps. Without one anywhere, loadRuntimeBridgeConfig throws its own clear message.
     let env: BridgeConfig | null = null;
     try {
-      env = loadBridgeConfig();
+      env = options.token === undefined ? loadRuntimeBridgeConfig() : loadRuntimeBridgeConfig({ ...process.env, [TOKEN_ENV]: options.token });
     } catch (error) {
       if (options.token === undefined) throw error;
     }
@@ -138,23 +165,36 @@ export class BridgeClient {
       }, timeoutMs);
 
       this.pending.set(id, { method, resolve: resolve as (value: unknown) => void, reject, timer });
-      socket.send(JSON.stringify({ type: "call", id, method, params }), (error) => {
+      socket.send(this.encode({ type: "call", id, method, params }), (error) => {
         if (!error) return;
         this.settle(id, undefined, new BridgeError("transport", `Could not send "${method}": ${error.message}`));
       });
     });
   }
 
-  close(): void {
+  /** Hold the shared bridge lane across a complete read/plan/write transaction. */
+  async transaction<T>(fileKey: string, work: (client: BridgeClient) => Promise<T>): Promise<T> {
+    await this.call("__elf_lock", { fileKey }, { timeoutMs: 30_000 });
+    try { return await work(this); }
+    finally { await this.call("__elf_unlock").catch(() => {}); }
+  }
+
+  close(): Promise<void> {
     const socket = this.socket;
+    const closed = socket && socket.readyState !== WebSocket.CLOSED ? new Promise<void>(resolve => socket.once("close", () => resolve())) : Promise.resolve();
     this.socket = null;
     if (socket && socket.readyState === WebSocket.OPEN) socket.close(1000, "client closing");
     this.rejectAll(new BridgeError("disconnected", "The bridge client was closed."));
+    this.updateStatus({ ...this.bridgeStatus, connected: false, file: null, plugin: null, connectedAt: null });
+    return closed;
   }
 
   private open(): Promise<void> {
     return new Promise((resolve, reject) => {
-      const socket = new WebSocket(`${this.address}${CONTROL_PATH}?token=${encodeURIComponent(this.options.token)}`);
+      const nonce = randomBytes(32).toString("hex");
+      const key = createHash("sha256").update("control\n" + this.options.token).digest("hex");
+      this.channel = null;
+      const socket = new WebSocket(`${this.address}${CONTROL_PATH}?nonce=${nonce}`);
       this.socket = socket;
 
       let settled = false;
@@ -183,20 +223,44 @@ export class BridgeClient {
         if (this.socket === socket) this.socket = null;
         const error = closeError(code, this.address);
         this.rejectAll(error);
+        this.updateStatus({ ...this.bridgeStatus, connected: false, file: null, plugin: null, connectedAt: null });
         settleReject(error);
       });
-      socket.on("message", (data) => this.receive(data.toString()));
-      socket.once("open", () => {
-        clearTimeout(timer);
-        // Give the bridge's 4001 close frame a moment to land before saying
-        // "connected" — that frame is how a wrong token shows up here.
-        setTimeout(() => {
-          if (settled) return;
-          settled = true;
-          resolve();
-        }, AUTH_GRACE_MS);
+      socket.on("message", data => {
+        try {
+          const message = JSON.parse(data.toString());
+          if (!this.channel) {
+            if (message.type !== "challenge" || typeof message.nonce !== "string" || !/^[a-f0-9]{64}$/.test(message.nonce) || typeof message.proof !== "string" || !/^[a-f0-9]{64}$/.test(message.proof)) throw new Error("Invalid bridge identity.");
+            const context = `${nonce}\n${message.nonce}`;
+            const expected = createHmac("sha256", Buffer.from(key, "hex")).update(`server\n${context}`).digest();
+            if (!timingSafeEqual(expected, Buffer.from(message.proof, "hex"))) throw new Error("Could not verify the bridge identity.");
+            this.channel = {key, context, sent: 0, received: 0};
+            socket.send(JSON.stringify({type: "authenticate", proof: createHmac("sha256", Buffer.from(key, "hex")).update(`client\n${context}`).digest("hex")}));
+            return;
+          }
+          this.receive(this.decode(message));
+          if (!settled) { settled = true; clearTimeout(timer); resolve(); }
+        } catch (error) {
+          socket.close(AUTH_FAILED_CODE, "invalid bridge authentication");
+          settleReject(new BridgeError("auth", (error as Error).message));
+        }
       });
     });
+  }
+
+  private encode(message: unknown): string {
+    const channel = this.channel;
+    if (!channel) throw new BridgeError("auth", "The bridge has not authenticated.");
+    const payload = JSON.stringify(message), sequence = ++channel.sent;
+    const proof = createHmac("sha256", Buffer.from(channel.key, "hex")).update(`message-client\n${channel.context}\n${sequence}\n${payload}`).digest("hex");
+    return JSON.stringify({type: "authenticated", sequence, payload, proof});
+  }
+  private decode(frame: any): string {
+    const channel = this.channel!;
+    if (frame.type !== "authenticated" || frame.sequence !== channel.received + 1 || typeof frame.payload !== "string" || typeof frame.proof !== "string" || !/^[a-f0-9]{64}$/.test(frame.proof)) throw new Error("Invalid authenticated frame.");
+    const proof = createHmac("sha256", Buffer.from(channel.key, "hex")).update(`message-server\n${channel.context}\n${frame.sequence}\n${frame.payload}`).digest();
+    if (!timingSafeEqual(proof, Buffer.from(frame.proof, "hex"))) throw new Error("Invalid bridge message proof.");
+    channel.received++; return frame.payload;
   }
 
   private receive(raw: string): void {
@@ -204,6 +268,11 @@ export class BridgeClient {
     try {
       message = JSON.parse(raw) as BridgeControlResultMessage;
     } catch {
+      return;
+    }
+    const statusMessage = message as unknown as { type: string; status?: BridgeStatus };
+    if (statusMessage.type === "bridge-status" && statusMessage.status) {
+      this.updateStatus(statusMessage.status);
       return;
     }
     if (message.type !== "result" || !this.pending.has(message.id)) return;

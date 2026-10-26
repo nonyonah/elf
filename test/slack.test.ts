@@ -299,3 +299,23 @@ test("connectSlackManual stores a manual webhook and disconnectSlack removes it"
 test("env restored", () => {
   process.env = originalEnv;
 });
+import { statSync, symlinkSync } from "node:fs";
+
+test("Slack credential writes are private and reject linked destinations", () => {
+  const dir = mkdtempSync(join(tmpdir(), "elf-slack-private-"));
+  const configPath = join(dir, "elf.config.json");
+  const info = { url: "https://hooks.slack.com/services/test", channel: "design", channelId: "C1", teamName: "Team", teamId: "T1", configuredAt: "now" };
+  const file = join(dir, ".elf", "slack-webhook.json");
+  try {
+    writeSlackWebhook(configPath, info);
+    if (process.platform !== "win32") assert.equal(statSync(file).mode & 0o777, 0o600);
+    const original = readFileSync(file, "utf8");
+    const target = join(dir, "outside.json");
+    writeFileSync(target, original);
+    rmSync(file);
+    symlinkSync(target, file);
+    assert.equal(readSlackWebhook(configPath), null);
+    assert.throws(() => writeSlackWebhook(configPath, info), /regular file/);
+    assert.equal(readFileSync(target, "utf8"), original);
+  } finally { rmSync(dir, { recursive: true }); }
+});

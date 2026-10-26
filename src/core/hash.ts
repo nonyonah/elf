@@ -19,7 +19,10 @@ const rotr = (x: number, n: number): number => ((x >>> n) | (x << (32 - n))) >>>
 
 /** Lowercase hex SHA-256 — identical to node:crypto's digest("hex"). */
 export function sha256Hex(input: string): string {
-  const bytes = new TextEncoder().encode(input);
+  return sha256Bytes(new TextEncoder().encode(input));
+}
+
+export function sha256Bytes(bytes: Uint8Array): string {
   const padded = new Uint8Array(Math.ceil((bytes.length + 9) / 64) * 64);
   padded.set(bytes);
   padded[bytes.length] = 0x80;

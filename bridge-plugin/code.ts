@@ -1293,7 +1293,7 @@ async function listComponents(params: Record<string, unknown>): Promise<unknown>
   const components: SceneNode[] = [];
   const collect = (node: ChildrenMixin): void => {
     for (const child of node.children) {
-      if (child.type === "COMPONENT") components.push(child);
+      if (child.type === "COMPONENT" || child.type === "COMPONENT_SET") components.push(child);
       if (deep && "children" in child) collect(child as ChildrenMixin);
     }
   };
@@ -1304,6 +1304,7 @@ async function listComponents(params: Record<string, unknown>): Promise<unknown>
     components: components.map((component) => ({
       id: component.id,
       name: component.name,
+      type: component.type,
       codeKey: codeKeyOf(component),
       parentId: component.parent ? (component.parent as { id: string }).id : null,
       width: component.width,
@@ -1360,6 +1361,16 @@ async function nodePayload(node: SceneNode, depth: number): Promise<Record<strin
     payload.cornerRadius = numberOrMixed(layout.cornerRadius);
   }
 
+  if (node.type === "TEXT") {
+    payload.characters = node.characters;
+    payload.fontSize = numberOrMixed(node.fontSize);
+    payload.fontName = node.fontName === figma.mixed ? "mixed" : node.fontName;
+    payload.lineHeight = node.lineHeight === figma.mixed ? "mixed" : node.lineHeight;
+    payload.letterSpacing = node.letterSpacing === figma.mixed ? "mixed" : node.letterSpacing;
+  }
+  if (node.type === "INSTANCE") payload.mainComponentId = (await node.getMainComponentAsync())?.id ?? null;
+  if ("effects" in node) payload.effects = node.effects;
+  if ("variantProperties" in node) payload.variantProperties = node.variantProperties;
   if ("fills" in node && node.fills !== figma.mixed) {
     payload.fills = await paintsPayload(node.fills as ReadonlyArray<Paint>);
   }
@@ -1417,6 +1428,14 @@ async function handle(method: string, params: Record<string, unknown>): Promise<
       };
     case "list_collections":
       return listCollections();
+    case "list_styles": {
+      const texts = await figma.getLocalTextStylesAsync();
+      const effects = await figma.getLocalEffectStylesAsync();
+      return { styles: [
+        ...texts.map(style => ({ id: style.id, name: style.name, codeKey: style.getSharedPluginData("elf", "codeKey"), kind: "text", fontName: style.fontName, fontSize: style.fontSize, lineHeight: style.lineHeight, letterSpacing: style.letterSpacing })),
+        ...effects.map(style => ({ id: style.id, name: style.name, codeKey: style.getSharedPluginData("elf", "codeKey"), kind: "effect", effects: style.effects })),
+      ] };
+    }
     case "list_variables":
       return listVariables(params);
     case "create_collection":

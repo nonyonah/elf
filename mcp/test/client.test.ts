@@ -103,7 +103,7 @@ describe("control client (/control lane)", () => {
   test("a wrong token fails fast with an auth explanation", async () => {
     await assert.rejects(
       () => createBridgeClient({ port, token: "wrong-token-abcdefgh", timeoutMs: 500 }),
-      isBridgeError("auth", "ELF_MCP_TOKEN"),
+      isBridgeError("auth", "verify the bridge identity"),
     );
   });
 
@@ -155,4 +155,97 @@ describe("control client (/control lane)", () => {
     );
     client.close();
   });
+});
+
+import { acquireBridge } from "../src/runtime.js";
+
+test("MCP runtime reuses an authenticated bridge without taking ownership", async () => {
+  const owner = await acquireBridge({ token: TOKEN, port: 0, timeoutMs: 500 });
+  const port = owner.connection.status.port!;
+  try {
+    assert.equal(owner.owned, true);
+    const attached = await acquireBridge({ token: TOKEN, port, timeoutMs: 500 });
+    try {
+      assert.equal(attached.owned, false);
+      assert.equal(attached.pairingCode, null);
+      assert.equal(attached.connection.status.port, port);
+      const previousCode = owner.pairingCode!.code;
+      const refreshed = await attached.refreshPairingCode();
+      assert.notEqual(refreshed.code, previousCode);
+      assert.match(refreshed.code, /^[a-z2-9]{4}-[a-z2-9]{4}-[a-z2-9]{4}$/);
+      const plugin = await FakePlugin.connect({ port, token: TOKEN });
+      try {
+        const status = await new Promise<boolean>((resolve) => {
+          if (attached.connection.isConnected) return resolve(true);
+          const off = attached.connection.onStatus((value) => { if (value.connected) { off(); resolve(true); } });
+        });
+        assert.equal(status, true);
+      } finally { await plugin.close(); }
+    } finally { await attached.close(); }
+    assert.equal(owner.connection.status.port, port);
+    const probe = await createBridgeClient({ port, token: TOKEN });
+    probe.close();
+    await assert.rejects(acquireBridge({ token: "a-different-secret", port, timeoutMs: 500 }), /verify the bridge identity/);
+  } finally { await owner.close(); }
+});
+
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+test("bridge transactions isolate controllers and reject a changed target file", async () => {
+  const bridge = new Bridge({ token: TOKEN, port: 0 });
+  const port = await bridge.start();
+  const plugin = await FakePlugin.connect({ port, token: TOKEN, handlers: { get_node: params => ({ node: params.nodeId }) } });
+  plugin.sendStatus({ key: "file-one", name: "First" });
+  const a = await createBridgeClient({ port, token: TOKEN }); const b = await createBridgeClient({ port, token: TOKEN });
+  try {
+    await a.call("__elf_lock", { fileKey: "file-one" });
+    let answered = false;
+    const waiting = b.call("get_node", { nodeId: "other" }).then(value => { answered = true; return value; });
+    await a.call("get_node", { nodeId: "own" });
+    assert.equal(answered, false);
+    plugin.sendStatus({ key: "file-two", name: "Second" });
+    await new Promise(resolve => setTimeout(resolve, 30));
+    await assert.rejects(a.call("upsert_component", { name: "Must not write" }), /file changed/);
+    await a.call("__elf_unlock");
+    await waiting;
+    assert.equal(plugin.requests.some(request => request.method === "upsert_component"), false);
+  } finally { a.close(); b.close(); plugin.terminate(); await bridge.stop(); }
+});
+
+test("shared host survives a client exit and authenticates reused connections", { timeout: 20000 }, async () => {
+  const dir = mkdtempSync(join(tmpdir(), "elf-shared-host-"));
+  const server = createServer(); server.listen(0, "127.0.0.1"); await new Promise<void>(resolve => server.once("listening", resolve));
+  const port = (server.address() as { port: number }).port;
+  await new Promise<void>(resolve => server.close(() => resolve()));
+  const config = { token: TOKEN, port, timeoutMs: 1000, persistent: true, sessionStorePath: join(dir, "sessions.json") };
+  let a: Awaited<ReturnType<typeof acquireBridge>> | undefined; let b: typeof a;
+  try {
+    a = await acquireBridge(config); b = await acquireBridge(config);
+    assert.equal(a.owned, false); assert.equal(b.owned, false);
+    await a.close(); a = undefined;
+    const refreshed = await b.refreshPairingCode(); assert.ok(refreshed.code);
+    await b.connection.request("__elf_shutdown");
+    await b.close(); b = undefined;
+  } finally { await a?.close(); await b?.close(); rmSync(dir, { recursive: true }); }
+});
+
+import { WebSocketServer } from "ws";
+test("a spoofed bridge cannot obtain controller credentials or skip server verification", async () => {
+  const server = new WebSocketServer({host: "127.0.0.1", port: 0});
+  await new Promise<void>(resolve => server.once("listening", resolve));
+  let handshake = "", received = 0;
+  server.on("connection", (socket, request) => {
+    handshake = request.url ?? "";
+    socket.on("message", () => received++);
+    socket.send(JSON.stringify({type: "challenge", nonce: "a".repeat(64), proof: "0".repeat(64)}));
+  });
+  try {
+    const port = (server.address() as {port: number}).port;
+    await assert.rejects(createBridgeClient({port, token: TOKEN}), /verify the bridge identity/);
+    assert.equal(handshake.includes(TOKEN), false);
+    assert.match(handshake, /^\/control\?nonce=[a-f0-9]{64}$/);
+    assert.equal(received, 0);
+  } finally { for (const client of server.clients) client.terminate(); await new Promise<void>(resolve => server.close(() => resolve())); }
 });

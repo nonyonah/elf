@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, lstatSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { basename, dirname, extname, relative, resolve, sep } from "node:path";
 import ts from "typescript";
 import type { ParsedComponent } from "./types.js";
@@ -236,6 +236,7 @@ function collectFiles(dir: string): string[] {
   for (const entry of readdirSync(dir)) {
     if (entry.startsWith(".")) continue;
     const path = resolve(dir, entry);
+    if (lstatSync(path).isSymbolicLink()) throw new Error(`Component paths must not be symbolic links: ${path}.`);
     if (statSync(path).isDirectory()) {
       found.push(...collectFiles(path));
     } else if (COMPONENT_EXTENSIONS.includes(extname(entry))) {

@@ -13,6 +13,7 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const scratch = mkdtempSync(join(tmpdir(), "elf-notify-drill-"));
 const out = join(scratch, "drift-report.md");
 const statusPath = join(scratch, "drift-status.json");
+const configPath = join(scratch, "elf.config.json");
 
 const deliveries = [];
 let mode = "ok";
@@ -45,7 +46,7 @@ const check = (label, ok, detail = "") => {
 // Async spawn so this process's event loop stays free to serve the webhook.
 const run = (args, env = {}) =>
   new Promise((resolvePromise) => {
-    const child = spawn(process.execPath, ["--import", "tsx", "src/cli.ts", ...args], {
+    const child = spawn(process.execPath, ["--import", "tsx", "src/cli.ts", "--config", configPath, ...args], {
       cwd: ROOT,
       env: { ...process.env, ELF_NOTIFY_WEBHOOK: "", ...env },
     });

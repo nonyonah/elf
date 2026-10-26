@@ -410,3 +410,19 @@ describe("runSync", () => {
     scratch.cleanup();
   });
 });
+
+test("partial variable failures retain only confirmed successes and report the actual count", async () => {
+  const scratch = scratchFixtures(); const bridge = new FakeBridge();
+  try {
+    const variables = planTokens(scratch.config.tokensFile, scratch.config).plan.primitives.variables;
+    assert.ok(variables.length > 1);
+    bridge.variableErrors = [{ name: variables[0].name, message: "simulated refusal" }];
+    const result = await runSync({ config: scratch.config, client: bridge, log: silent });
+    assert.match(result.aborted ?? "", /Figma refused/);
+    assert.equal(result.tokens.primitives.upserted, variables.length - 1);
+    const manifest = loadManifest(scratch.config.manifestFile);
+    assert.equal(manifest.tokens[variables[0].codeKey], undefined);
+    assert.ok(manifest.tokens[variables[1].codeKey]?.figmaVariableId);
+    assert.equal(result.components.length, 0);
+  } finally { scratch.cleanup(); }
+});

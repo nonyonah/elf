@@ -106,11 +106,17 @@ function parseNotify(value: unknown, configDir: string, configPath: string): Not
   if (record.stateFile !== undefined && (typeof record.stateFile !== "string" || !record.stateFile.trim())) {
     throw new Error(`Config "${configPath}": "notify.stateFile" must be a non-empty path.`);
   }
+  if (record.reportUrl !== undefined) {
+    if (typeof record.reportUrl !== "string" || !/^https?:\/\//i.test(record.reportUrl.trim())) {
+      throw new Error(`Config "${configPath}": "notify.reportUrl" must be an http(s) URL.`);
+    }
+  }
   return {
     webhookEnv: record.webhookEnv.trim(),
     format,
     onlyOnChange: record.onlyOnChange ?? true,
     ...(typeof record.stateFile === "string" ? { stateFile: resolve(configDir, record.stateFile) } : {}),
+    ...(typeof record.reportUrl === "string" ? { reportUrl: record.reportUrl.trim() } : {}),
   };
 }
 

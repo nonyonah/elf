@@ -137,6 +137,7 @@ function createFigmaStub(sendToSocket) {
           id: nextId("I"),
           name: this.name,
           type: "INSTANCE",
+          getMainComponentAsync: async () => this,
           x: 0,
           y: 0,
           width: this.width,

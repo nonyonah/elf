@@ -1,6 +1,6 @@
 import { loadManifest } from "../batch/src/manifest.js";
 import { parseComponents } from "../batch/src/parser.js";
-import { componentSpecHash } from "../batch/src/sync.js";
+import { componentSourceHash, componentSpecHash } from "../batch/src/sync.js";
 import type { BridgeCaller } from "./figma/bridge.js";
 import { listBridgeComponents, readNodeState } from "./figma/bridge.js";
 import type { ComponentIssue } from "./core/diff.js";
@@ -62,6 +62,7 @@ export async function diffComponents(
       continue;
     }
 
+    const implementationChanged = entry?.sourceHash && entry.sourceHash !== componentSourceHash(componentsDir, component);
     const specChanged =
       entry === undefined || entry.specHash !== componentSpecHash(componentsDir, component);
 
@@ -83,11 +84,13 @@ export async function diffComponents(
         ...base,
         detail: specChanged ? `${figmaDetail} — and the code spec also changed` : figmaDetail,
       });
-    } else if (specChanged) {
+    } else if (specChanged || implementationChanged) {
       outOfDate.push({
         ...base,
         detail:
-          entry === undefined
+          implementationChanged && !specChanged
+            ? "implementation changed; review its Figma description before syncing — visual changes cannot be inferred automatically"
+            : entry === undefined
             ? "in Figma but never synced by elf-batch"
             : "the code spec changed — re-run elf-batch",
       });

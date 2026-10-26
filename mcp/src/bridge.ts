@@ -1,6 +1,7 @@
-import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import type { AddressInfo } from "node:net";
 import { WebSocket, WebSocketServer } from "ws";
+import type { SessionStore } from "./sessions.js";
 import { BridgeError } from "./errors.js";
 import { silentLogger, type Logger } from "./logger.js";
 import {
@@ -31,6 +32,8 @@ const MAX_PAYLOAD_BYTES = 4 * 1024 * 1024;
 const KEEPALIVE_MS = 30_000;
 
 export interface BridgeOptions {
+  sessionStore?: SessionStore;
+  shutdown?: () => void;
   token: string;
   port: number;
   timeoutMs?: number;
@@ -72,15 +75,19 @@ export type StatusListener = (status: BridgeStatus) => void;
 
 /**
  * Local WebSocket bridge between the MCP server (Node) and the Figma plugin's
- * UI iframe. Binds to 127.0.0.1 only.
+ * UI iframe. Binds to IPv4 and IPv6 loopback.
  *
- * Plugin handshakes use a one-time pairing code (`?code=`) or the longer-lived
- * session secret it returns (`?session=`). The shared token (`?token=`) stays
- * supported for existing panels and for the local /control lane.
+ * First pairing uses a one-time code. Persistent reconnects and controllers
+ * verify fresh HMAC challenges and authenticate subsequent messages. Legacy
+ * bearer sessions remain available only to nonpersistent compatibility hosts.
  */
 export class Bridge {
   private server: WebSocketServer | null = null;
+  private server6: WebSocketServer | null = null;
   private socket: WebSocket | null = null;
+  private activeSession: string | null = null;
+  private pendingAuth = 0;
+  private channels = new WeakMap<WebSocket, {key: string; context: string; sent: number; received: number}>();
   private readonly controls = new Set<WebSocket>();
   private keepalive: NodeJS.Timeout | null = null;
   private port: number | null = null;
@@ -89,6 +96,12 @@ export class Bridge {
   private file: BridgeFileInfo | null = null;
   private plugin: BridgePluginInfo | null = null;
   private alive = false;
+  private jobs: { queuedAt: number; owner: WebSocket | null; method: string; params: Record<string, unknown>; options: RequestOptions; resolve: (value: any) => void; reject: (error: Error) => void }[] = [];
+  private processing = false;
+  private lockOwner: WebSocket | null = null;
+  private lockFile: string | null = null;
+  private lockTimer: NodeJS.Timeout | null = null;
+
   private readonly pending = new Map<string, PendingRequest>();
   private readonly listeners = new Set<StatusListener>();
   private readonly timeoutMs: number;
@@ -126,12 +139,22 @@ export class Bridge {
     return { code: pairing.code, expiresAt: new Date(pairing.expiresAt).toISOString() };
   }
 
+  /** Rotate only the unused pairing code; established sessions stay valid. */
+  refreshPairingCode(): BridgePairing {
+    if (!this.server) throw new Error("Start the Elf bridge before requesting a pairing code.");
+    const pairing = createPairingCode(Date.now(), this.pairingTtlMs);
+    this.pairing = { ...pairing, hash: pairingCodeDigest(pairing.code) };
+    return { code: pairing.code, expiresAt: new Date(pairing.expiresAt).toISOString() };
+  }
+
   /** Starts listening. Resolves with the bound port (port 0 picks a free one). */
   async start(): Promise<number> {
     if (this.server) throw new Error("Bridge already started.");
 
     const server = new WebSocketServer({ host: HOST, port: this.options.port, maxPayload: MAX_PAYLOAD_BYTES });
     this.server = server;
+    server.on("connection", (socket, request) => { try { this.accept(socket, request.url ?? ""); } catch { socket.close(AUTH_FAILED_CODE, "pairing storage unavailable"); } });
+
 
     try {
       await new Promise<void>((resolve, reject) => {
@@ -143,7 +166,7 @@ export class Bridge {
       if ((error as NodeJS.ErrnoException).code === "EADDRINUSE") {
         throw new Error(
           `Port ${this.options.port} on ${HOST} is already in use — another bridge is probably running. ` +
-            `Stop it or set a different ${"ELF_MCP_PORT"}.`,
+            `Stop it or set a different ${"ELF_MCP_PORT"}.`, { cause: error },
         );
       }
       throw error;
@@ -152,9 +175,20 @@ export class Bridge {
     const address = server.address() as AddressInfo | null;
     this.port = address?.port ?? this.options.port;
     this.boundAddress = address?.address ?? HOST;
+    const ipv6 = new WebSocketServer({ host: "::1", port: this.port, maxPayload: MAX_PAYLOAD_BYTES });
+    try {
+      await new Promise<void>((resolve, reject) => { ipv6.once("listening", resolve); ipv6.once("error", reject); });
+      this.server6 = ipv6;
+      ipv6.on("connection", (socket, request) => { try { this.accept(socket, request.url ?? ""); } catch { socket.close(AUTH_FAILED_CODE, "pairing storage unavailable"); } });
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code !== "EAFNOSUPPORT" && code !== "EADDRNOTAVAIL") {
+        await this.stop();
+        throw new Error("The IPv6 loopback bridge could not bind safely. Close the process using its port before starting Elf.", { cause: error });
+      }
+    }
     const pairing = createPairingCode(Date.now(), this.pairingTtlMs);
     this.pairing = { ...pairing, hash: pairingCodeDigest(pairing.code) };
-    server.on("connection", (socket, request) => this.accept(socket, request.url ?? ""));
     this.logger.log(`bridge listening on ws://${HOST}:${this.port}`);
 
     this.keepalive = setInterval(() => this.ping(), KEEPALIVE_MS);
@@ -171,6 +205,10 @@ export class Bridge {
     for (const control of this.controls) control.close(1001, "bridge shutting down");
     this.controls.clear();
     this.rejectAll("bridge shut down");
+    for (const job of this.jobs.splice(0)) job.reject(new BridgeError("disconnected", "The bridge shut down."));
+    this.releaseLock();
+    const server6 = this.server6; this.server6 = null;
+    if (server6) { for (const client of server6.clients) client.terminate(); await new Promise<void>(resolve => server6.close(() => resolve())); }
     const server = this.server;
     this.server = null;
     if (!server) return;
@@ -191,7 +229,7 @@ export class Bridge {
    * otherwise. Plugin errors are relayed with their original message so plan
    * limits stay visible to the caller.
    */
-  async request<T = unknown>(
+  private async sendRequest<T = unknown>(
     method: string,
     params: Record<string, unknown> = {},
     options: RequestOptions = {},
@@ -223,17 +261,73 @@ export class Bridge {
         timer,
       });
 
-      socket.send(JSON.stringify({ type: "request", id, method, params }), (error) => {
+      socket.send(this.encodePlugin(socket, { type: "request", id, method, params }), (error) => {
         if (!error) return;
         this.settle(id, undefined, new BridgeError("transport", `Could not send "${method}": ${error.message}`));
       });
     });
   }
 
+  /** One bridge-wide lane, including requests from direct MCP adapters. */
+  request<T = unknown>(method: string, params: Record<string, unknown> = {}, options: RequestOptions = {}): Promise<T> {
+    return this.schedule(null, method, params, options);
+  }
+
+  private schedule<T>(owner: WebSocket | null, method: string, params: Record<string, unknown>, options: RequestOptions = {}): Promise<T> {
+    if (this.jobs.length >= 256) return Promise.reject(new BridgeError("transport", "The Elf bridge is busy. Try again shortly."));
+    return new Promise<T>((resolve, reject) => {
+      this.jobs.push({ queuedAt: Date.now(), owner, method, params, options, resolve, reject });
+      void this.drain();
+    });
+  }
+
+  private async drain(): Promise<void> {
+    if (this.processing) return;
+    this.processing = true;
+    try {
+      while (this.jobs.length) {
+        const index = this.lockOwner ? this.jobs.findIndex(job => job.owner === this.lockOwner) : 0;
+        if (index < 0) break;
+        const job = this.jobs.splice(index, 1)[0];
+        try {
+          if (Date.now() - job.queuedAt >= (job.method === "__elf_lock" ? 30_000 : job.options.timeoutMs ?? this.timeoutMs)) throw new BridgeError("timeout", "The queued bridge operation expired before it started.");
+          if (job.owner && job.owner.readyState !== WebSocket.OPEN) throw new BridgeError("disconnected", "The operation's controller disconnected.");
+          if (job.method === "__elf_lock") {
+            if (!job.owner || this.lockOwner) throw new Error("A transaction is already active on this connection.");
+            const fileKey = job.params.fileKey;
+            if (typeof fileKey !== "string" || !fileKey || this.file?.key !== fileKey || !this.socket) throw new Error("The connected Figma file does not match the operation's target.");
+            this.lockOwner = job.owner;
+            this.lockFile = fileKey;
+            this.lockTimer = setTimeout(() => {
+              this.lockOwner?.close(1008, "transaction expired");
+              this.releaseLock();
+            }, 120_000);
+            job.resolve({ ok: true });
+          } else if (job.method === "__elf_unlock") {
+            if (!job.owner || job.owner !== this.lockOwner) throw new Error("This connection does not own the transaction.");
+            this.releaseLock();
+            job.resolve({ ok: true });
+          } else {
+            if (this.lockOwner === job.owner && this.lockFile && this.file?.key !== this.lockFile) throw new Error("The Figma file changed during the operation. Nothing else was written.");
+            job.resolve(await this.sendRequest(job.method, job.params, job.options));
+          }
+        } catch (error) { job.reject(error instanceof Error ? error : new Error(String(error))); }
+      }
+    } finally { this.processing = false; }
+  }
+
+  private releaseLock(): void {
+    if (this.lockTimer) clearTimeout(this.lockTimer);
+    this.lockTimer = null; this.lockOwner = null; this.lockFile = null;
+    void this.drain();
+  }
+
   private accept(socket: WebSocket, url: string): void {
     const params = queryFromUrl(url);
 
     if (pathFromUrl(url) === CONTROL_PATH) {
+      if (params.has("nonce")) { this.authenticateSaved(socket, params, true); return; }
+      if (this.options.sessionStore) { socket.close(AUTH_FAILED_CODE, "verified handshake required"); return; }
       if (!this.tokenMatches(params.get("token"))) {
         this.logger.log("rejected control connection: bad or missing handshake token");
         socket.close(AUTH_FAILED_CODE, "unauthorized");
@@ -243,6 +337,7 @@ export class Bridge {
       return;
     }
 
+    if (params.has("hint") && this.options.sessionStore) { this.authenticateSaved(socket, params); return; }
     const code = params.get("code");
     const session = params.get("session");
     let issued: SessionSecret | null = null;
@@ -254,13 +349,11 @@ export class Bridge {
         socket.close(AUTH_FAILED_CODE, "unauthorized");
         return;
       }
-      issued = issueSession(this.options.token, Date.now(), this.sessionTtlMs);
+      issued = this.options.sessionStore ? { session: this.options.sessionStore.issue(), expiresAt: 0 } : issueSession(this.options.token, Date.now(), this.sessionTtlMs);
       auth = "code";
     } else if (session) {
-      if (verifySession(this.options.token, session) === null) {
-        this.logger.log("rejected connection: invalid or expired session");
-        socket.close(AUTH_FAILED_CODE, "unauthorized");
-        return;
+      if (this.options.sessionStore || verifySession(this.options.token, session) === null) {
+        socket.close(AUTH_FAILED_CODE, "saved pairing requires a verified handshake; pair again"); return;
       }
       auth = "session";
     } else if (!this.tokenMatches(params.get("token"))) {
@@ -270,6 +363,57 @@ export class Bridge {
     }
 
     this.acceptPlugin(socket, issued, auth);
+    this.activeSession = this.options.sessionStore && issued ? createHash("sha256").update(issued.session).digest("hex") : null;
+  }
+
+  private authenticateSaved(socket: WebSocket, params: URLSearchParams, control = false): void {
+    const client = params.get("nonce") ?? "";
+    const key = control ? createHash("sha256").update("control\n" + this.options.token).digest("hex") : this.options.sessionStore!.keyForHint(params.get("hint") ?? "");
+    if (!key || !/^[a-f0-9]{64}$/.test(client) || this.pendingAuth >= 32) {
+      socket.close(AUTH_FAILED_CODE, "unauthorized"); return;
+    }
+    this.pendingAuth++;
+    const server = randomBytes(32).toString("hex");
+    const proof = (role: string) => createHmac("sha256", Buffer.from(key, "hex")).update(`${role}\n${client}\n${server}`).digest();
+    const timer = setTimeout(() => socket.close(AUTH_FAILED_CODE, "authentication timed out"), 5000); timer.unref();
+    let finished = false;
+    const cleanup = () => { if (!finished) { finished = true; clearTimeout(timer); this.pendingAuth--; } };
+    socket.once("close", cleanup);
+    socket.once("error", cleanup);
+    socket.once("message", data => {
+      cleanup();
+      try {
+        const message = JSON.parse(data.toString());
+        if (message.type !== "authenticate" || typeof message.proof !== "string" || !/^[a-f0-9]{64}$/.test(message.proof) ||
+            !timingSafeEqual(proof("client"), Buffer.from(message.proof, "hex")) || (!control && this.options.sessionStore!.keyForHint(params.get("hint")!) !== key)) {
+          socket.close(AUTH_FAILED_CODE, "unauthorized"); return;
+        }
+        this.channels.set(socket, {key, context: `${client}\n${server}`, sent: 0, received: 0});
+        if (control) this.acceptControl(socket);
+        else { this.acceptPlugin(socket, null, "session"); this.activeSession = key; }
+      } catch { socket.close(AUTH_FAILED_CODE, "unauthorized"); }
+    });
+    socket.send(JSON.stringify({ type: "challenge", nonce: server, proof: proof("server").toString("hex") }));
+  }
+
+  private sendControlResult(socket: WebSocket, message: BridgeControlResultMessage): void {
+    if (socket.readyState === WebSocket.OPEN) socket.send(this.encodePlugin(socket, message));
+  }
+  private encodePlugin(socket: WebSocket, message: unknown): string {
+    const channel = this.channels.get(socket);
+    if (!channel) return JSON.stringify(message);
+    const payload = JSON.stringify(message), sequence = ++channel.sent;
+    const proof = createHmac("sha256", Buffer.from(channel.key, "hex")).update(`message-server\n${channel.context}\n${sequence}\n${payload}`).digest("hex");
+    return JSON.stringify({type: "authenticated", sequence, payload, proof});
+  }
+  private decodePlugin(socket: WebSocket, raw: string): string {
+    const channel = this.channels.get(socket);
+    if (!channel) return raw;
+    const frame = JSON.parse(raw);
+    if (frame.type !== "authenticated" || frame.sequence !== channel.received + 1 || typeof frame.payload !== "string" || typeof frame.proof !== "string" || !/^[a-f0-9]{64}$/.test(frame.proof)) throw new Error("Invalid authenticated frame.");
+    const expected = createHmac("sha256", Buffer.from(channel.key, "hex")).update(`message-client\n${channel.context}\n${frame.sequence}\n${frame.payload}`).digest();
+    if (!timingSafeEqual(expected, Buffer.from(frame.proof, "hex"))) throw new Error("Invalid message proof.");
+    channel.received++; return frame.payload;
   }
 
   private acceptPlugin(
@@ -278,6 +422,7 @@ export class Bridge {
     auth: "code" | "session" | "token",
   ): void {
     const previous = this.socket;
+    if (previous) this.rejectAll("the plugin connection was replaced");
     this.socket = socket;
     if (previous) {
       this.logger.log("closing previous plugin connection");
@@ -294,10 +439,10 @@ export class Bridge {
     this.emitStatus();
 
     socket.send(
-      JSON.stringify({
+      this.encodePlugin(socket, {
         type: "ready",
         ...(issued
-          ? { session: issued.session, sessionExpiresAt: new Date(issued.expiresAt).toISOString() }
+          ? { session: issued.session, ...(issued.expiresAt ? { sessionExpiresAt: new Date(issued.expiresAt).toISOString() } : {}) }
           : {}),
       }),
     );
@@ -305,7 +450,7 @@ export class Bridge {
     socket.on("pong", () => {
       this.alive = true;
     });
-    socket.on("message", (data) => this.receive(data.toString()));
+    socket.on("message", (data) => { if (this.socket === socket) { try { this.receive(this.decodePlugin(socket, data.toString())); } catch { socket.close(AUTH_FAILED_CODE, "pairing storage unavailable"); } } });
     socket.on("close", (code) => {
       if (this.socket === socket) this.disconnect(code);
     });
@@ -336,11 +481,16 @@ export class Bridge {
    */
   private acceptControl(socket: WebSocket): void {
     this.controls.add(socket);
+    socket.send(this.encodePlugin(socket, { type: "bridge-status", status: this.status }));
     this.logger.log("control client connected");
 
-    socket.on("message", (data) => void this.receiveControl(socket, data.toString()));
+    socket.on("message", (data) => { try { void this.receiveControl(socket, this.decodePlugin(socket, data.toString())); } catch { socket.close(AUTH_FAILED_CODE, "invalid authenticated message"); } });
     socket.on("close", () => {
       this.controls.delete(socket);
+      const abandoned = this.jobs.filter(job => job.owner === socket);
+      this.jobs = this.jobs.filter(job => job.owner !== socket);
+      for (const job of abandoned) job.reject(new BridgeError("disconnected", "The transaction controller disconnected."));
+      if (this.lockOwner === socket) this.releaseLock();
       this.logger.log("control client disconnected");
     });
     socket.on("error", (error) => {
@@ -362,12 +512,26 @@ export class Bridge {
     }
 
     try {
-      const result = await this.request(message.method, message.params ?? {});
-      sendControlResult(socket, { type: "result", id: message.id, ok: true, result });
+      let result: unknown;
+      if (message.method === "__elf_pairing_refresh") result = this.refreshPairingCode();
+      else if (message.method === "__elf_pairing_current") result = this.pairingCode;
+      else if (message.method === "__elf_revoke") {
+        const key = message.params?.fileKey;
+        if (typeof key !== "string" || !key) throw new Error("Choose a Figma file to disconnect.");
+        if (!this.options.sessionStore) throw new Error("Pairing revocation requires the shared persistent bridge.");
+        this.options.sessionStore.revoke(key);
+        if (this.file?.key === key) this.socket?.close(AUTH_FAILED_CODE, "pairing revoked");
+        result = { ok: true };
+      } else if (message.method === "__elf_shutdown") {
+        if (this.controls.size > 1 || this.lockOwner) throw new Error("Other Elf clients are using the bridge. Close them before stopping it.");
+        result = { ok: true };
+        setTimeout(() => this.options.shutdown?.(), 50);
+      } else result = await this.schedule(socket, message.method, message.params ?? {});
+      this.sendControlResult(socket, { type: "result", id: message.id, ok: true, result });
     } catch (error) {
       const bridgeError =
         error instanceof BridgeError ? error : new BridgeError("plugin", (error as Error).message);
-      sendControlResult(socket, {
+      this.sendControlResult(socket, {
         type: "result",
         id: message.id,
         ok: false,
@@ -396,6 +560,12 @@ export class Bridge {
     }
 
     if (message.type === "status") {
+      if (this.options.sessionStore && this.activeSession) {
+        const key = message.file?.key;
+        if (!key || !this.options.sessionStore.bindKey(this.activeSession, key)) {
+          this.socket?.close(AUTH_FAILED_CODE, "pairing belongs to another file"); return;
+        }
+      }
       this.file = message.file ?? null;
       this.plugin = message.plugin ?? null;
       this.emitStatus();
@@ -453,6 +623,9 @@ export class Bridge {
   private emitStatus(): void {
     const status = this.status;
     for (const listener of this.listeners) listener(status);
+    for (const control of this.controls) {
+      if (control.readyState === WebSocket.OPEN) control.send(this.encodePlugin(control, { type: "bridge-status", status }));
+    }
   }
 }
 
@@ -466,9 +639,6 @@ function pathFromUrl(url: string): string {
   return path.startsWith("/") ? path : "/";
 }
 
-function sendControlResult(socket: WebSocket, message: BridgeControlResultMessage): void {
-  if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(message));
-}
 
 function digest(value: string): Buffer {
   return createHash("sha256").update(value).digest();

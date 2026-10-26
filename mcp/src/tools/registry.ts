@@ -19,7 +19,7 @@ export interface ToolDefinition<Shape extends z.ZodRawShape> {
   title: string;
   description: string;
   inputSchema: Shape;
-  handler(client: PluginClient, args: z.objectOutputType<Shape, z.ZodTypeAny>): Promise<ToolPayload>;
+  handler(client: PluginClient, args: z.output<z.ZodObject<Shape>>): Promise<ToolPayload>;
 }
 
 export type AnyToolDefinition = ToolDefinition<z.ZodRawShape>;
@@ -39,7 +39,9 @@ export function registerTools(
       },
       async (args: Record<string, unknown>) => {
         try {
-          const payload = await tool.handler(client, args);
+          const payload = /^(create|upsert|rename|delete)_/.test(tool.name)
+            ? await client.mutate(scoped => tool.handler(scoped, args))
+            : await tool.handler(client, args);
           return {
             content: [{ type: "text" as const, text: JSON.stringify(payload, null, 2) }],
             isError: payload.ok === false,

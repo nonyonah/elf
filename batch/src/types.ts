@@ -84,6 +84,7 @@ export interface PlannedComponent {
   parsed: ParsedComponent;
   /** Raw sidecar (kept for hashing), or null when the file is missing. */
   sidecar: SidecarSpec | null;
+  sourceHash?: string;
   /** Sidecar read/resolve error — the component counts as failed. */
   sidecarError?: string;
   /** set-level call params (tokens already resolved), for upsert_component_set. */
@@ -141,6 +142,7 @@ export interface Plan {
 export type ComponentStatus = "pending" | "synced" | "failed" | "skipped";
 
 export interface ManifestComponent {
+  sourceHash?: string;
   figmaNodeId: string | null;
   specHash: string;
   /** nodeStateHash of the node right after the last sync — absent in older manifests. */
@@ -151,6 +153,7 @@ export interface ManifestComponent {
 }
 
 export interface ManifestToken {
+  remoteHash?: string;
   figmaVariableId: string | null;
   valueHash: string;
 }
@@ -159,6 +162,7 @@ export interface Manifest {
   version: 1;
   components: Record<string, ManifestComponent>;
   tokens: Record<string, ManifestToken>;
+  styles?: Record<string, { valueHash: string; remoteHash: string }>;
 }
 
 /** The narrow slice of the bridge client the sync needs (easy to fake). */

@@ -1,12 +1,15 @@
 "use client";
+import { settingsFetch as fetch } from "@/lib/settings-api";
 
-import { CircleAlert, CircleCheck, Coffee, Info, X } from "lucide-react";
+import { CircleAlert, CircleCheck, CupSoda, Info, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { ProjectControls } from "@/components/project-controls";
+import { Onboarding, type OnboardingStatus } from "@/components/onboarding";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 
-const BUY_ME_A_COFFEE_URL = "https://buymeacoffee.com/elftokens";
+const SUPPORT_URL = "https://buymeamalt.com/@nonso";
 
 interface SlackInfo {
   connected: boolean;
@@ -24,7 +27,7 @@ interface NotifyConfig {
   onlyOnChange: boolean;
 }
 
-type Saving = "connect" | "disconnect" | "notify" | "onlyOnChange" | null;
+type Saving = "connect" | "disconnect" | "notify" | "onlyOnChange" | "test" | null;
 
 type ToastTone = "success" | "error" | "info";
 
@@ -45,6 +48,7 @@ class SettingsApiError extends Error {
 }
 
 export default function SettingsPage() {
+  const [onboarding, setOnboarding] = useState<OnboardingStatus | null>(null);
   const [project, setProject] = useState<ProjectInfo | null>(null);
   const [slack, setSlack] = useState<SlackInfo>({ connected: false });
   const [notify, setNotify] = useState<NotifyConfig>({
@@ -91,6 +95,7 @@ export default function SettingsPage() {
           res.status,
         );
       }
+      setOnboarding(data?.onboarding ?? null);
       setProject({
         configPath: data?.project?.configPath ?? "",
         fileKey: data?.project?.fileKey ?? "",
@@ -123,6 +128,20 @@ export default function SettingsPage() {
   useEffect(() => {
     void fetchConfig();
   }, [fetchConfig]);
+
+  useEffect(() => {
+    if (!onboarding || onboarding.active) return;
+    let disposed = false;
+    const timer = setInterval(() => {
+      void fetch("/api/onboarding").then(res => {
+        if (!res.ok) throw new Error();
+        return res.json();
+      }).then(data => { if (!disposed) setOnboarding(data); }).catch(() => {
+        if (!disposed) setOnboarding(previous => previous ? { ...previous, error: "Couldn’t reach elf. Keep its terminal running." } : null);
+      });
+    }, 3000);
+    return () => { disposed = true; clearInterval(timer); };
+  }, [Boolean(onboarding), onboarding?.active]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -160,7 +179,7 @@ export default function SettingsPage() {
   }) => {
     const res = await fetch("/api/config", {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "X-Elf-Request": "1" },
       body: JSON.stringify({ notify: body }),
     });
     const data = await res.json().catch(() => null);
@@ -172,7 +191,7 @@ export default function SettingsPage() {
   const handleConnectSlack = async () => {
     setSaving("connect");
     try {
-      const res = await fetch("/api/slack/connect", { method: "POST" });
+      const res = await fetch("/api/slack/connect", { method: "POST", headers: { "X-Elf-Request": "1" } });
       const data = await res.json().catch(() => null);
       if (!res.ok) {
         throw new Error(
@@ -200,10 +219,19 @@ export default function SettingsPage() {
     }
   };
 
+  const handleTestSlack = async () => {
+    setSaving("test");
+    try {
+      const response = await fetch("/api/slack/test", { method: "POST", headers: { "X-Elf-Request": "1" } });
+      if (!response.ok) throw new Error("Could not send the test message. Check your Slack connection.");
+      showToast("Test message sent");
+    } catch (error) { showToast((error as Error).message, "error"); }
+    finally { setSaving(null); }
+  };
   const handleDisconnectSlack = async () => {
     setSaving("disconnect");
     try {
-      const res = await fetch("/api/slack/disconnect", { method: "POST" });
+      const res = await fetch("/api/slack/disconnect", { method: "POST", headers: { "X-Elf-Request": "1" } });
       const data = await res.json().catch(() => null);
       if (!res.ok) {
         throw new Error(
@@ -277,6 +305,8 @@ export default function SettingsPage() {
       ? [slack.teamName, slack.channel].filter(Boolean).join(" · ")
       : "Connect to get drift notifications in Slack";
 
+  if (onboarding?.active) return <Onboarding initial={onboarding} onFinished={() => { void fetchConfig(); }} />;
+
   return (
     <main className="mx-auto w-full max-w-[420px] px-5 pb-6 pt-8">
       <h1 className="mb-1 text-[15px] font-medium leading-[1.55]">Settings</h1>
@@ -290,6 +320,21 @@ export default function SettingsPage() {
       ) : (
         <div className="mb-5" />
       )}
+
+      {onboarding?.running && <section aria-labelledby="watching-heading">
+        <h2 id="watching-heading" className="mb-2 text-[11px] font-semibold uppercase tracking-[0.04em] text-muted-foreground">Project</h2>
+        <Card className="mb-5 gap-0 rounded-2xl border-[0.5px] border-border bg-card shadow-none before:hidden">
+          <div className="px-3.5 py-3">
+            <p className="flex items-center gap-2 text-[13px] font-medium leading-[1.55]"><span className={`size-1.5 rounded-full ${onboarding.error || onboarding.attention || !onboarding.bridge.connected ? "bg-warning" : "bg-success"}`} aria-hidden="true" />Watching for drift</p>
+            <p className="mt-0.5 text-[12px] leading-[1.55] text-muted-foreground">{onboarding.bridge.file?.name ?? "Waiting for Figma"} · {onboarding.mode === "automatic" ? "Automatic sync" : "Monitoring"}</p>
+            <p role="status" className={`mt-1.5 text-[11.5px] leading-[1.55] ${onboarding.error || onboarding.attention ? "text-warning" : "text-faint"}`}>
+              {onboarding.error ?? onboarding.attention ?? (onboarding.checking ? "Checking for drift…" : onboarding.lastCheck?.status === "clean" ? "Last check found no drift." : onboarding.lastCheck?.status === "drift" ? `${onboarding.lastCheck.total ?? "Some"} differences in drift-report.md.` : "Your first check is running.")}
+            </p>
+          </div>
+        </Card>
+      </section>}
+
+      {onboarding?.running && <ProjectControls runtime={onboarding} onChanged={() => { void fetchConfig(); }} />}
 
       <section aria-labelledby="slack-heading">
         <h2
@@ -317,6 +362,7 @@ export default function SettingsPage() {
                 {slackSub}
               </p>
             </div>
+            {slack.connected && <Button variant="ghost" size="sm" className="h-7 shrink-0 rounded-lg px-2 text-xs shadow-none sm:text-xs" loading={saving === "test"} disabled={unavailable || busy} onClick={() => { void handleTestSlack(); }}>Test</Button>}
             {slack.connected ? (
               <Button
                 variant="outline"
@@ -415,14 +461,14 @@ export default function SettingsPage() {
           className="mx-auto flex h-auto gap-1.5 px-0 py-0 text-[12px] font-normal text-muted-foreground hover:bg-transparent hover:text-foreground"
           render={
             <a
-              href={BUY_ME_A_COFFEE_URL}
+              href={SUPPORT_URL}
               target="_blank"
               rel="noopener noreferrer"
             />
           }
         >
-          <Coffee className="size-3.5" aria-hidden="true" />
-          Support this project
+          <CupSoda className="size-3.5" aria-hidden="true" />
+          Buy me a malt
         </Button>
       </footer>
 
