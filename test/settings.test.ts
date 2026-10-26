@@ -420,3 +420,24 @@ test("drift reports require a private session, support download, and refuse link
     assert.equal((await handle.fetch("/api/report")).status, 400);
   } finally {await handle.close(); rmSync(dir, {recursive: true});}
 });
+
+import {reopenCompatibleSettingsServer} from "../src/settings.js";
+test("Settings advertises API capabilities and refuses incompatible process reuse", async () => {
+  const {dir, dist, configPath} = createWorkspace();
+  const identity = "capability-test-identity";
+  const handle = await createSettingsServer(configPath, {distPath: dist, identityToken: identity});
+  const realFetch = globalThis.fetch;
+  try {
+    assert.equal((await fetch(`${handle.url}/api/runtime`)).status, 401);
+    const capabilities = await (await handle.fetch("/api/runtime")).json() as any;
+    assert.equal(capabilities.apiVersion, 2); assert.equal(capabilities.managed, false);
+    assert.ok(await reopenCompatibleSettingsServer(handle.url, configPath, identity));
+    await assert.rejects(reopenCompatibleSettingsServer(handle.url, configPath, identity, true), /incompatible Elf server/);
+    const unsupported = await handle.fetch("/api/project/resources", {method: "POST", headers: {"X-Elf-Request": "1"}});
+    assert.equal(unsupported.status, 409); assert.match((await unsupported.json() as any).error, /require elf start/);
+    const missing = await handle.fetch("/api/missing"); assert.equal(missing.status, 404);
+    assert.match(missing.headers.get("content-type")!, /json/);
+    globalThis.fetch = (async (input: any, init?: RequestInit) => String(input).endsWith("/api/runtime") ? new Response("Not found", {status: 404}) : realFetch(input, init)) as typeof fetch;
+    await assert.rejects(reopenCompatibleSettingsServer(handle.url, configPath, identity), /Stop it with Ctrl\+C/);
+  } finally {globalThis.fetch = realFetch; await handle.close(); rmSync(dir, {recursive: true});}
+});

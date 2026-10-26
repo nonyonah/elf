@@ -8,6 +8,7 @@
  * The server runs until Ctrl+C. Running the page's own dev server is not
  * enough: it has no /api routes and will show a 404.
  */
+import { SETTINGS_API_VERSION } from "./settings-protocol.js";
 import { readDriftReport } from "./reports.js";
 import { createServer, IncomingMessage, Server, ServerResponse } from "node:http";
 import { readFileSync, existsSync, realpathSync, statSync } from "node:fs";
@@ -195,6 +196,11 @@ export async function createSettingsServer(
       res.writeHead(401, { "Content-Type": "application/json" }); res.end(JSON.stringify({ error: "Open the private Settings link from your terminal." })); return;
     }
 
+    if (path === "/api/runtime" && req.method === "GET") {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ apiVersion: SETTINGS_API_VERSION, managed: Boolean(options.onboarding?.projectAction) })); return;
+    }
+
     if ((path === "/api/report" || path === "/api/report/download") && req.method === "GET") {
       try {
         const report = readDriftReport(configPath);
@@ -207,6 +213,11 @@ export async function createSettingsServer(
         res.end(JSON.stringify({ error: missing ? "No drift report yet. Run a drift check first." : "The drift report could not be read safely." }));
       }
       return;
+    }
+
+    if (path.startsWith("/api/project/") && !options.onboarding?.projectAction) {
+      res.writeHead(409, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Project actions require elf start. Stop this settings-only server and run elf start in your project." })); return;
     }
 
     if (path.startsWith("/api/project/") && req.method === "POST" && options.onboarding?.projectAction) {
@@ -455,6 +466,9 @@ export async function createSettingsServer(
       return;
     }
 
+    if (path.startsWith("/api/")) {
+      res.writeHead(404, { "Content-Type": "application/json" }); res.end(JSON.stringify({ error: "This local API route is unavailable. Restart Elf to load the latest version." })); return;
+    }
     res.writeHead(404);
     res.end("Not found");
   };
@@ -526,7 +540,7 @@ export async function runSettingsServer(configPath: string): Promise<void> {
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "EADDRINUSE") {
       const existing = `http://127.0.0.1:${DEFAULT_SETTINGS_PORT}`;
-      const reopen = await reopenSettingsServer(existing, configPath, identity.token);
+      const reopen = await reopenCompatibleSettingsServer(existing, configPath, identity.token);
       if (reopen) {
         console.log(`Settings page: ${reopen}`);
         if (process.env.ELF_SETTINGS_NO_OPEN !== "1") openSettingsBrowser(reopen);
@@ -592,4 +606,23 @@ export async function reopenSettingsServer(url: string, configPath: string, toke
     const target = new URL(result.url);
     return target.origin === new URL(url).origin && /^#elf=[a-f0-9]{64}$/.test(target.hash) ? target.href : null;
   } catch { return null; }
+}
+
+
+/** Do not silently reopen an older process that cannot serve the installed UI. */
+export async function reopenCompatibleSettingsServer(url: string, configPath: string, token: string, managed = false): Promise<string | null> {
+  const link = await reopenSettingsServer(url, configPath, token);
+  if (!link) return null;
+  const restart = "An older or incompatible Elf server is already running. Stop it with Ctrl+C, then run elf start again (or node bin/elf-tokens.js start in this repo).";
+  try {
+    const bootstrap = new URLSearchParams(new URL(link).hash.slice(1)).get("elf")!;
+    const opened = await fetch(`${url}/api/session`, {method: "POST", headers: {"X-Elf-Request": "1", "X-Elf-Bootstrap": bootstrap}, signal: AbortSignal.timeout(2000)});
+    if (!opened.ok) throw new Error(restart);
+    const { session } = await opened.json();
+    const response = await fetch(`${url}/api/runtime`, {headers: {"X-Elf-Session": session}, signal: AbortSignal.timeout(2000)});
+    if (!response.ok || !response.headers.get("content-type")?.includes("application/json")) throw new Error(restart);
+    const status = await response.json();
+    if (typeof status.apiVersion !== "number" || status.apiVersion < SETTINGS_API_VERSION || (managed && !status.managed)) throw new Error(restart);
+  } catch { throw new Error(restart); }
+  return reopenSettingsServer(url, configPath, token);
 }

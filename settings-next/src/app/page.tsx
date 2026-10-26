@@ -3,6 +3,8 @@ import { settingsFetch as fetch } from "@/lib/settings-api";
 
 import { CircleAlert, CircleCheck, CupSoda, Info, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { ServerNotice } from "@/components/server-notice";
+import { Notifications } from "@/components/notifications";
 import { ProjectControls } from "@/components/project-controls";
 import { Onboarding, type OnboardingStatus } from "@/components/onboarding";
 import { Button } from "@/components/ui/button";
@@ -309,7 +311,7 @@ export default function SettingsPage() {
 
   return (
     <main className="mx-auto w-full max-w-[420px] px-5 pb-6 pt-8">
-      <h1 className="mb-1 text-[15px] font-medium leading-[1.55]">Settings</h1>
+      <div className="mb-1 flex items-center justify-between gap-3"><h1 className="text-[15px] font-medium leading-[1.55]">Settings</h1><Notifications activity={onboarding?.activity} projectKey={project?.configPath ?? onboarding?.root ?? ""} /></div>
       {project?.configPath ? (
         <p
           className="mb-5 truncate text-[11.5px] leading-[1.55] text-faint"
@@ -320,6 +322,8 @@ export default function SettingsPage() {
       ) : (
         <div className="mb-5" />
       )}
+
+      <ServerNotice />
 
       {onboarding?.running && <section aria-labelledby="watching-heading">
         <h2 id="watching-heading" className="mb-2 text-[11px] font-semibold uppercase tracking-[0.04em] text-muted-foreground">Project</h2>

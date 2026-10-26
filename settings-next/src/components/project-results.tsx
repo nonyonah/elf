@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { settingsFetch as fetch } from "@/lib/settings-api";
+import { settingsFetch as fetch, settingsJson } from "@/lib/settings-api";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 
@@ -22,23 +22,24 @@ export function ProjectResults({onChanged}: {onChanged: () => void}) {
   const [resources, setResources] = useState<{checkedAt: string; resources: Resource[]} | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
   const request = async (path: string, post = false) => {
     const response = await fetch(path, post ? {method: "POST", headers: {"X-Elf-Request": "1", "Content-Type": "application/json"}, body: "{}"} : {});
-    if (!response.ok) { const body = await response.json(); throw new Error(body.error ?? "Could not load project results."); }
+    if (!response.ok) await settingsJson(response.clone());
     return response;
   };
   const run = async (action: string) => {
-    setBusy(action); setError(null);
+    setBusy(action); setError(null); setMessage(null);
     try {
-      if (action === "report") setReport(await (await request("/api/report")).json());
+      if (action === "report") setReport(await settingsJson(await request("/api/report")));
       if (action === "download") {
         const blob = await (await request("/api/report/download")).blob();
         const url = URL.createObjectURL(blob); const link = document.createElement("a");
         link.href = url; link.download = "drift-report.md"; document.body.appendChild(link); link.click(); link.remove();
         setTimeout(() => URL.revokeObjectURL(url), 1000);
       }
-      if (action === "resources") setResources(await (await request("/api/project/resources", true)).json());
-      if (action === "check") { await request("/api/project/check", true); setReport(null); onChanged(); }
+      if (action === "resources") setResources(await settingsJson(await request("/api/project/resources", true)));
+      if (action === "check") { await settingsJson(await request("/api/project/check", true)); setReport(null); setMessage("Drift check requested. Wait for the project status to update, then open the latest report."); onChanged(); }
     } catch (cause) { setError((cause as Error).message); }
     finally { setBusy(null); }
   };
@@ -50,6 +51,7 @@ export function ProjectResults({onChanged}: {onChanged: () => void}) {
     <section aria-labelledby="resources-heading"><h2 id="resources-heading" className="mb-2 text-[11px] font-semibold uppercase tracking-[0.04em] text-muted-foreground">Synced resources</h2><Card className={card}><div className="px-3.5 py-3"><p className="text-[13px] font-medium leading-[1.55]">What reached Figma</p><p className="mt-1 text-[12px] leading-[1.55] text-muted-foreground">Inspect managed variables and components. Variables appear in Figma’s local variables panel; components appear on the canvas.</p><Button variant="outline" size="sm" className={`${button} mt-3`} disabled={busy !== null} onClick={() => void run("resources")}>{resources ? "Refresh resources" : "View synced resources"}</Button></div>
       {resources && <div className="border-t-[0.5px] border-border"><p className="px-3.5 py-3 text-[11px] text-faint">{resources.resources.length} managed resources · checked {new Date(resources.checkedAt).toLocaleTimeString()}</p>{resources.resources.length === 0 && <p className="px-3.5 pb-3 text-[12px] text-muted-foreground">No managed resources recorded yet. Review and apply a sync first.</p>}<ul className="max-h-96 overflow-auto">{resources.resources.map(item => <li key={`${item.kind}:${item.key}`} className="border-t-[0.5px] border-border px-3.5 py-3"><div className="flex items-start justify-between gap-3"><p className="min-w-0 break-words text-[12px] font-medium">{item.name}</p><a href={item.figmaUrl} target="_blank" rel="noopener noreferrer" className="shrink-0 text-[11px] underline underline-offset-2">Open Figma</a></div><p className="mt-1 text-[11px] text-muted-foreground">{item.kind} · {item.location} · {item.verified ? "Matches last verified sync" : item.recorded ? "Last sync recorded; inspect in Figma" : "Needs verification or review"}</p><p className="mt-1 break-all font-mono text-[11px] leading-relaxed">{displayValue(item.value)}</p></li>)}</ul></div>}
     </Card></section>
+    {message && <p role="status" className="mb-4 text-[12px] text-muted-foreground">{message}</p>}
     {error && <p role="alert" className="mb-4 text-[12px] text-destructive">{error}</p>}
   </>;
 }

@@ -7,7 +7,7 @@ import { loadRuntimeBridgeConfig } from "../mcp/src/config.js";
 import { loadWatchEnv } from "../watch/src/bridge.js";
 import { runElfCheck } from "../watch/src/check.js";
 import { findConfigPath, loadConfig } from "./config.js";
-import { createSettingsServer, DEFAULT_SETTINGS_PORT, openSettingsBrowser, reopenSettingsServer } from "./settings.js";
+import { createSettingsServer, DEFAULT_SETTINGS_PORT, openSettingsBrowser, reopenCompatibleSettingsServer } from "./settings.js";
 import { completeProjectSetup, detectProjectSources, projectResource, saveProjectSetup, validateProjectSources, type OnboardingController } from "./onboarding.js";
 import { createHash } from "node:crypto";
 import { SyncAlerts } from "./sync-alerts.js";
@@ -230,7 +230,7 @@ export async function main(argv: string[]): Promise<number> {
     try { handle = await createSettingsServer(configPath, { port: settingsPort, onboarding: controller, identityToken: bridgeConfig.token }); }
     catch (error) {
       const url = `http://127.0.0.1:${settingsPort}`;
-      const reopen = (error as NodeJS.ErrnoException).code === "EADDRINUSE" ? await reopenSettingsServer(url, configPath, bridgeConfig.token) : null;
+      const reopen = (error as NodeJS.ErrnoException).code === "EADDRINUSE" ? await reopenCompatibleSettingsServer(url, configPath, bridgeConfig.token, true) : null;
       if (reopen) {
         console.log(`Elf is already running for this project. Settings: ${reopen}`);
         if (!noOpen) openSettingsBrowser(reopen);
@@ -243,7 +243,7 @@ export async function main(argv: string[]): Promise<number> {
     if (configured() && completed()) {
       try { await controller.start(); } catch (error) { lastError = (error as Error).message; console.error(`elf: ${lastError}`); }
     }
-    if (!noOpen && !running) openSettingsBrowser(handle.publicUrl);
+    if (!noOpen) openSettingsBrowser(handle.publicUrl);
     await done;
     return 0;
   } finally {

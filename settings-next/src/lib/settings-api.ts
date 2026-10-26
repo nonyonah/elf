@@ -29,5 +29,23 @@ export async function settingsFetch(input: string, init: RequestInit = {}): Prom
     try { sessionStorage.removeItem(STORAGE_KEY); } catch {}
     throw new Error("Your Settings session expired. Run elf settings to open a new one.");
   }
+  if (new URL(input, window.location.origin).pathname.startsWith("/api/") && !response.ok) {
+    await settingsJson(response.clone());
+  }
   return response;
+}
+
+
+export const RESTART_ELF_MESSAGE = "This page is newer than the running Elf server. Stop Elf with Ctrl+C, run elf start again (or node bin/elf-tokens.js start in this repo), then refresh Settings.";
+
+/** Never show a JSON parser exception for an older or incompatible local server. */
+export async function settingsJson(response: Response): Promise<any> {
+  if (!response.headers.get("content-type")?.includes("application/json")) throw new Error(RESTART_ELF_MESSAGE);
+  let body: any;
+  try { body = await response.json(); } catch { throw new Error("Elf returned an unreadable response. Restart Elf and refresh Settings."); }
+  if (!response.ok) {
+    if (body?.error === "Unknown project action.") throw new Error(RESTART_ELF_MESSAGE);
+    throw new Error(typeof body?.error === "string" ? body.error : "The local request could not be completed.");
+  }
+  return body;
 }

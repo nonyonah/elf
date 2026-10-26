@@ -43,7 +43,7 @@ In Settings:
   paired file. Variables show their collection, current values, and whether they
   match the last verified sync. Components show their last recorded sync status
   and an **Open Figma** link to their canvas node. Styles show current values.
-- **Recent activity → View … synced changes** shows before/after values from new
+- **Notifications (the bell at the top right) → View … synced changes** shows before/after values from new
   syncs. Older syncs did not retain those values; inspect their current managed
   resources instead. Before/after excerpts and recent history are bounded.
 - **Drift report → View report** opens the latest Markdown report in the browser.
@@ -61,9 +61,16 @@ creation uses reviewed `.figma.json` descriptions and supported variants.
 
 Edit a supported token and save. With automatic sync enabled and Elf Bridge
 connected, Elf pushes the change, verifies the written value, and checks drift.
-Open Settings to inspect the result. If sync pauses, review the listed conflicts
+Open Settings to inspect the result. New activity appears in the notifications bell. If sync pauses, review the listed conflicts
 before choosing whether to preserve the Figma edits or explicitly replace them.
 
 Coding assistants use the same bridge and project configuration. Settings has
 setup snippets for Cursor, Claude Code, and Codex. Ask the assistant to check
 drift, prepare a component description, or show a sync plan before applying it.
+
+If Settings says the page is newer than the running server, stop the existing Elf
+terminal with Ctrl+C and start Elf again before refreshing the browser. Refreshing
+alone cannot update a running Node process. New startup attempts refuse to silently
+reuse incompatible servers. Report and action failures show instructions rather
+than JSON parser errors. A requested check runs asynchronously; the confirmation
+message tells you to wait for the project status before reopening its report.
