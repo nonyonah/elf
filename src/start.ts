@@ -143,6 +143,11 @@ export async function main(argv: string[]): Promise<number> {
       if (action === "disconnect-figma") {
         await runtime.revoke(loadConfig(configPath).figma.fileKey); project.setMonitoring(); return { ok: true };
       }
+      if (action === "resources") return project.resources();
+      if (action === "show-plugin") {
+        const key = loadConfig(configPath).figma.fileKey;
+        return runtime.transaction(key, client => client.call("show_ui"));
+      }
       if (action === "plan") return project.plan();
       if (action === "apply") {
         if (typeof body.planId !== "string" || (body.enableAuto !== undefined && typeof body.enableAuto !== "boolean") || (body.overwriteConflicts !== undefined && typeof body.overwriteConflicts !== "boolean")) throw new Error("Invalid sync request.");

@@ -1,6 +1,6 @@
 import { verifyComponentPatch, verifyStylePatch } from "./verify-write.js";
 import { cssColorToHex } from "./core/normalize.js";
-import { readActivity, recordActivity, type Activity } from "./activity.js";
+import { readActivity, recordActivity, type Activity, type SyncedChange } from "./activity.js";
 import { createHash, randomUUID } from "node:crypto";
 import { existsSync, lstatSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
@@ -32,8 +32,8 @@ export class ProjectService {
   private tail: Promise<unknown> = Promise.resolve();
   constructor(readonly configPath: string, private readonly runtime: BridgeRuntime) { this.migrate(); }
 
-  record(type: Activity["type"], message: string): void {
-    recordActivity(this.configPath, type, message);
+  record(type: Activity["type"], message: string, changes?: SyncedChange[]): void {
+    recordActivity(this.configPath, type, message, changes);
   }
   private serial<T>(work: () => Promise<T>): Promise<T> {
     const next = this.tail.then(work, work); this.tail = next.catch(() => {}); return next;
@@ -101,6 +101,28 @@ export class ProjectService {
         return { synced: 0, conflicts: plan.view.issues, paused: true };
       }
       return this.execute(plan, client);
+    }));
+  }
+  async resources(): Promise<Record<string, unknown>> {
+    return this.serial(() => this.runtime.transaction(loadConfig(this.configPath).figma.fileKey, async client => {
+      const { config } = this.batchConfig(); const manifest = loadManifest(config.manifestFile);
+      const { variables } = await client.call<{ variables: any[] }>("list_variables");
+      const styles = Object.keys(manifest.styles ?? {}).length ? (await client.call<{styles: any[]}>("list_styles")).styles : [];
+      const components = Object.values(manifest.components).some(entry => entry.figmaNodeId) ? (await client.call<{components: any[]}>("list_components", {deep: true})).components : [];
+      const fileKey = loadConfig(this.configPath).figma.fileKey;
+      const fileUrl = `https://www.figma.com/design/${encodeURIComponent(fileKey)}`;
+      return { fileUrl, checkedAt: new Date().toISOString(), resources: [
+        ...Object.entries(manifest.tokens).map(([key, entry]) => {
+          const remote = variables.find(item => item.id === entry.figmaVariableId);
+          return {kind: "token", key, name: remote?.name ?? key, figmaId: entry.figmaVariableId, location: remote?.collectionName ?? "Variables", value: remote ? JSON.stringify(remote.valuesByMode) : "Unavailable", verified: Boolean(remote && entry.remoteHash && hashSpec(remote) === entry.remoteHash), figmaUrl: fileUrl};
+        }),
+        ...Object.entries(manifest.components).filter(([, entry]) => entry.figmaNodeId).map(([key, entry]) => ({kind: "component", key, name: components.find(item => item.id === entry.figmaNodeId)?.name ?? key, figmaId: entry.figmaNodeId, location: "Canvas", value: `Last recorded status: ${entry.status}`, verified: false, recorded: entry.status === "synced", figmaUrl: `${fileUrl}?node-id=${encodeURIComponent(entry.figmaNodeId!)}`})),
+        ...Object.entries(manifest.styles ?? {}).map(([key, entry]) => {
+          const split = key.indexOf(":"); const kind = key.slice(0, split); const name = key.slice(split + 1);
+          const remote = styles.find(item => item.kind === kind && (item.codeKey === name || item.name === name));
+          return {kind: "style", key, name: remote?.name ?? name, location: `${kind} styles`, value: remote ? JSON.stringify(remote).slice(0, 4000) : "Unavailable", verified: Boolean(remote && hashSpec(remote) === entry.remoteHash), figmaUrl: fileUrl};
+        }),
+      ] };
     }));
   }
   generatedPaths(): string[] { const { config } = this.batchConfig(); return [config.manifestFile, realpathSync(this.configPath), join(config.root, "drift-report.md"), join(config.root, "drift-status.json")]; }
@@ -283,7 +305,18 @@ export class ProjectService {
     saveManifest(plan.config.manifestFile, plan.manifest);
     const failed = [...outcomes.values()].filter(outcome => outcome.action === "failed" || outcome.action === "skipped");
     const synced = variableKeys.size + styleKeys.size + [...outcomes.values()].filter(outcome => outcome.action === "synced").length;
-    this.record(failed.length ? "error" : "sync", `${synced} ${synced === 1 ? "resource" : "resources"} synced${failed.length ? `; ${failed.length} components need attention` : ""}.`);
+    const describe = (entry: PlanEntry, snapshot: Snapshot): string | null => {
+      const resource = entry.kind === "token" ? snapshot.variables.find(item => item.codeKey === entry.key || item.id === plan.manifest.tokens[entry.key]?.figmaVariableId)
+        : entry.kind === "component" ? snapshot.nodes[plan.manifest.components[entry.key]?.figmaNodeId ?? ""] : snapshot.styles.find(item => {
+          const kind = entry.key.startsWith("text:") ? "text" : "effect";
+          const spec = (kind === "text" ? plan.tokens.textStyles : plan.tokens.effectStyles).find(style => `${kind}:${style.key}` === entry.key);
+          return item.kind === kind && spec && ((spec.params.codeKey && item.codeKey === spec.params.codeKey) || item.name === spec.params.name);
+        });
+      if (!resource) return null;
+      return JSON.stringify(entry.kind === "token" ? resource.valuesByMode : resource).slice(0, 1000);
+    };
+    const changes = plan.view.entries.filter(entry => entry.kind !== "component" || outcomes.get(entry.key)?.action === "synced").map(entry => ({...entry, before: describe(entry, plan.snapshot), after: describe(entry, after) ?? "Verified updated properties"}));
+    this.record(failed.length ? "error" : "sync", `${synced} ${synced === 1 ? "resource" : "resources"} synced${failed.length ? `; ${failed.length} components need attention` : ""}.`, changes);
     if (failed.length) throw new Error(failed.map(outcome => outcome.error).join("; "));
     return { synced, issues: plan.view.issues };
     } catch (error) {

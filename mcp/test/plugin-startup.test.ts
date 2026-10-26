@@ -89,3 +89,17 @@ test("development manifest enables real file identity and missing identity never
   assert.match(plugin.messages[0].message, /file’s identity/);
   assert.equal(plugin.messages.some(message => message.file?.key === "draft"), false);
 });
+
+test("hiding the running plugin preserves its channel and can be reversed", async () => {
+  const plugin = main(async () => undefined); let hidden = false; let notification: any;
+  plugin.figma.ui.hide = () => {hidden = true;}; plugin.figma.ui.show = () => {hidden = false;};
+  plugin.figma.notify = (_message: string, options: any) => {notification = options;};
+  await plugin.figma.ui.onmessage({type: "context", channel});
+  await plugin.figma.ui.onmessage({type: "hide-ui", channel: "wrong"}); assert.equal(hidden, false);
+  await plugin.figma.ui.onmessage({type: "hide-ui", channel}); assert.equal(hidden, true);
+  notification.button.action(); assert.equal(hidden, false);
+  await plugin.figma.ui.onmessage({type: "hide-ui", channel});
+  await plugin.figma.ui.onmessage({type: "request", channel, id: "show", method: "show_ui"});
+  assert.equal(hidden, false);
+  assert.equal(plugin.messages.at(-1).ok, true);
+});

@@ -1,7 +1,8 @@
 import { closeSync, constants, fstatSync, lstatSync, mkdirSync, openSync, readSync, renameSync, writeSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { randomUUID } from "node:crypto";
-export interface Activity { id: string; at: string; type: "sync" | "conflict" | "error" | "check" | "description"; message: string; }
+export interface SyncedChange { kind: string; key: string; name: string; action: string; before: string | null; after: string; }
+export interface Activity { id: string; at: string; type: "sync" | "conflict" | "error" | "check" | "description"; message: string; changes?: SyncedChange[]; }
 
 function pathFor(configPath: string): string { return join(dirname(configPath), ".elf", "activity.jsonl"); }
 function validate(fd: number): void {
@@ -14,12 +15,13 @@ export function readActivity(configPath: string): Activity[] {
   catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return []; throw error; }
   try {
     validate(fd);
-    const size = fstatSync(fd).size; const length = Math.min(size, 64 * 1024); const bytes = Buffer.alloc(length);
+    const size = fstatSync(fd).size; const length = Math.min(size, 1024 * 1024); const bytes = Buffer.alloc(length);
     readSync(fd, bytes, 0, length, size - length);
     return bytes.toString("utf8").split("\n").flatMap(line => { try { return [JSON.parse(line) as Activity]; } catch { return []; } }).slice(-50).reverse();
   } finally { closeSync(fd); }
 }
-export function recordActivity(configPath: string, type: Activity["type"], message: string): void {
+export function recordActivity(configPath: string, type: Activity["type"], message: string, changes?: SyncedChange[]): void {
+  const detail = changes ? { changes: changes.slice(0, 200).map(change => ({ kind: change.kind.slice(0, 30), key: change.key.slice(0, 200), name: change.name.slice(0, 200), action: change.action.slice(0, 30), before: change.before?.slice(0, 1000) ?? null, after: change.after.slice(0, 1000) })) } : {};
   const path = pathFor(configPath); const dir = dirname(path);
   mkdirSync(dir, { recursive: true, mode: 0o700 });
   const directory = lstatSync(dir);
@@ -31,8 +33,8 @@ export function recordActivity(configPath: string, type: Activity["type"], messa
       // Keep one bounded previous log. Renaming never follows a destination symlink.
       renameSync(path, `${path}.previous`);
       const next = openSync(path, constants.O_WRONLY | constants.O_APPEND | constants.O_CREAT | constants.O_NOFOLLOW, 0o600);
-      try { validate(next); writeSync(next, JSON.stringify({ id: randomUUID(), at: new Date().toISOString(), type, message: message.slice(0, 800) }) + "\n"); }
+      try { validate(next); writeSync(next, JSON.stringify({ id: randomUUID(), at: new Date().toISOString(), type, message: message.slice(0, 800), ...detail }) + "\n"); }
       finally { closeSync(next); }
-    } else writeSync(fd, JSON.stringify({ id: randomUUID(), at: new Date().toISOString(), type, message: message.slice(0, 800) }) + "\n");
+    } else writeSync(fd, JSON.stringify({ id: randomUUID(), at: new Date().toISOString(), type, message: message.slice(0, 800), ...detail }) + "\n");
   } finally { closeSync(fd); }
 }

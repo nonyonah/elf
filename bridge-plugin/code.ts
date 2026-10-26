@@ -1428,6 +1428,9 @@ function currentFile(): { name: string; key: string } {
 
 async function handle(method: string, params: Record<string, unknown>): Promise<unknown> {
   switch (method) {
+    case "show_ui":
+      figma.ui.show();
+      return { visible: true };
     case "status":
       return {
         file: currentFile(),
@@ -1503,6 +1506,11 @@ figma.ui.onmessage = async (message: UiMessage) => {
   if (message.type === "context") { uiChannel = message.channel; await announceContext(uiChannel); return; }
   if (message.channel !== uiChannel) return;
   try {
+    if (message.type === "hide-ui") {
+      figma.ui.hide();
+      figma.notify("Elf remains connected while this plugin is running.", { timeout: 10000, button: { text: "Show Elf Bridge", action: () => { figma.ui.show(); return false; } } });
+      return;
+    }
     if (message.type === "save-host") {
       await saveHost(String(message.host ?? ""));
       postUi({ type: "host-saved" });

@@ -8,6 +8,7 @@
  * The server runs until Ctrl+C. Running the page's own dev server is not
  * enough: it has no /api routes and will show a 404.
  */
+import { readDriftReport } from "./reports.js";
 import { createServer, IncomingMessage, Server, ServerResponse } from "node:http";
 import { readFileSync, existsSync, realpathSync, statSync } from "node:fs";
 import { resolve as resolvePath, extname, sep } from "node:path";
@@ -192,6 +193,20 @@ export async function createSettingsServer(
     const callback = (path === "/callback" || path === "/api/slack/callback") && req.method === "GET";
     if (path.startsWith("/api/") && !callback && (typeof req.headers["x-elf-session"] !== "string" || !sessions.has(req.headers["x-elf-session"]))) {
       res.writeHead(401, { "Content-Type": "application/json" }); res.end(JSON.stringify({ error: "Open the private Settings link from your terminal." })); return;
+    }
+
+    if ((path === "/api/report" || path === "/api/report/download") && req.method === "GET") {
+      try {
+        const report = readDriftReport(configPath);
+        if (path.endsWith("/download")) {
+          res.writeHead(200, { "Content-Type": "text/markdown; charset=utf-8", "Content-Disposition": 'attachment; filename="drift-report.md"' }); res.end(report.markdown);
+        } else { res.writeHead(200, { "Content-Type": "application/json" }); res.end(JSON.stringify(report)); }
+      } catch (error) {
+        const missing = (error as NodeJS.ErrnoException).code === "ENOENT";
+        res.writeHead(missing ? 404 : 400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: missing ? "No drift report yet. Run a drift check first." : "The drift report could not be read safely." }));
+      }
+      return;
     }
 
     if (path.startsWith("/api/project/") && req.method === "POST" && options.onboarding?.projectAction) {

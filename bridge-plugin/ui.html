@@ -457,6 +457,8 @@
             </div>
           </dl>
 
+          <button class="secondary" id="hide-window">Hide window</button>
+          <p class="file-meta" style="margin-top: 8px">The connection continues while the plugin runs. Show it again from Elf Settings. Closing the plugin or file stops it.</p>
           <button class="secondary disconnect" id="disconnect">Disconnect this file</button>
         </div>
       </section>
@@ -874,6 +876,7 @@ function pairingHmac(key, text) {
       if (state.socket) state.socket.close(1000, "pairing cancelled");
       else showPairing("");
     });
+    $("hide-window").addEventListener("click", () => { if (state.ready) postPluginMessage({ type: "hide-ui" }); });
     $("disconnect").addEventListener("click", disconnect);
 
     $("host").addEventListener("input", (event) => {

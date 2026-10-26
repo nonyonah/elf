@@ -100,3 +100,12 @@ identity. Sessions created with the former placeholder need one fresh pairing.
 Figma limits this API to development/private plugins. A future Community plugin
 needs a separate explicit file-link verification flow before it can replace the
 development plugin; do not enable writes using a shared placeholder or file name.
+
+Settings now provides authenticated report viewing and Markdown downloads from
+the fixed project report path. Linked, special, and oversized report files are
+refused. Report content is escaped text. Managed-resource inspection reads the
+paired file; successful new syncs record bounded before/after excerpts in private
+activity history. Older activity contains summaries only. The plugin can hide its
+window while remaining running; Settings can reopen it through the file-pinned
+bridge. This does not make the plugin an independently running background service.
+See [the designer walkthrough](designer-workflow.md).

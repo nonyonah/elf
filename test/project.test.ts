@@ -166,3 +166,24 @@ test("sync alerts deduplicate across restarts and only persist successful delive
     await new SyncAlerts(p.path).update("issue-two", deliver); assert.equal(sent, 3);
   } finally { p.cleanup(); }
 });
+
+test("completed sync records before and after values and exposes live managed resources", async () => {
+  const p = project();
+  try {
+    const plan = await p.service.plan(); await p.service.apply(plan.id);
+    const first = p.service.activity.find(item => item.changes?.length)!;
+    assert.equal(first.changes![0].before, null);
+    assert.match(first.changes![0].after, /#112233/);
+    const resources = await p.service.resources() as any;
+    assert.equal(resources.resources.length, 1);
+    assert.equal(resources.resources[0].verified, true);
+    assert.match(resources.resources[0].value, /#112233/);
+    writeFileSync(join(p.root, "tokens.css"), ":root { --color-primary: #334455; }");
+    const next = await p.service.plan(); await p.service.apply(next.id);
+    const updated = p.service.activity.find(item => item.changes?.length)!;
+    assert.match(updated.changes![0].before!, /#112233/);
+    assert.match(updated.changes![0].after, /#334455/);
+    p.variables[0].valuesByMode.Value.value = "#abcdef";
+    assert.equal(((await p.service.resources()) as any).resources[0].verified, false);
+  } finally {p.cleanup();}
+});

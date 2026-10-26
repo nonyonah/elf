@@ -401,3 +401,22 @@ test("Settings API requires a private session and consumes bootstrap links once"
     assert.ok(reopened?.includes("#elf=")); assert.notEqual(reopened, handle.publicUrl);
   } finally { await handle.close(); rmSync(dir, {recursive: true}); }
 });
+
+test("drift reports require a private session, support download, and refuse linked files", async () => {
+  const {dir, dist, configPath} = createWorkspace();
+  const handle = await createSettingsServer(configPath, {distPath: dist});
+  try {
+    assert.equal((await fetch(`${handle.url}/api/report`)).status, 401);
+    assert.equal((await handle.fetch("/api/report")).status, 404);
+    const markdown = "## Report\n\n<script>alert('untrusted')</script>\n";
+    writeFileSync(join(dir, "drift-report.md"), markdown);
+    const viewed = await handle.fetch("/api/report"); assert.equal(viewed.status, 200);
+    assert.equal((await viewed.json() as any).markdown, markdown);
+    const downloaded = await handle.fetch("/api/report/download");
+    assert.equal(downloaded.headers.get("content-disposition"), 'attachment; filename="drift-report.md"');
+    assert.equal(await downloaded.text(), markdown);
+    rmSync(join(dir, "drift-report.md"));
+    symlinkSync(configPath, join(dir, "drift-report.md"));
+    assert.equal((await handle.fetch("/api/report")).status, 400);
+  } finally {await handle.close(); rmSync(dir, {recursive: true});}
+});
