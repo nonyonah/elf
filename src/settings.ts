@@ -201,12 +201,10 @@ export async function createSettingsServer(
       res.end(JSON.stringify({ apiVersion: SETTINGS_API_VERSION, managed: Boolean(options.onboarding?.projectAction) })); return;
     }
 
-    if ((path === "/api/report" || path === "/api/report/download") && req.method === "GET") {
+    if (path === "/api/report" && req.method === "GET") {
       try {
         const report = readDriftReport(configPath);
-        if (path.endsWith("/download")) {
-          res.writeHead(200, { "Content-Type": "text/markdown; charset=utf-8", "Content-Disposition": 'attachment; filename="drift-report.md"' }); res.end(report.markdown);
-        } else { res.writeHead(200, { "Content-Type": "application/json" }); res.end(JSON.stringify(report)); }
+        res.writeHead(200, { "Content-Type": "application/json" }); res.end(JSON.stringify(report));
       } catch (error) {
         const missing = (error as NodeJS.ErrnoException).code === "ENOENT";
         res.writeHead(missing ? 404 : 400, { "Content-Type": "application/json" });

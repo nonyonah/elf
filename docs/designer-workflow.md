@@ -20,8 +20,8 @@ changes. Figma edits and removed resources pause automatic writes for review.
 ## Keep the plugin out of the way
 
 After connecting, select **Hide window** in Elf Bridge. The iframe and connection
-stay alive while that plugin remains running. Use **Show plugin** in Elf Settings,
-or the notification's **Show Elf Bridge** button, to restore the window.
+stay alive while that plugin remains running. Use the notification’s **Show Elf Bridge**
+button to restore the window.
 
 Figma does not support independently running background plugins. Closing the
 plugin, closing its file, or starting another plugin can end this connection.
@@ -44,10 +44,12 @@ In Settings:
   match the last verified sync. Components show their last recorded sync status
   and an **Open Figma** link to their canvas node. Styles show current values.
 - **Notifications (the bell at the top right) → View … synced changes** shows before/after values from new
-  syncs. Older syncs did not retain those values; inspect their current managed
+  syncs. Use **Mark all as read** or **Clear all**, or the controls on each notification.
+  These preferences persist in this browser for this project; clearing the dropdown
+  keeps the underlying project activity log. Older syncs did not retain those values; inspect their current managed
   resources instead. Before/after excerpts and recent history are bounded.
 - **Drift report → View report** opens the latest Markdown report in the browser.
-  **Download .md** saves that same report. **Check now** requests a fresh check;
+  **Check now** requests a fresh check;
   wait for it to finish before reopening the report. Reports require the private
   Settings session and are shown as escaped text rather than executable HTML.
 
