@@ -1,17 +1,16 @@
 "use client";
 import { settingsFetch as fetch } from "@/lib/settings-api";
 
-import { CircleAlert, CircleCheck, CupSoda, Info, X } from "lucide-react";
+import { CircleAlert, CircleCheck, Info, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ServerNotice } from "@/components/server-notice";
 import { Notifications } from "@/components/notifications";
+import { SupportFooter } from "@/components/support-footer";
 import { ProjectControls } from "@/components/project-controls";
 import { Onboarding, type OnboardingStatus } from "@/components/onboarding";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
-
-const SUPPORT_URL = "https://buymeamalt.com/@nonso";
 
 interface SlackInfo {
   connected: boolean;
@@ -459,22 +458,7 @@ export default function SettingsPage() {
         Overdue deprecations always notify, regardless of these switches.
       </p>
 
-      <footer className="border-t-[0.5px] border-border pt-3">
-        <Button
-          variant="ghost"
-          className="mx-auto flex h-auto gap-1.5 px-0 py-0 text-[12px] font-normal text-muted-foreground hover:bg-transparent hover:text-foreground"
-          render={
-            <a
-              href={SUPPORT_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-            />
-          }
-        >
-          <CupSoda className="size-3.5" aria-hidden="true" />
-          Buy me a malt
-        </Button>
-      </footer>
+      <SupportFooter />
 
       {toast && (
         <div className="pointer-events-none fixed inset-x-0 bottom-4 z-50 flex justify-center px-5">

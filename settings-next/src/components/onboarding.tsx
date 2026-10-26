@@ -2,7 +2,8 @@
 import { settingsFetch as fetch } from "@/lib/settings-api";
 
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, ArrowRight, Check, CircleAlert, CupSoda, Shapes, FolderOpen, Radio, Terminal } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, CircleAlert, Shapes, FolderOpen, Radio, Terminal } from "lucide-react";
+import { SupportFooter } from "@/components/support-footer";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import type { ProjectRuntime } from "@/components/project-controls";
@@ -224,7 +225,7 @@ export function Onboarding({ initial, onFinished }: { initial: OnboardingStatus;
           {step === 2 ? "Start watching" : "Continue"}{step < 2 && <ArrowRight className="size-3" aria-hidden="true" />}
         </Button>
       </div>
-      <footer className="border-t-[0.5px] border-border pt-3"><Button variant="ghost" className="mx-auto flex h-auto gap-1.5 px-0 py-0 text-[12px] font-normal text-muted-foreground hover:bg-transparent hover:text-foreground" render={<a href="https://buymeamalt.com/@nonso" target="_blank" rel="noopener noreferrer" />}><CupSoda className="size-3.5" aria-hidden="true" />Buy me a malt</Button></footer>
+      <SupportFooter />
     </main>
   );
 }
