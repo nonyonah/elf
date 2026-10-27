@@ -3,6 +3,8 @@ import { webcrypto } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { runInNewContext } from "node:vm";
+import { execFileSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 
 function ui() {
   const sockets: any[] = [];
@@ -51,16 +53,29 @@ test("a stalled or failed context displays an actionable retry instead of spinni
   assert.equal(app.elements.get("context-spinner").hidden, true);
 });
 
-function main(getAsync: (key: string) => Promise<unknown>) {
+function main(getAsync: (key: string) => Promise<unknown>, codeUrl = new URL("../../bridge-plugin/code.js", import.meta.url)) {
   const messages: any[] = []; const timers = new Map<number, () => void>(); let id = 0;
   const stored = new Map<string, unknown>(); const data = new Map<string, string>(); const shared = new Map<string, string>();
   const figma: any = {root: {name: "Design system", getPluginData: (key: string) => data.get(key) ?? "", setPluginData: (key: string, value: string) => data.set(key, value), setSharedPluginData: (namespace: string, key: string, value: string) => shared.set(`${namespace}:${key}`, value)}, fileKey: "file", apiVersion: "1.0.0", showUI() {},
     clientStorage: {getAsync: async (key: string) => stored.get(key) ?? getAsync(key), async setAsync(key: string, value: unknown) {stored.set(key, value);}, async deleteAsync(key: string) {stored.delete(key);}}, ui: {postMessage(message: any) { messages.push(message); }}};
-  runInNewContext(readFileSync(new URL("../../bridge-plugin/code.js", import.meta.url), "utf8"), {figma, __html__: "", console,
+  runInNewContext(readFileSync(codeUrl, "utf8"), {figma, __html__: "", console,
     setTimeout(fn: () => void) {timers.set(++id, fn); return id;}, clearTimeout(key: number) {timers.delete(key);}});
   return {figma, messages, timers, stored, data, shared};
 }
 const channel = "a".repeat(64);
+test("the public bundle always prompts for a file link even when a development import exposes fileKey", async () => {
+  execFileSync(process.execPath, [fileURLToPath(new URL("../../scripts/build-public-bridge.mjs", import.meta.url))]);
+  const plugin = main(async () => undefined, new URL("../../dist/bridge-plugin-public/code.js", import.meta.url));
+  await plugin.figma.ui.onmessage({type: "context", channel});
+  assert.equal(plugin.messages[0].type, "file-link-required");
+  const app = ui();
+  app.window.onmessage({source: null, data: {pluginMessage: {...plugin.messages[0], channel: app.messages[0].channel}}});
+  assert.equal(app.elements.get("file-link-form").hidden, false);
+  await plugin.figma.ui.onmessage({type: "set-file-link", channel, url: "https://www.figma.com/design/publicFile123/Test"});
+  const context = plugin.messages.find(message => message.type === "context");
+  assert.equal(context.file.key, "publicFile123");
+  assert.equal(context.file.verification.nonce, channel);
+});
 test("plugin context tolerates malformed saved host values", async () => {
   const plugin = main(async key => key === "elf-bridge-host" ? 42 : undefined);
   await plugin.figma.ui.onmessage({type: "context", channel});

@@ -19,6 +19,8 @@ const ROLE_KEY = "role";
 const LABEL_ROLE = "label";
 const SLOT_ROLE = "slot";
 const FILE_LINK_KEY = "elf-file-key";
+// The public bundle sets this at build time, including when imported for testing.
+const PUBLIC_FILE_LINK_REQUIRED = false;
 const DEFAULT_HOST = "localhost:8765";
 
 interface BridgeState {
@@ -1420,6 +1422,7 @@ async function getNode(params: Record<string, unknown>): Promise<unknown> {
 
 /** Never substitute a shared placeholder for a document identity. */
 function nativeFileKey(): string | undefined {
+  if (PUBLIC_FILE_LINK_REQUIRED) return undefined;
   try {return figma.fileKey;} catch {return undefined;}
 }
 function currentFile(): { name: string; key: string; verification?: {nonce: string} } {

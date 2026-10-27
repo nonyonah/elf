@@ -131,5 +131,11 @@ The development and public builds share the same assigned plugin ID. Figma may
 update the existing Elf Bridge development entry rather than add a second entry.
 Close any running Elf Bridge instance first. If importing appears to do nothing,
 remove the existing entry from **Manage plugins → Development**, then import the
-generated manifest and run Elf Bridge again. Removing a local development entry
+generated manifest and run **Elf Bridge (Public)** again. Removing a local development entry
 is separate from revoking its saved file pairing.
+
+The generated public build always uses explicit file-link verification, even if
+Figma exposes a native file key while it is imported as a development plugin.
+With no saved link, it opens **Link this Figma file** with a URL input. The regular
+`bridge-plugin/manifest.json` build can use the native identity and will not need
+that input.
