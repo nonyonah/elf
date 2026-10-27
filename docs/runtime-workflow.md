@@ -106,6 +106,12 @@ file's verified identity. Public OAuth registration and live verification are
 still required before publication; see [connection service setup](connection-service-setup.md).
 Pairing credentials are stored separately for each file.
 
+The shared host persists after a CLI terminal exits. Clients verify its secure
+file-verification capability before reusing it. If an upgrade finds an older
+host, stop Elf watcher/MCP clients, run `node bin/elf-tokens.js bridge --stop`
+from this repository (or `elf bridge --stop` when installed), then start Elf
+again. Saved file pairings remain; temporary pairing codes must be refreshed.
+
 Settings now provides authenticated report viewing from
 the fixed project report path. Linked, special, and oversized report files are
 refused. Report content is escaped text. Managed-resource inspection reads the

@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { createServer } from "node:net";
-import { after, before, describe, test } from "node:test";
+import { after, before, describe, test, mock } from "node:test";
 import { Bridge } from "../src/bridge.js";
-import { createBridgeClient } from "../src/client.js";
+import { BridgeClient, createBridgeClient } from "../src/client.js";
 import { BridgeError } from "../src/errors.js";
 import { silentLogger } from "../src/logger.js";
 import { FakePlugin } from "./helpers/plugin-connection.js";
@@ -159,6 +159,18 @@ describe("control client (/control lane)", () => {
 
 import { acquireBridge } from "../src/runtime.js";
 
+test("runtime refuses an authenticated host missing secure file verification", async () => {
+  const owner = await acquireBridge({token: TOKEN, port: 0, timeoutMs: 500});
+  const original = BridgeClient.prototype.call;
+  const mocked = mock.method(BridgeClient.prototype, "call", function (this: BridgeClient, method: string, ...args: any[]) {
+    if (method === "__elf_capabilities") return Promise.resolve({});
+    return Reflect.apply(original, this, [method, ...args]);
+  });
+  try {
+    await assert.rejects(acquireBridge({token: TOKEN, port: owner.connection.status.port!, timeoutMs: 500}), /older Elf shared bridge.*bridge --stop/);
+  } finally {mocked.mock.restore(); await owner.close();}
+});
+
 test("MCP runtime reuses an authenticated bridge without taking ownership", async () => {
   const owner = await acquireBridge({ token: TOKEN, port: 0, timeoutMs: 500 });
   const port = owner.connection.status.port!;
@@ -223,6 +235,7 @@ test("shared host survives a client exit and authenticates reused connections", 
   let a: Awaited<ReturnType<typeof acquireBridge>> | undefined; let b: typeof a;
   try {
     a = await acquireBridge(config); b = await acquireBridge(config);
+    assert.deepEqual(await a.connection.request("__elf_capabilities"), {fileVerification: 1});
     assert.equal(a.owned, false); assert.equal(b.owned, false);
     await a.close(); a = undefined;
     const refreshed = await b.refreshPairingCode(); assert.ok(refreshed.code);

@@ -520,7 +520,8 @@ export class Bridge {
 
     try {
       let result: unknown;
-      if (message.method === "__elf_pairing_refresh") result = this.refreshPairingCode();
+      if (message.method === "__elf_capabilities") result = {fileVerification: 1};
+      else if (message.method === "__elf_pairing_refresh") result = this.refreshPairingCode();
       else if (message.method === "__elf_pairing_current") result = this.pairingCode;
       else if (message.method === "__elf_revoke") {
         const key = message.params?.fileKey;

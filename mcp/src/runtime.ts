@@ -17,6 +17,17 @@ export interface BridgeRuntime {
   close(): Promise<void>;
 }
 
+/** Authentication proves identity; capabilities separately prove runtime support. */
+async function requireFileVerification(connection: BridgeClient): Promise<void> {
+  try {
+    const capabilities = await connection.call<{fileVerification?: number}>("__elf_capabilities", {}, {timeoutMs: 1500});
+    if (capabilities?.fileVerification !== 1) throw new Error("Unsupported bridge");
+  } catch {
+    await connection.close();
+    throw new Error("An older Elf shared bridge is still running. Stop Elf watcher and MCP sessions, run elf bridge --stop (or node bin/elf-tokens.js bridge --stop in this repo), then run elf start again. Saved pairings are preserved.");
+  }
+}
+
 /** Reuse only an authenticated bridge. A port collision is never treated as trust. */
 export async function acquireBridge(config: BridgeConfig, logger: Logger = silentLogger): Promise<BridgeRuntime> {
   if (config.persistent) return acquireSharedHost(config, logger);
@@ -37,6 +48,7 @@ export async function acquireBridge(config: BridgeConfig, logger: Logger = silen
   } catch (error) {
     if (((error as Error).cause as NodeJS.ErrnoException | undefined)?.code !== "EADDRINUSE") throw error;
     const connection = await BridgeClient.connect(config);
+    await requireFileVerification(connection);
     logger.log("using the existing authenticated Elf bridge");
     return {
       revoke: async fileKey => { await connection.call("__elf_revoke", { fileKey }); },
@@ -68,6 +80,7 @@ async function acquireSharedHost(config: BridgeConfig, logger: Logger): Promise<
     if (host.connected) host.disconnect(); host.unref();
     connection = await BridgeClient.connect(config);
   }
+  await requireFileVerification(connection);
   logger.log("using the shared authenticated Elf bridge");
   const pairingCode = await connection.call<BridgePairing | null>("__elf_pairing_current");
   return {
