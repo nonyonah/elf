@@ -16,11 +16,11 @@ import { parseComponents } from "../batch/src/parser.js";
 import { loadSidecar, resolveSidecar, sidecarPathFor, validateSidecar } from "../batch/src/sidecar.js";
 import { orderComponents } from "../batch/src/graph.js";
 import { NODE_STATE_DEPTH, nodeStateHash } from "../batch/src/nodestate.js";
-import type { BatchConfig, BridgeCaller, Manifest, PlannedComponent, TokensPlan } from "../batch/src/types.js";
+import type { BatchConfig, BridgeCaller, Manifest, ParsedComponent, PlannedComponent, TokensPlan } from "../batch/src/types.js";
 import type { BridgeRuntime } from "../mcp/src/runtime.js";
 
 export interface PlanEntry { kind: "token" | "component" | "style"; key: string; name: string; action: "create" | "update"; }
-export interface PlanIssue { kind: "conflict" | "unsupported" | "removed"; key: string; message: string; }
+export interface PlanIssue { kind: "conflict" | "unsupported" | "removed"; key: string; message: string; component?: string; action?: "prepare-component"; blocksApply?: boolean; }
 export interface SyncPlan { id: string; fileKey: string; entries: PlanEntry[]; issues: PlanIssue[]; expiresAt: string; }
 interface Snapshot { collections: any[]; variables: any[]; components: any[]; nodes: Record<string, unknown>; styles: any[]; }
 interface InternalPlan { view: SyncPlan; fingerprint: string; config: BatchConfig; manifest: Manifest; tokens: TokensPlan; components: PlannedComponent[]; snapshot: Snapshot; }
@@ -83,7 +83,7 @@ export class ProjectService {
       if (!reviewed || Date.parse(reviewed.view.expiresAt) < Date.now()) throw new Error("This sync plan expired. Review a fresh plan.");
       const fresh = await this.build(client);
       if (fresh.fingerprint !== reviewed.fingerprint) throw new Error("Code, configuration, or Figma changed after review. Review a fresh plan before applying.");
-      if (fresh.view.issues.some(issue => issue.kind === "conflict") && !options.overwriteConflicts) throw new Error("Figma has edits. Keep them, or explicitly choose to replace the conflicts in this reviewed plan.");
+      if (fresh.view.issues.some(issue => issue.kind === "conflict" && issue.blocksApply !== false) && !options.overwriteConflicts) throw new Error("Figma has edits. Keep them, or explicitly choose to replace the conflicts in this reviewed plan.");
       if (options.enableAuto && loadConfig(this.configPath).intentionalDifferences?.length) throw new Error("Intentional differences are configured. Keep monitoring enabled and review writes individually.");
       if (options.enableAuto && fresh.view.issues.some(issue => issue.kind !== "unsupported")) throw new Error("Resolve conflicts and removed resources before enabling automatic sync.");
       this.reviewed.delete(id);
@@ -240,10 +240,10 @@ export class ProjectService {
       if (component.variants.length > 50 || specs.some(spec => spec && Array.isArray(spec.children) && spec.children.length + (spec.text ? 1 : 0) > 50)) {
         issues.push({ kind: "unsupported", key, message: `${component.parsed.name}: its variant or child count exceeds the verified component limit. Split the description into smaller components before syncing.` }); continue;
       }
-      if (component.sidecarError) { issues.push({ kind: "unsupported", key, message: `${component.parsed.name}: its Figma description is missing or invalid. Ask your coding assistant to prepare and review it.` }); continue; }
+      if (component.sidecarError) { issues.push({ kind: "unsupported", key, component: component.parsed.codeKey, action: "prepare-component", message: `${component.parsed.name}: prepare and review its Figma description before syncing.` }); continue; }
       if (known?.nodeHash && remote && nodeStateHash(snapshot.nodes[remote.id]) !== known.nodeHash) issues.push({ kind: "conflict", key, message: `${component.parsed.name}: the Figma component was edited.` });
       if (known?.sourceHash && known.sourceHash !== component.sourceHash && known.specHash === specHash) {
-        issues.push({ kind: "unsupported", key, message: `${component.parsed.name}: implementation changed without an updated Figma description. Review the description before syncing.` }); continue;
+        issues.push({ kind: "unsupported", key, component: component.parsed.codeKey, action: "prepare-component", message: `${component.parsed.name}: implementation changed without an updated Figma description. Review the description before syncing.` }); continue;
       }
       if (!known || known.status !== "synced" || known.specHash !== specHash || !remote || !known.sourceHash || issues.some(issue => issue.kind === "conflict" && issue.key === key)) entries.push({ kind: "component", key, name: component.parsed.name, action: remote ? "update" : "create" });
     }
@@ -260,6 +260,23 @@ export class ProjectService {
       if (known?.remoteHash && remote && known.remoteHash !== hashSpec(remote)) issues.push({ kind: "conflict", key, message: `${style.key}: this Figma style was edited.` });
       if (!known || known.valueHash !== hashSpec(style.params) || !remote || issues.some(issue => issue.kind === "conflict" && issue.key === key)) entries.push({ kind: "style", key, name: style.key, action: remote ? "update" : "create" });
     }
+    // Keep conflicts on a planned component's dependencies blocking, while
+    // unrelated unsupported components remain untouched and don't block a
+    // separately reviewed write (for example a new Divider).
+    const byKey = new Map(components.map(component => [component.parsed.codeKey, component]));
+    const relevant = new Set(entries.map(entry => entry.key));
+    const pending = [...relevant];
+    while (pending.length) {
+      const component = byKey.get(pending.pop()!);
+      if (!component) continue;
+      const specs = [component.params, component.setParams, ...Object.values(component.variantParams ?? {})];
+      const children = specs.flatMap(spec => Array.isArray(spec?.children) ? spec.children.map((child: any) => child.component).filter((key: unknown): key is string => typeof key === "string") : []);
+      for (const reference of [...component.parsed.dependencies, ...children]) {
+        const target = byKey.get(reference) ?? components.find(item => item.parsed.name === reference);
+        if (target && !relevant.has(target.parsed.codeKey)) {relevant.add(target.parsed.codeKey); pending.push(target.parsed.codeKey);}
+      }
+    }
+    for (const issue of issues) if (issue.kind === "conflict") issue.blocksApply = !byKey.has(issue.key) || relevant.has(issue.key);
     const view: SyncPlan = { id: randomUUID(), fileKey: loadConfig(this.configPath).figma.fileKey, entries, issues, expiresAt: new Date(Date.now() + 10 * 60_000).toISOString() };
     const fingerprint = createHash("sha256").update(stableStringify({ config: this.raw(), tokens: tokens.plan, source: [...new Set([config.tokensFile, ...(loadConfig(this.configPath).codebase.paths ?? [])])].map(path => readFileSync(path, "utf8")), components: components.map(component => ({ ...component, source: readFileSync(resolve(config.componentsDir, component.parsed.file), "utf8"), raw: existsSync(sidecarPathFor(config.componentsDir, component.parsed)) ? readFileSync(sidecarPathFor(config.componentsDir, component.parsed), "utf8") : null })), manifest, snapshot })).digest("hex");
     return { view, fingerprint, config, manifest, tokens: tokens.plan, components, snapshot };
@@ -342,28 +359,43 @@ export class ProjectService {
     }
   }
 
+  private descriptionRevision(config: BatchConfig, component: ParsedComponent): string {
+    const path = this.outputPath(relative(config.root, sidecarPathFor(config.componentsDir, component)));
+    const stat = lstatSync(path, {throwIfNoEntry: false});
+    if (stat && stat.size > 128_000) throw new Error("This component description is too large to review in Elf.");
+    return createHash("sha256").update(JSON.stringify({source: componentSourceHash(config.componentsDir, component), description: stat ? readFileSync(path, "utf8") : null})).digest("hex");
+  }
   async prepareComponent(name: string): Promise<Record<string, unknown>> {
     const { config, hasComponents, structured } = this.batchConfig();
     if (!hasComponents) throw new Error("No component source files were discovered in this project. Add a component and try again.");
     const component = parseComponents(config.componentsDir, config.componentFiles).find(item => item.name === name || item.codeKey === name);
     if (!component) throw new Error("That component is not in this project.");
-    const sidecar = loadSidecar(config.componentsDir, component) ?? { layoutMode: "HORIZONTAL", size: { width: 120, height: 40 }, text: { characters: component.name, fontSize: 14 } };
+    const reviewHash = this.descriptionRevision(config, component);
+    let sidecar; let warning: string | null = null; let existing = false;
+    try {const loaded = loadSidecar(config.componentsDir, component); sidecar = loaded ? validateSidecar(loaded, component.name) : null; existing = Boolean(sidecar);}
+    catch {warning = "The existing description is invalid. Saving this reviewed draft replaces it; cancelling leaves it untouched.";}
+    sidecar ??= { layoutMode: "HORIZONTAL", size: { width: 120, height: 40 }, text: { characters: component.name, fontSize: 14 } };
     const source = readFileSync(resolve(config.componentsDir, component.file), "utf8");
     const tokens = await this.tokens(config, structured);
-    return { source: source.slice(0, 20_000), sourceTruncated: source.length > 20_000, dependencies: component.dependencies, tokens: [...tokens.index.entries()].slice(0, 200).map(([key, value]) => ({ key, name: value.name, type: value.type })), tokenCount: tokens.index.size, codeKey: component.codeKey, file: component.file, path: relative(config.root, sidecarPathFor(config.componentsDir, component)), variantProps: component.variantProps, sidecar, reviewRequired: true, message: "Review layout, token bindings and variants against the implementation. This is an editable description, not a rendered reconstruction." };
+    try {const {variantMatrix} = await import("../batch/src/sync.js"); resolveSidecar(sidecar, variantMatrix(component), tokens.index, component.name);}
+    catch (error) {warning = [warning, `Review required: ${(error as Error).message.slice(0, 400)}`].filter(Boolean).join(" ");}
+    return { name: component.name, reviewHash, existing, warning, source: source.slice(0, 20_000), sourceTruncated: source.length > 20_000, dependencies: component.dependencies, tokens: [...tokens.index.entries()].slice(0, 200).map(([key, value]) => ({ key, name: value.name, type: value.type })), tokenCount: tokens.index.size, codeKey: component.codeKey, file: component.file, path: relative(config.root, sidecarPathFor(config.componentsDir, component)), variantProps: component.variantProps, sidecar, reviewRequired: true, message: "Review layout, token bindings and variants against the implementation. This is an editable description, not a rendered reconstruction." };
   }
-  async saveDescription(name: string, description: unknown): Promise<Record<string, unknown>> {
+  async saveDescription(name: string, description: unknown, reviewHash?: string): Promise<Record<string, unknown>> {
     return this.serial(() => this.runtime.transaction(loadConfig(this.configPath).figma.fileKey, async () => {
       const { config, hasComponents, structured } = this.batchConfig();
       if (!hasComponents) throw new Error("No component source files were discovered in this project. Add a component and try again.");
       const component = parseComponents(config.componentsDir, config.componentFiles).find(item => item.name === name || item.codeKey === name);
       if (!component) throw new Error("That component is not in this project.");
+      if (reviewHash !== undefined && reviewHash !== this.descriptionRevision(config, component)) throw new Error("The component or its description changed after preparation. Prepare it again before saving.");
       const sidecar = validateSidecar(description as any, component.name);
       const tokenPlan = await this.tokens(config, structured);
       // Validate token references before saving an agent-authored description.
       const { variantMatrix } = await import("../batch/src/sync.js");
       resolveSidecar(sidecar, variantMatrix(component), tokenPlan.index, component.name);
       const path = this.outputPath(relative(config.root, sidecarPathFor(config.componentsDir, component)));
+      // A sidecar save must not trigger automatic Figma writes before a fresh plan.
+      if (this.automatic()) this.setMonitoring();
       const temporary = `${path}.${randomUUID()}.tmp`;
       try { writeFileSync(temporary, `${JSON.stringify(sidecar, null, 2)}\n`, { flag: "wx", mode: 0o600 }); renameSync(temporary, path); }
       finally { rmSync(temporary, { force: true }); }

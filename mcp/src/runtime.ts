@@ -21,7 +21,7 @@ export interface BridgeRuntime {
 async function requireFileVerification(connection: BridgeClient): Promise<void> {
   try {
     const capabilities = await connection.call<{fileVerification?: number}>("__elf_capabilities", {}, {timeoutMs: 1500});
-    if (capabilities?.fileVerification !== 1) throw new Error("Unsupported bridge");
+    if (capabilities?.fileVerification !== 1 || (capabilities as { accountRenewal?: number }).accountRenewal !== 1) throw new Error("Unsupported bridge");
   } catch {
     await connection.close();
     throw new Error("An older Elf shared bridge is still running. Stop Elf watcher and MCP sessions, run elf bridge --stop (or node bin/elf-tokens.js bridge --stop in this repo), then run elf start again. Saved pairings are preserved.");
@@ -68,7 +68,7 @@ async function acquireSharedHost(config: BridgeConfig, logger: Logger): Promise<
     const require = createRequire(import.meta.url);
     const host = spawn(process.execPath, ["--import", require.resolve("tsx"), fileURLToPath(new URL("./host.ts", import.meta.url))], {
       cwd: dirname(fileURLToPath(import.meta.url)),
-      env: { ...Object.fromEntries(Object.entries(process.env).filter(([key]) => ["PATH", "HOME", "USERPROFILE", "SYSTEMROOT", "WINDIR", "TMPDIR", "TEMP", "TMP", "LANG", "LC_ALL", "ELF_FIGMA_ACCOUNT_PATH"].includes(key))), ELF_MCP_TOKEN: config.token, ELF_MCP_PORT: String(config.port), ELF_MCP_TIMEOUT_MS: String(config.timeoutMs), ...(config.sessionStorePath ? { ELF_BRIDGE_SESSION_PATH: config.sessionStorePath } : {}) },
+      env: { ...Object.fromEntries(Object.entries(process.env).filter(([key]) => ["PATH", "HOME", "USERPROFILE", "SYSTEMROOT", "WINDIR", "TMPDIR", "TEMP", "TMP", "LANG", "LC_ALL", "ELF_FIGMA_ACCOUNT_PATH", "ELECTRON_RUN_AS_NODE"].includes(key))), ELF_MCP_TOKEN: config.token, ELF_MCP_PORT: String(config.port), ELF_MCP_TIMEOUT_MS: String(config.timeoutMs), ...(config.sessionStorePath ? { ELF_BRIDGE_SESSION_PATH: config.sessionStorePath } : {}) },
       detached: true, stdio: ["ignore", "ignore", "ignore", "ipc"],
     });
     await new Promise<void>((resolve, reject) => {

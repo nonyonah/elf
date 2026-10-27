@@ -37,10 +37,10 @@ export function writeFigmaAccount(value: FigmaAccount): void {
 export function removeFigmaAccount(): void {directory(); rmSync(accountPath(), {force: true});}
 
 let refreshing: Promise<string> | null = null;
-export async function figmaAccessToken(): Promise<string> {
+export async function figmaAccessToken(forceRefresh = false): Promise<string> {
   const account = readFigmaAccount();
   if (!account) throw new Error("Connect your Figma account in Elf Settings to verify this file.");
-  if (account.expiresAt > Date.now() + 60_000) return account.accessToken;
+  if (!forceRefresh && account.expiresAt > Date.now() + 60_000) return account.accessToken;
   if (refreshing) return refreshing;
   refreshing = (async () => {
     // The origin is pinned when the account is connected; no caller supplies a URL.

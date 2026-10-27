@@ -27,7 +27,7 @@ export async function main(argv: string[]): Promise<number> {
     const plan = await project.plan();
     console.log(JSON.stringify(plan, null, 2));
     if (dryRun) return 0;
-    if (plan.issues.some(issue => issue.kind === "conflict")) throw new Error("Figma edits need review. Open Elf Settings to resolve the conflicts.");
+    if (plan.issues.some(issue => issue.kind === "conflict" && issue.blocksApply !== false)) throw new Error("Figma edits need review. Open Elf Settings to resolve the conflicts.");
     if (!yes) {
       if (!process.stdin.isTTY) throw new Error("Use --dry-run to inspect changes, or --yes to apply a fresh plan.");
       const input = createInterface({ input: process.stdin, output: process.stdout });

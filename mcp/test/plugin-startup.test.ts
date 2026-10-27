@@ -65,6 +65,9 @@ function main(getAsync: (key: string) => Promise<unknown>, codeUrl = new URL("..
 const channel = "a".repeat(64);
 test("the public bundle always prompts for a file link even when a development import exposes fileKey", async () => {
   execFileSync(process.execPath, [fileURLToPath(new URL("../../scripts/build-public-bridge.mjs", import.meta.url))]);
+  const manifest = JSON.parse(readFileSync(new URL("../../dist/bridge-plugin-public/manifest.json", import.meta.url), "utf8"));
+  assert.deepEqual(manifest.networkAccess.allowedDomains, ["ws://localhost:8765"]);
+  assert.equal(manifest.enablePrivatePluginApi, undefined);
   const plugin = main(async () => undefined, new URL("../../dist/bridge-plugin-public/code.js", import.meta.url));
   await plugin.figma.ui.onmessage({type: "context", channel});
   assert.equal(plugin.messages[0].type, "file-link-required");

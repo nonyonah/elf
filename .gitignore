@@ -9,4 +9,6 @@ worker/.dev.vars
 batch/elf.manifest.json
 /elf.manifest.json
 *.tgz
+extension/runtime/
+*.vsix
 .DS_Store

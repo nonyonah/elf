@@ -1,0 +1,264 @@
+{
+  "name": "elf-design-system",
+  "displayName": "Elf",
+  "description": "Connect your project and Figma, monitor design drift, and review sync changes.",
+  "version": "0.2.5",
+  "publisher": "elf-local",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nonyonah/elf.git"
+  },
+  "private": true,
+  "engines": {
+    "vscode": "^1.95.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "main": "./src/extension.cjs",
+  "activationEvents": [
+    "onStartupFinished",
+    "onView:elf.overview"
+  ],
+  "extensionKind": [
+    "workspace"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": false
+    },
+    "virtualWorkspaces": false
+  },
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "elf",
+          "title": "Elf",
+          "icon": "media/elf.svg"
+        }
+      ]
+    },
+    "views": {
+      "elf": [
+        {
+          "id": "elf.overview",
+          "name": "Overview",
+          "contextualTitle": "Elf"
+        },
+        {
+          "id": "elf.changes",
+          "name": "Changes",
+          "contextualTitle": "Elf changes"
+        },
+        {
+          "id": "elf.activityView",
+          "name": "Activity",
+          "contextualTitle": "Elf activity"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "elf.start",
+        "title": "Elf: Start",
+        "icon": "$(play)"
+      },
+      {
+        "command": "elf.stop",
+        "title": "Elf: Stop",
+        "icon": "$(debug-stop)"
+      },
+      {
+        "command": "elf.settings",
+        "title": "Elf: Open Overview"
+      },
+      {
+        "command": "elf.refresh",
+        "title": "Elf: Refresh",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "elf.setup",
+        "title": "Elf: Set Up Project"
+      },
+      {
+        "command": "elf.check",
+        "title": "Elf: Check Now",
+        "icon": "$(check)"
+      },
+      {
+        "command": "elf.monitor",
+        "title": "Elf: Use Monitoring Mode"
+      },
+      {
+        "command": "elf.toggleAutomatic",
+        "title": "Elf: Toggle Automatic Sync"
+      },
+      {
+        "command": "elf.reviewSync",
+        "title": "Elf: Review Sync",
+        "icon": "$(git-compare)"
+      },
+      {
+        "command": "elf.applySync",
+        "title": "Elf: Apply Reviewed Sync",
+        "icon": "$(check-all)"
+      },
+      {
+        "command": "elf.cancelPlan",
+        "title": "Elf: Cancel Sync Review",
+        "icon": "$(close)"
+      },
+      {
+        "command": "elf.toggleReplace",
+        "title": "Elf: Replace Figma Edits for This Plan"
+      },
+      {
+        "command": "elf.toggleEnableAuto",
+        "title": "Elf: Keep Syncing After This Review"
+      },
+      {
+        "command": "elf.figma",
+        "title": "Elf: Connect or Disconnect Figma"
+      },
+      {
+        "command": "elf.pairing",
+        "title": "Elf: Show Pairing Code"
+      },
+      {
+        "command": "elf.disconnectFigma",
+        "title": "Elf: Disconnect Figma Pairing"
+      },
+      {
+        "command": "elf.slack",
+        "title": "Elf: Connect or Disconnect Slack"
+      },
+      {
+        "command": "elf.slackTest",
+        "title": "Elf: Send Slack Test"
+      },
+      {
+        "command": "elf.toggleNotify",
+        "title": "Elf: Toggle Drift Notifications"
+      },
+      {
+        "command": "elf.toggleOnlyOnChange",
+        "title": "Elf: Toggle Notify Only on Change"
+      },
+      {
+        "command": "elf.notifications",
+        "title": "Elf: Manage Notifications"
+      },
+      {
+        "command": "elf.preferences",
+        "title": "Elf: Notification Preferences"
+      },
+      {
+        "command": "elf.prepareDescription",
+        "title": "Elf: Prepare Component Description"
+      },
+      {
+        "command": "elf.saveDescription",
+        "title": "Elf: Save Reviewed Description"
+      },
+      {
+        "command": "elf.resource",
+        "title": "Elf: Open Synced Resource"
+      },
+      {
+        "command": "elf.activity",
+        "title": "Elf: Open Activity"
+      },
+      {
+        "command": "elf.assistants",
+        "title": "Elf: Connect Coding Assistant"
+      },
+      {
+        "command": "elf.report",
+        "title": "Elf: View Drift Report"
+      },
+      {
+        "command": "elf.manage",
+        "title": "Elf: Manage",
+        "icon": "$(gear)"
+      },
+      {
+        "command": "elf.driftDetail",
+        "title": "Elf: View Drift Item"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "elf.manage",
+          "when": "view == elf.overview",
+          "group": "navigation@1"
+        },
+        {
+          "command": "elf.check",
+          "when": "view == elf.overview && elf.running",
+          "group": "navigation@2"
+        },
+        {
+          "command": "elf.start",
+          "when": "view == elf.overview && !elf.running",
+          "group": "navigation@2"
+        },
+        {
+          "command": "elf.refresh",
+          "when": "view == elf.overview",
+          "group": "navigation@3"
+        },
+        {
+          "command": "elf.reviewSync",
+          "when": "view == elf.changes && elf.running",
+          "group": "navigation@1"
+        },
+        {
+          "command": "elf.applySync",
+          "when": "view == elf.changes && elf.hasPlan",
+          "group": "navigation@2"
+        },
+        {
+          "command": "elf.cancelPlan",
+          "when": "view == elf.changes && elf.hasPlan",
+          "group": "navigation@3"
+        },
+        {
+          "command": "elf.notifications",
+          "when": "view == elf.activityView",
+          "group": "navigation@1"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "elf.prepareDescription",
+          "when": "view == elf.changes && viewItem == elf.issue",
+          "group": "inline@1"
+        },
+        {
+          "command": "elf.applySync",
+          "when": "view == elf.changes && viewItem == elf.plan-action",
+          "group": "inline@1"
+        },
+        {
+          "command": "elf.resource",
+          "when": "view == elf.changes && viewItem == elf.resource",
+          "group": "inline@1"
+        },
+        {
+          "command": "elf.activity",
+          "when": "view == elf.activityView && viewItem == elf.activity",
+          "group": "inline@1"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "test": "node --test test/*.test.cjs",
+    "prepare-runtime": "node scripts/prepare-runtime.mjs",
+    "vscode:prepublish": "npm run prepare-runtime && npm test"
+  }
+}

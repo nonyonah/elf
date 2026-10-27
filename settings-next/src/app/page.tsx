@@ -1,5 +1,5 @@
 "use client";
-import { settingsFetch as fetch } from "@/lib/settings-api";
+import { settingsFetch as fetch, openConnection } from "@/lib/settings-api";
 
 import { CircleAlert, CircleCheck, Info, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -128,6 +128,9 @@ export default function SettingsPage() {
 
   useEffect(() => {
     void fetchConfig();
+    const refresh = () => { void fetchConfig(); };
+    window.addEventListener("focus", refresh);
+    return () => window.removeEventListener("focus", refresh);
   }, [fetchConfig]);
 
   useEffect(() => {
@@ -202,7 +205,7 @@ export default function SettingsPage() {
       if (data?.url) {
         const target = new URL(data.url);
         if (target.protocol !== "https:" || target.origin !== (data.authorizationOrigin ?? "https://slack.com")) throw new Error("Unexpected Slack connection address.");
-        window.location.href = target.href;
+        openConnection(target.href);
         return;
       }
       showToast(

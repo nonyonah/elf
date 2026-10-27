@@ -1,0 +1,9 @@
+test/**
+scripts/**
+.vscode/**
+runtime/package-lock.json
+runtime/package.json
+**/*.log
+**/.env
+**/.env.*
+**/.elf/**

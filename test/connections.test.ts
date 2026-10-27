@@ -7,6 +7,18 @@ import { startConnection, finishSlackConnection } from "../src/connection-servic
 import { readFigmaAccount, writeFigmaAccount, figmaAccessToken, removeFigmaAccount } from "../src/figma/account.js";
 import { verifyPublicFile } from "../src/figma/file-identity.js";
 
+test("rate-limited file verification observes a cooldown instead of retrying every reconnect", async () => {
+  const root = mkdtempSync(join(tmpdir(), "elf-figma-rate-")); const oldPath = process.env.ELF_FIGMA_ACCOUNT_PATH;
+  process.env.ELF_FIGMA_ACCOUNT_PATH = join(root, "account.json");
+  try {
+    writeFigmaAccount({accessToken: "test-token", refreshToken: "test-refresh", expiresAt: Date.now() + 3600_000, origin: "https://console.test"});
+    let calls = 0;
+    const fetchImpl = (async () => { calls++; return new Response(null, {status: 429, headers: {"Retry-After": "120"}}); }) as typeof fetch;
+    for (let i = 0; i < 2; i++) await assert.rejects(verifyPublicFile("rateLimitedFile", {nonce: "e".repeat(64)}, fetchImpl), /rate-limited/);
+    assert.equal(calls, 1);
+  } finally { if (oldPath === undefined) delete process.env.ELF_FIGMA_ACCOUNT_PATH; else process.env.ELF_FIGMA_ACCOUNT_PATH = oldPath; rmSync(root, {recursive: true, force: true}); }
+});
+
 test("local account grants use HTTPS and proof-bound loopback callbacks without app secrets", async () => {
   const flow = startConnection("figma", 3210); const url = new URL(flow.url);
   assert.equal(url.searchParams.get("return_uri"), "http://127.0.0.1:3210/api/figma/broker-callback");
@@ -46,4 +58,35 @@ test("public file identity requires the fresh document proof and retries a save 
     await assert.rejects(verifyPublicFile("file12345", {nonce: "bad"}, fetchImpl), /Invalid/);
     await assert.rejects(verifyPublicFile("file12345", {nonce}, (async () => Response.json({document: {sharedPluginData: {elf: {fileProof: "different-file"}}}})) as typeof fetch), /does not match/);
   } finally {if (oldPath === undefined) delete process.env.ELF_FIGMA_ACCOUNT_PATH; else process.env.ELF_FIGMA_ACCOUNT_PATH = oldPath; rmSync(root, {recursive: true, force: true});}
+});
+
+test("public file verification renews an early-rejected token once and still rejects denied access", async () => {
+  const root = mkdtempSync(join(tmpdir(), "elf-figma-renew-proof-"));
+  const oldPath = process.env.ELF_FIGMA_ACCOUNT_PATH; const originalFetch = globalThis.fetch;
+  process.env.ELF_FIGMA_ACCOUNT_PATH = join(root, "account.json");
+  const nonce = "c".repeat(64); let renewals = 0; let requests = 0;
+  try {
+    writeFigmaAccount({accessToken: "rejected-before-expiry", refreshToken: "private-refresh-token", expiresAt: Date.now() + 3600_000, origin: "https://console.test"});
+    globalThis.fetch = (async (url: URL) => {
+      assert.equal(url.href, "https://console.test/api/local-connect/figma/refresh");
+      renewals++;
+      return Response.json({accessToken: "renewed-access", expiresAt: Date.now() + 3600_000});
+    }) as typeof fetch;
+    await verifyPublicFile("file12345", {nonce}, (async (_url: URL, init: RequestInit) => {
+      requests++;
+      if (requests === 1) return Response.json({err: "Request denied"}, {status: 403});
+      assert.equal((init.headers as Record<string, string>).Authorization, "Bearer renewed-access");
+      return Response.json({document: {sharedPluginData: {elf: {fileProof: nonce}}}});
+    }) as typeof fetch);
+    assert.equal(renewals, 1); assert.equal(requests, 2);
+    requests = 0;
+    await assert.rejects(verifyPublicFile("file12345", {nonce}, (async () => {
+      requests++; return Response.json({err: "Request denied"}, {status: 403});
+    }) as typeof fetch), /Figma denied file access/);
+    assert.equal(renewals, 2); assert.equal(requests, 2);
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (oldPath === undefined) delete process.env.ELF_FIGMA_ACCOUNT_PATH; else process.env.ELF_FIGMA_ACCOUNT_PATH = oldPath;
+    rmSync(root, {recursive: true, force: true});
+  }
 });

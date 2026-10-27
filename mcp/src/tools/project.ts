@@ -19,7 +19,7 @@ export function registerProjectTools(server: McpServer, project: ProjectService)
   }, args => project.apply(args.planId, args));
   add("set_monitoring", "Pause automatic Figma writes while retaining drift monitoring.", {}, async () => { project.setMonitoring(); return { ok: true }; });
   add("prepare_component", "Read component source, available token references, variants and an editable initial Figma description for one local component. This is not a rendered reconstruction. Review and fill in design intent and token bindings.", { component: z.string().min(1) }, args => project.prepareComponent(args.component));
-  add("save_component_description", "Save an explicitly reviewed Figma description for a local component. Validates token references and paths. Does not write to Figma; use plan_sync next.", {
-    component: z.string().min(1), description: z.record(z.string(), z.unknown()),
-  }, args => project.saveDescription(args.component, args.description));
+  add("save_component_description", "Save an explicitly reviewed Figma description for a local component. Validates token references and paths. Pass the reviewHash from prepare_component to reject stale drafts. Pauses automatic sync; does not write to Figma. Use plan_sync next.", {
+    component: z.string().min(1), description: z.record(z.string(), z.unknown()), reviewHash: z.string().regex(/^[a-f0-9]{64}$/),
+  }, args => project.saveDescription(args.component, args.description, args.reviewHash));
 }

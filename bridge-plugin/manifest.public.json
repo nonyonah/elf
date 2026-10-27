@@ -7,7 +7,7 @@
   "ui": "ui.html",
   "editorType": ["figma"],
   "networkAccess": {
-    "allowedDomains": ["ws://localhost:8765", "ws://127.0.0.1:8765"],
+    "allowedDomains": ["ws://localhost:8765"],
     "reasoning": "Elf connects only to the authenticated bridge on your computer. Figma account credentials stay in the local Elf process; this plugin never receives them. The bridge verifies the file before allowing managed writes."
   }
 }

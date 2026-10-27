@@ -9,7 +9,7 @@ import { loadRuntimeBridgeConfig } from "../mcp/src/config.js";
 import { loadWatchEnv } from "../watch/src/bridge.js";
 import { runElfCheck } from "../watch/src/check.js";
 import { findConfigPath, loadConfig } from "./config.js";
-import { createSettingsServer, DEFAULT_SETTINGS_PORT, openSettingsBrowser, reopenCompatibleSettingsServer } from "./settings.js";
+import { createSettingsServer, DEFAULT_SETTINGS_PORT, openSettingsBrowser, reopenCompatibleSettingsServer, reopenSettingsServer } from "./settings.js";
 import { completeProjectSetup, projectResource, saveProjectSetup, validateProjectSources, type OnboardingController } from "./onboarding.js";
 import { createHash } from "node:crypto";
 import { SyncAlerts } from "./sync-alerts.js";
@@ -167,7 +167,10 @@ export async function main(argv: string[]): Promise<number> {
       if (action === "monitor") { project.setMonitoring(); return { ok: true }; }
       if (action === "check") { check(); return { ok: true }; }
       if (action === "prepare-component" && typeof body.component === "string") return project.prepareComponent(body.component);
-      if (action === "save-description" && typeof body.component === "string") return project.saveDescription(body.component, body.description);
+      if (action === "save-description" && typeof body.component === "string") {
+        if (typeof body.reviewHash !== "string" || !/^[a-f0-9]{64}$/.test(body.reviewHash)) throw new Error("Prepare and review the component description before saving.");
+        return project.saveDescription(body.component, body.description, body.reviewHash);
+      }
       if (action === "test-slack") {
         const webhook = resolveNotifyWebhook({ webhookEnv: "SLACK_WEBHOOK_URL", format: "slack" }, configPath);
         if (!webhook) throw new Error("Connect Slack before sending a test message.");
@@ -246,6 +249,16 @@ export async function main(argv: string[]): Promise<number> {
     finish();
   };
   const onSignal = (): void => { void close(); };
+  // The editor owns this private IPC channel. Never accept these requests over HTTP.
+  const onEditorMessage = (message: unknown): void => {
+    if (!message || typeof message !== "object") return;
+    const input = message as Record<string, unknown>;
+    if (input.type !== "elf:open-settings" || !Number.isSafeInteger(input.id) || !handle || stopping) return;
+    void reopenSettingsServer(handle.url, configPath, bridgeConfig.token).then(url => {
+      if (process.connected) process.send?.({ type: "elf:settings", id: input.id, url });
+    }).catch(() => { if (process.connected) process.send?.({ type: "elf:settings", id: input.id, url: null }); });
+  };
+  if (process.send) process.on("message", onEditorMessage);
   process.once("SIGINT", onSignal); process.once("SIGTERM", onSignal);
   try {
     try { handle = await createSettingsServer(configPath, { port: settingsPort, onboarding: controller, identityToken: bridgeConfig.token }); }
@@ -268,6 +281,7 @@ export async function main(argv: string[]): Promise<number> {
     await done;
     return 0;
   } finally {
+    process.off("message", onEditorMessage);
     process.off("SIGINT", onSignal); process.off("SIGTERM", onSignal);
     await close();
   }

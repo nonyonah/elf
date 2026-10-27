@@ -112,6 +112,11 @@ host, stop Elf watcher/MCP clients, run `node bin/elf-tokens.js bridge --stop`
 from this repository (or `elf bridge --stop` when installed), then start Elf
 again. Saved file pairings remain; temporary pairing codes must be refreshed.
 
+File verification renews a rejected Figma access token once, even if its saved
+expiry is in the future, then retries the read. Continued denial, a missing file,
+rate limiting, and a proof mismatch produce distinct safe plugin messages.
+Renewal never bypasses the document proof or authorizes writes by itself.
+
 Settings now provides authenticated report viewing from
 the fixed project report path. Linked, special, and oversized report files are
 refused. Report content is escaped text. Managed-resource inspection reads the

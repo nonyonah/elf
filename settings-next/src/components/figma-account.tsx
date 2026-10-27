@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { settingsFetch as fetch, settingsJson } from "@/lib/settings-api";
+import { settingsFetch as fetch, settingsJson, openConnection } from "@/lib/settings-api";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { figmaConnectionError } from "@/lib/connection-error";
@@ -11,10 +11,11 @@ export function FigmaAccount() {
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     let active = true;
-    void fetch("/api/figma/account").then(settingsJson).then(data => {if (active) setConnected(data.connected);}).catch(cause => {if (active) setError(cause.message);});
+    const refresh = () => { void fetch("/api/figma/account").then(settingsJson).then(data => {if (active) setConnected(data.connected);}).catch(cause => {if (active) setError(cause.message);}); };
+    refresh(); window.addEventListener("focus", refresh);
     const params = new URLSearchParams(window.location.search);
     if (params.get("figma") === "error") setError(figmaConnectionError(params.get("figma_reason")));
-    return () => {active = false;};
+    return () => {active = false; window.removeEventListener("focus", refresh);};
   }, []);
   const act = async () => {
     setBusy(true); setError(null);
@@ -24,7 +25,7 @@ export function FigmaAccount() {
       else {
         const url = new URL(data.url);
         if (url.protocol !== "https:" || url.origin !== data.authorizationOrigin) throw new Error("Unexpected Figma connection address.");
-        window.location.assign(url.href);
+        openConnection(url.href);
       }
     } catch (cause) {setError((cause as Error).message);} finally {setBusy(false);}
   };

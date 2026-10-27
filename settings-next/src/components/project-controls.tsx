@@ -1,4 +1,5 @@
 "use client";
+import { ComponentDescription, type PreparedDescription } from "@/components/component-description";
 import { FigmaAccount } from "@/components/figma-account";
 import { settingsFetch as fetch } from "@/lib/settings-api";
 import { ProjectResults } from "@/components/project-results";
@@ -10,7 +11,7 @@ import { Switch } from "@/components/ui/switch";
 interface Plan {
   id: string;
   entries: { kind: string; key: string; name: string; action: string }[];
-  issues: { kind: string; key: string; message: string }[];
+  issues: { kind: string; key: string; message: string; component?: string; action?: string; blocksApply?: boolean }[];
 }
 export interface ProjectRuntime {
   project?: {componentsPath?: string};
@@ -26,6 +27,7 @@ const button = "h-7 shrink-0 rounded-lg px-3 text-xs shadow-none sm:text-xs";
 
 export function ProjectControls({ runtime, onChanged }: { runtime: ProjectRuntime; onChanged: () => void }) {
   const [plan, setPlan] = useState<Plan | null>(null);
+  const [description, setDescription] = useState<PreparedDescription | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -43,6 +45,12 @@ export function ProjectControls({ runtime, onChanged }: { runtime: ProjectRuntim
     try { const next = await run("plan"); setPlan(next); setEnableAuto(runtime.mode !== "automatic" && automatic && !next.issues.some((issue: { kind: string }) => issue.kind !== "unsupported")); } catch (cause) { setError((cause as Error).message); }
     finally { setBusy(null); }
   };
+  const prepare = async (component: string) => {
+    setBusy("prepare"); setError(null); setMessage(null);
+    try {setDescription(await run("prepare-component", {component})); setPlan(null);}
+    catch (cause) {setError((cause as Error).message);}
+    finally {setBusy(null);}
+  };
   const apply = async () => {
     if (!plan) return;
     setBusy("apply"); setError(null);
@@ -59,7 +67,7 @@ export function ProjectControls({ runtime, onChanged }: { runtime: ProjectRuntim
     catch (cause) { setError((cause as Error).message); }
     finally { setBusy(null); }
   };
-  const conflicts = plan?.issues.some(issue => issue.kind === "conflict") ?? false;
+  const conflicts = plan?.issues.some(issue => issue.kind === "conflict" && issue.blocksApply !== false) ?? false;
   const unresolved = plan?.issues.some(issue => issue.kind !== "unsupported") ?? false;
   const integration = runtime.integration;
   const quote = (value: string) => "'" + value.replace(/'/g, "'\\''") + "'";
@@ -82,16 +90,17 @@ export function ProjectControls({ runtime, onChanged }: { runtime: ProjectRuntim
         </div>
         {plan && <div className="border-t-[0.5px] border-border px-3.5 py-3">
           <h3 className="text-[13px] font-medium leading-[1.55]">{plan.entries.length ? `${plan.entries.length} planned ${plan.entries.length === 1 ? "change" : "changes"}` : "No supported changes to apply"}</h3>
-          <p className="mb-3 mt-1 text-[11.5px] leading-[1.55] text-faint">A fresh review is required if code or Figma changes. Removed resources stay in Figma.</p>
+          <p className="mb-3 mt-1 text-[11.5px] leading-[1.55] text-faint">Only the listed changes will be applied. Other items stay unchanged for review. A fresh review is required if code or Figma changes.</p>
           {plan.entries.length > 0 && <ul className="mb-3 max-h-52 space-y-2 overflow-auto text-[12px] leading-[1.55]">{plan.entries.map(entry => <li className="flex items-start justify-between gap-3" key={`${entry.kind}:${entry.key}`}><span className="min-w-0 break-words">{entry.name}<span className="ml-1 text-faint">· {entry.kind}</span></span><span className="shrink-0 text-muted-foreground">{entry.action === "create" ? "Create" : "Update"}</span></li>)}</ul>}
-          {plan.issues.length > 0 && <details open className="mb-3 text-[12px] leading-[1.55]"><summary className="cursor-pointer text-warning">{plan.issues.length} {plan.issues.length === 1 ? "item needs" : "items need"} attention</summary><ul className="mt-2 max-h-48 space-y-2 overflow-auto text-muted-foreground">{plan.issues.map((issue, index) => <li key={`${issue.key}:${index}`} className="break-words">{issue.message}</li>)}</ul></details>}
-          {conflicts && <label className="mb-3 flex items-start gap-2 text-[12px] leading-[1.55]"><input type="checkbox" className="mt-0.5 accent-primary" checked={replace} onChange={event => setReplace(event.target.checked)} /><span>Replace the Figma edits listed in this review with code values</span></label>}
+          {plan.issues.length > 0 && <details open className="mb-3 text-[12px] leading-[1.55]"><summary className="cursor-pointer text-warning">{plan.issues.length} {plan.issues.length === 1 ? "item needs" : "items need"} attention</summary><ul className="mt-2 max-h-48 space-y-2 overflow-auto text-muted-foreground">{plan.issues.map((issue, index) => <li key={`${issue.key}:${index}`} className="break-words"><p>{issue.message}</p>{issue.action === "prepare-component" && issue.component && <Button size="sm" className={`${button} mt-2`} disabled={busy !== null} loading={busy === "prepare"} onClick={() => void prepare(issue.component!)}>Prepare description</Button>}</li>)}</ul></details>}
+          {conflicts && <label className="mb-3 flex items-start gap-2 text-[12px] leading-[1.55]"><input type="checkbox" className="mt-0.5 accent-primary" checked={replace} onChange={event => setReplace(event.target.checked)} /><span>Replace Figma edits affecting the planned changes with code values</span></label>}
           {runtime.mode !== "automatic" && <label className="mb-3 flex items-start gap-2 text-[12px] leading-[1.55]"><input type="checkbox" className="mt-0.5 accent-primary" checked={enableAuto} disabled={unresolved} onChange={event => setEnableAuto(event.target.checked)} /><span>Keep syncing supported changes after this review{unresolved && <span className="block text-[11.5px] text-faint">Resolve conflicts and removed resources first.</span>}</span></label>}
           {runtime.mode === "automatic" && <p className="mb-3 text-[11.5px] leading-[1.55] text-faint">Automatic sync stays enabled and resumes once conflicts are resolved.</p>}
           <div className="flex items-center justify-end gap-2"><Button variant="default" size="sm" className={button} disabled={busy !== null} onClick={() => setPlan(null)}>Cancel</Button><Button size="sm" className={button} loading={busy === "apply"} disabled={busy !== null || (conflicts && !replace) || (enableAuto && unresolved) || (!plan.entries.length && !enableAuto)} onClick={() => { void apply(); }}>{enableAuto ? "Apply and enable" : "Apply sync"}</Button></div>
         </div>}
       </Card>
     </section>
+    {description && <ComponentDescription key={`${description.codeKey}:${description.reviewHash}`} prepared={description} onClose={() => setDescription(null)} onSaved={() => {setDescription(null); setPlan(null); setMessage("Reviewed description saved locally. Review sync again to preview the Figma changes."); onChanged();}} />}
     {error && <p role="alert" className="mb-4 text-[12px] leading-[1.55] text-destructive">{error}</p>}
     {message && <p role="status" className="mb-4 text-[12px] leading-[1.55] text-muted-foreground">{message}</p>}
     <FigmaAccount />

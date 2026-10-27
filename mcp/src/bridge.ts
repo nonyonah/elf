@@ -1,4 +1,4 @@
-import { verifyPublicFile } from "../../src/figma/file-identity.js";
+import { FileVerificationError, verifyPublicFile } from "../../src/figma/file-identity.js";
 import { createHash, createHmac, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import type { AddressInfo } from "node:net";
 import { WebSocket, WebSocketServer } from "ws";
@@ -520,7 +520,7 @@ export class Bridge {
 
     try {
       let result: unknown;
-      if (message.method === "__elf_capabilities") result = {fileVerification: 1};
+      if (message.method === "__elf_capabilities") result = {fileVerification: 1, accountRenewal: 1};
       else if (message.method === "__elf_pairing_refresh") result = this.refreshPairingCode();
       else if (message.method === "__elf_pairing_current") result = this.pairingCode;
       else if (message.method === "__elf_revoke") {
@@ -578,8 +578,8 @@ export class Bridge {
         if (this.options.sessionStore && this.activeSession && !this.options.sessionStore.bindKey(this.activeSession, file.key)) throw new Error("Pairing belongs to a different file");
         this.file = file; this.plugin = message.plugin ?? null; this.emitStatus();
         socket.send(this.encodePlugin(socket, {type: "file-verified"}));
-      }).catch(() => {
-        if (this.socket === socket && generation === this.identityGeneration) socket?.close(4003, "File not verified. Connect Figma in Settings, check the file link, and retry after saving.");
+      }).catch(error => {
+        if (this.socket === socket && generation === this.identityGeneration) socket?.close(4003, error instanceof FileVerificationError ? error.message : "File not verified. Check Settings and the file link, then retry after saving.");
       });
       return;
     }

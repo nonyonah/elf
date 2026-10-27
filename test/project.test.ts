@@ -208,3 +208,104 @@ test("deprecated resources are not recreated by managed sync", async () => {
     assert.ok(plan.issues.some(item => item.message.includes("deprecated")));
   } finally {p.cleanup();}
 });
+
+test("component drafts are actionable and stale code or descriptions cannot be acknowledged", async () => {
+  const p = project(true);
+  try {
+    const sidecarPath = join(p.root, "components", "Button.figma.json");
+    rmSync(sidecarPath);
+    const plan = await p.service.plan();
+    const issue = plan.issues.find(item => item.action === "prepare-component");
+    assert.ok(issue?.component);
+    const prepared = await p.service.prepareComponent(issue.component);
+    assert.match(prepared.reviewHash as string, /^[a-f0-9]{64}$/);
+    assert.equal(prepared.existing, false);
+    assert.equal(p.calls.some(call => call.startsWith("upsert")), false);
+    writeFileSync(join(p.root, "components", "Button.tsx"), "export function Button() { return <button>Changed</button>; }");
+    await assert.rejects(p.service.saveDescription(issue.component, prepared.sidecar, prepared.reviewHash as string), /changed after preparation/);
+    const next = await p.service.prepareComponent(issue.component);
+    writeFileSync(sidecarPath, JSON.stringify({text: {characters: "Edited elsewhere"}}));
+    await assert.rejects(p.service.saveDescription(issue.component, next.sidecar, next.reviewHash as string), /changed after preparation/);
+    assert.equal(JSON.parse(readFileSync(sidecarPath, "utf8")).text.characters, "Edited elsewhere");
+  } finally {p.cleanup();}
+});
+
+test("reviewing an invalid description preserves it until save and pauses automatic writes", async () => {
+  const p = project(true);
+  try {
+    await p.service.apply((await p.service.plan()).id, {enableAuto: true});
+    const path = join(p.root, "components", "Button.figma.json");
+    writeFileSync(path, "{ invalid description");
+    const prepared = await p.service.prepareComponent("Button");
+    assert.match(prepared.warning as string, /invalid/);
+    assert.equal(readFileSync(path, "utf8"), "{ invalid description");
+    const writes = p.calls.filter(call => /^(upsert|create|delete)/.test(call)).length;
+    await p.service.saveDescription(prepared.codeKey as string, prepared.sidecar, prepared.reviewHash as string);
+    assert.equal(p.service.automatic(), false);
+    assert.equal(p.calls.filter(call => /^(upsert|create|delete)/.test(call)).length, writes);
+    assert.equal((await p.service.plan()).issues.some(issue => issue.action === "prepare-component"), false);
+  } finally {p.cleanup();}
+});
+
+test("preparation exposes unresolved token references without inventing replacements", async () => {
+  const p = project(true);
+  try {
+    const sidecar = {fill: "color.not.in.this.project", text: {characters: "Save", fontSize: 14}};
+    writeFileSync(join(p.root, "components", "Button.figma.json"), JSON.stringify(sidecar));
+    const prepared = await p.service.prepareComponent("Button");
+    assert.match(prepared.warning as string, /Review required/);
+    assert.deepEqual(prepared.sidecar, sidecar);
+    await assert.rejects(p.service.saveDescription(prepared.codeKey as string, prepared.sidecar, prepared.reviewHash as string), /token|reference/i);
+    assert.equal(p.calls.some(call => /^(upsert|create|delete)/.test(call)), false);
+  } finally {p.cleanup();}
+});
+
+test("intentional differences pause automatic writes and require an explicit manual review", async () => {
+  const p = project();
+  try {
+    await p.service.apply((await p.service.plan()).id, {enableAuto: true});
+    const raw = JSON.parse(readFileSync(p.path, "utf8"));
+    raw.intentionalDifferences = [{name: "color-primary", figmaValue: "#112233", codeValue: "#334455", reason: "Platform contrast"}];
+    writeFileSync(p.path, JSON.stringify(raw));
+    writeFileSync(join(p.root, "tokens.css"), ":root { --color-primary: #334455; }");
+    const writes = p.calls.filter(call => /^(upsert|create|delete)/.test(call)).length;
+    assert.equal((await p.service.autoSync()).paused, true);
+    assert.equal(p.calls.filter(call => /^(upsert|create|delete)/.test(call)).length, writes);
+    const plan = await p.service.plan();
+    await assert.rejects(p.service.apply(plan.id, {enableAuto: true}), /Intentional differences/);
+    await p.service.apply(plan.id);
+    assert.equal(p.variables[0].valuesByMode.Value.value, "#334455");
+  } finally {p.cleanup();}
+});
+
+test("an unrelated component type conflict does not force replacement when applying supported entries", async () => {
+  const p = project(true);
+  try {
+    writeFileSync(join(p.root, "components", "Other.tsx"), 'export interface OtherProps { tone?: "info" | "danger"; } export function Other({tone}: OtherProps) { return <div>{tone}</div>; }');
+    writeFileSync(join(p.root, "components", "Other.figma.json"), JSON.stringify({text: {characters: "Other", fontSize: 14}}));
+    const existing = {id: "unrelated-node", name: "Other", codeKey: "Other.tsx#Other", type: "COMPONENT", width: 90, height: 40};
+    p.refs.push({...existing}); p.nodes[existing.id] = {...existing};
+    const plan = await p.service.plan();
+    assert.ok(plan.issues.some(issue => issue.kind === "conflict" && issue.key === existing.codeKey));
+    assert.equal(plan.entries.some(entry => entry.key === existing.codeKey), false);
+    assert.ok(plan.entries.some(entry => entry.name === "Button"));
+    await p.service.apply(plan.id);
+    assert.deepEqual(p.nodes[existing.id], existing);
+    assert.ok(p.refs.some(ref => ref.name === "Button"));
+  } finally {p.cleanup();}
+});
+
+test("conflicts on a planned component dependency still require explicit replacement review", async () => {
+  const p = project(true);
+  try {
+    writeFileSync(join(p.root, "components", "Button.tsx"), 'import {Other} from "./Other"; export function Button() { return <Other />; }');
+    writeFileSync(join(p.root, "components", "Other.tsx"), 'export interface OtherProps { tone?: "info" | "danger"; } export function Other({tone}: OtherProps) { return <div>{tone}</div>; }');
+    writeFileSync(join(p.root, "components", "Other.figma.json"), JSON.stringify({text: {characters: "Other", fontSize: 14}}));
+    const existing = {id: "dependency-node", name: "Other", codeKey: "Other.tsx#Other", type: "COMPONENT", width: 90, height: 40};
+    p.refs.push({...existing}); p.nodes[existing.id] = {...existing};
+    const plan = await p.service.plan();
+    assert.ok(plan.issues.some(issue => issue.key === existing.codeKey && issue.blocksApply === true));
+    await assert.rejects(p.service.apply(plan.id), /Figma has edits/);
+    assert.equal(p.calls.some(call => /^(upsert|create|delete)/.test(call)), false);
+  } finally {p.cleanup();}
+});

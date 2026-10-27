@@ -1,6 +1,16 @@
 let session: string | null = null;
 let opening: Promise<void> | null = null;
 const STORAGE_KEY = "elf.settings.session";
+declare global {
+  interface Window {
+    __elfEditor?: { fetch: (path: string, init?: RequestInit) => Promise<Response>; openExternal: (url: string) => void };
+  }
+}
+
+export function openConnection(url: string): void {
+  if (window.__elfEditor) window.__elfEditor.openExternal(url);
+  else window.location.assign(url);
+}
 
 async function openSession(): Promise<void> {
   const fragment = new URLSearchParams(window.location.hash.slice(1));
@@ -19,6 +29,11 @@ async function openSession(): Promise<void> {
 
 /** Per-origin session storage avoids sharing credentials with other localhost ports. */
 export async function settingsFetch(input: string, init: RequestInit = {}): Promise<Response> {
+  if (window.__elfEditor) {
+    const response = await window.__elfEditor.fetch(input, init);
+    if (!response.ok) await settingsJson(response.clone());
+    return response;
+  }
   if (new URL(input, window.location.origin).origin !== window.location.origin) throw new Error("Settings API requests must stay on this page’s origin.");
   if (!opening) opening = openSession();
   await opening;

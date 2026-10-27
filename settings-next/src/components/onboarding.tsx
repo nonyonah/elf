@@ -1,6 +1,6 @@
 "use client";
 import { FigmaAccount } from "@/components/figma-account";
-import { settingsFetch as fetch } from "@/lib/settings-api";
+import { settingsFetch as fetch, openConnection } from "@/lib/settings-api";
 
 import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, ArrowRight, Check, CircleAlert, Shapes, FolderOpen, Radio, Terminal } from "lucide-react";
@@ -76,14 +76,15 @@ export function Onboarding({ initial, onFinished }: { initial: OnboardingStatus;
 
   useEffect(() => {
     let disposed = false;
-    void fetch("/api/config").then(res => res.json()).then(data => {
+    const refresh = () => { void fetch("/api/config").then(res => res.json()).then(data => {
       if (!disposed && data.slack) setSlack(data.slack);
-    }).catch(() => {});
+    }).catch(() => {}); };
+    refresh(); window.addEventListener("focus", refresh);
     const params = new URLSearchParams(window.location.search);
     if (params.has("figma")) setStep(1);
     if (params.get("slack") === "error") setError("Slack connection failed. Try again, or continue without Slack.");
     if (params.has("slack")) { params.delete("slack"); window.history.replaceState(null, "", `${window.location.pathname}${params.size ? `?${params}` : ""}`); }
-    return () => { disposed = true; };
+    return () => { disposed = true; window.removeEventListener("focus", refresh); };
   }, []);
 
   const validateProject = async () => {
@@ -114,8 +115,9 @@ export function Onboarding({ initial, onFinished }: { initial: OnboardingStatus;
       const result = await api("/api/slack/connect");
       const target = new URL(result.url);
       if (target.protocol !== "https:" || target.origin !== (result.authorizationOrigin ?? "https://slack.com")) throw new Error("Slack returned an unexpected connection address.");
-      window.location.assign(target.href);
-    } catch (cause) { setError((cause as Error).message); setBusy(false); }
+      openConnection(target.href);
+    } catch (cause) { setError((cause as Error).message); }
+    finally { setBusy(false); }
   };
   const disconnectSlack = async () => {
     setBusy(true); setError(null);

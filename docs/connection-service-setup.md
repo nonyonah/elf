@@ -139,3 +139,8 @@ Figma exposes a native file key while it is imported as a development plugin.
 With no saved link, it opens **Link this Figma file** with a URL input. The regular
 `bridge-plugin/manifest.json` build can use the native identity and will not need
 that input.
+
+The plugin's network permission uses `ws://localhost:8765`. Keep the bridge host
+set to `localhost:8765` in the plugin; numeric IP patterns are not included in
+the manifest. This preserves the fixed loopback restriction without wildcard
+network access. The bridge server itself continues to bind to loopback addresses.
