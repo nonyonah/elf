@@ -4,9 +4,11 @@ This setup is for Elf's maintainer, once. Designers connect their accounts from
 onboarding or Settings without creating apps or configuring secrets. Both apps
 use the existing Elf Console Worker.
 
-The implementation is prepared, but hosted connections remain unavailable until
-the OAuth apps, Worker secrets, migration, and deployment below are complete.
-The public Figma plugin has not been published or verified against a live OAuth app.
+As of 27 October 2026, the OAuth database migration and Worker deployment are
+complete. Both configured start routes redirect to the correct provider with the
+expected scope and callback. Full account authorization and live sync/notification
+checks remain; follow [the live test plan](tonight-test-plan.md).
+The public Figma plugin has not been published or fully verified against a live OAuth app.
 
 | Provider | Exact redirect URL | Required permission |
 | --- | --- | --- |
@@ -79,9 +81,9 @@ npx wrangler deploy
 ```
 
 Build the Console client first if `dist/client` is absent, using the Console's
-documented build configuration. These activation commands have not been executed
-as part of preparing this change. Publish the updated npm package separately
-after the hosted flows pass live verification.
+documented build configuration. Migration `0005_local_oauth.sql` and deployment
+from implementation commit `eef9146` were completed on 27 October 2026. Publish
+the updated npm package separately after the hosted flows pass live verification.
 
 ## Verify the designer's flow
 
