@@ -36,6 +36,18 @@ beforeEach(async () => {await env.DB.prepare("DELETE FROM local_oauth").run(); a
 afterEach(() => vi.unstubAllGlobals());
 
 describe("local OAuth delivery", () => {
+  it("returns fixed Figma failure reasons without leaking provider response text", async () => {
+    for (const [error, expected] of [["invalid_client", "invalid_client"], ["private-token-secret", "provider_rejected"]]) {
+      const flow = await start("figma");
+      vi.stubGlobal("fetch", async () => Response.json({error, message: "private-provider-response"}, {status: 400}));
+      const response = await request(`/figma/callback?code=test&state=${flow.id}`, {headers: {Cookie: flow.cookie}});
+      const target = new URL(response.headers.get("Location")!);
+      expect(target.searchParams.get("reason")).toBe(expected);
+      expect(target.href).not.toContain("private-");
+      expect(target.searchParams.has("grant")).toBe(false);
+      expect(await env.DB.prepare("SELECT id FROM local_oauth WHERE id = ?").bind(flow.id).first()).toBeNull();
+    }
+  });
   it("exchanges once, seals credentials at rest, and never redirects credentials through the browser", async () => {
     const flow = await complete();
     expect(flow.redirect.origin).toBe("http://127.0.0.1:3456");

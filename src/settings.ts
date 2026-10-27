@@ -365,15 +365,17 @@ export async function createSettingsServer(
     }
     if (path === "/api/figma/broker-callback" && req.method === "GET") {
       const generation = figmaGeneration;
-      const pending = pendingFigma; let status = "error";
+      const pending = pendingFigma; let status = "error"; let reason = "expired_session";
       if (pending && pending.expiresAt > Date.now() && url.searchParams.get("state") === pending.state) {
         pendingFigma = null; const grant = url.searchParams.get("grant");
+        const supplied = url.searchParams.get("reason") ?? "";
+        reason = ["access_denied", "invalid_client", "invalid_grant", "invalid_scope", "redirect_uri_mismatch", "unauthorized_client", "missing_code", "provider_rejected", "service_error", "credential_storage"].includes(supplied) ? supplied : "service_error";
         if (grant && !url.searchParams.has("error")) {
           try {const account = validateAccount(await finishConnection(grant, pending.verifier, pending.origin, "figma"), pending.origin); if (generation !== figmaGeneration) throw new Error("Connection canceled"); writeFigmaAccount(account); status = "connected";}
-          catch {console.error("Figma account connection failed. Reconnect from Elf Settings.");}
+          catch {reason = "local_exchange"; console.error("Figma account connection failed. Reconnect from Elf Settings.");}
         }
       }
-      res.writeHead(302, {Location: `http://127.0.0.1:${req.socket.localPort}/?figma=${status}`}); res.end(); return;
+      res.writeHead(302, {Location: `http://127.0.0.1:${req.socket.localPort}/?figma=${status}${status === "error" ? `&figma_reason=${reason}` : ""}`}); res.end(); return;
     }
 
     if (path === "/api/slack/connect" && req.method === "POST") {

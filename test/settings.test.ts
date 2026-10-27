@@ -471,6 +471,13 @@ test("Figma browser callbacks keep tokens private, reject replay, and honor disc
     assert.equal(JSON.stringify(status).includes("private-"), false);
     assert.match((await callback(state)).headers.get("location")!, /figma=error/);
     assert.equal(exchanges, 1);
+    const failedState = await connect();
+    const failed = await handle.fetch(`${handle.url}/api/figma/broker-callback?state=${failedState}&error=connection_failed&reason=invalid_client`, {redirect: "manual"});
+    assert.match(failed.headers.get("location")!, /figma_reason=invalid_client/);
+    const unsafeState = await connect();
+    const unsafe = await handle.fetch(`${handle.url}/api/figma/broker-callback?state=${unsafeState}&error=connection_failed&reason=private-secret`, {redirect: "manual"});
+    assert.match(unsafe.headers.get("location")!, /figma_reason=service_error/);
+    assert.equal(unsafe.headers.get("location")!.includes("private-secret"), false);
     const nextState = await connect();
     const pending = callback(nextState);
     await started;

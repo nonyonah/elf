@@ -117,6 +117,14 @@ export function Onboarding({ initial, onFinished }: { initial: OnboardingStatus;
       window.location.assign(target.href);
     } catch (cause) { setError((cause as Error).message); setBusy(false); }
   };
+  const disconnectSlack = async () => {
+    setBusy(true); setError(null);
+    try {
+      await api("/api/slack/disconnect");
+      setSlack({ connected: false }); setSlackTested(false); setNotify(false);
+    } catch (cause) { setError((cause as Error).message); }
+    finally { setBusy(false); }
+  };
   const testSlack = async () => {
     setBusy(true); setError(null);
     try { await api("/api/slack/test"); setSlackTested(true); }
@@ -200,7 +208,7 @@ export function Onboarding({ initial, onFinished }: { initial: OnboardingStatus;
           <div className="flex items-center gap-2.5 px-3.5 py-3">
             <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-white ring-1 ring-black/5 dark:ring-white/10"><img src="https://a.slack-edge.com/80588/marketing/img/icons/icon_slack_hash_colored.png" alt="" width={24} height={24} className="size-6" /></span>
             <div className="min-w-0 flex-1"><p className="text-[13px] font-medium leading-[1.55]">{slack.connected ? "Connected" : "Not connected"}</p><p className="text-[12px] leading-[1.55] text-muted-foreground">{slack.connected ? [slack.teamName, slack.channel].filter(Boolean).join(" · ") : "Send drift notifications to your team"}</p></div>
-            {!slack.connected && <Button size="sm" className={smallButton} loading={busy} disabled={busy || offline} onClick={() => { void connectSlack(); }}>Connect</Button>}
+            <Button variant={slack.connected ? "outline" : "default"} size="sm" className={smallButton} loading={busy} disabled={busy || offline} onClick={() => { void (slack.connected ? disconnectSlack() : connectSlack()); }}>{slack.connected ? "Disconnect" : "Connect Slack"}</Button>
           </div>
           {slack.connected && <div className="flex items-center justify-between gap-2 border-t-[0.5px] border-border px-3.5 py-3"><p role="status" className="text-[12px] text-muted-foreground">{slackTested ? "Test message sent" : "Check that messages reach your channel"}</p><Button variant="outline" size="sm" className={`${smallButton} border-[0.5px]`} disabled={busy} onClick={() => { void testSlack(); }}>Send test</Button></div>}
           {slack.connected && <div className="flex items-center gap-2.5 border-t-[0.5px] border-border px-3.5 py-3"><div className="min-w-0 flex-1"><p className="text-[13px] font-medium leading-[1.55]">Notify on drift</p><p className="text-[12px] leading-[1.55] text-muted-foreground">Only when the drift state changes</p></div><Switch checked={notify} onCheckedChange={setNotify} disabled={busy} aria-label="Notify on drift" className="h-5 w-9 shrink-0 p-[2px] [--thumb-size:--spacing(4)]" thumbClassName="data-checked:translate-x-4" /></div>}

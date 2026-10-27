@@ -6,6 +6,14 @@ import { takeRateLimit } from "./ratelimit.js";
 const TTL = 10 * 60_000;
 const opaque = () => Array.from(crypto.getRandomValues(new Uint8Array(32)), byte => byte.toString(16).padStart(2, "0")).join("");
 const encoder = new TextEncoder();
+// Only fixed diagnostic codes cross the browser redirect. Never forward provider
+// response bodies, exception messages, authorization codes, or credentials.
+class ConnectionFailure extends Error {
+  constructor(readonly reason: string) { super(reason); }
+}
+function providerFailure(value: unknown): string {
+  return typeof value === "string" && ["access_denied", "invalid_client", "invalid_grant", "invalid_scope", "redirect_uri_mismatch", "unauthorized_client"].includes(value) ? value : "provider_rejected";
+}
 async function hash(value: string): Promise<string> {
   return Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", encoder.encode(value))), byte => byte.toString(16).padStart(2, "0")).join("");
 }
@@ -70,7 +78,8 @@ export function localOAuth() {
     c.header("Set-Cookie", `__Host-elf-local-${id}=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0`);
     const destination = new URL(pending.returnUri); destination.searchParams.set("state", pending.localState);
     try {
-      if (!code || code.length > 2048 || c.req.query("error")) throw new Error("Authorization declined");
+      if (c.req.query("error")) throw new ConnectionFailure(providerFailure(c.req.query("error")));
+      if (!code || code.length > 2048) throw new ConnectionFailure("missing_code");
       let result: Record<string, unknown>;
       if (provider === "slack") {
       const response = await fetch("https://slack.com/api/oauth.v2.access", {method: "POST", redirect: "error", signal: AbortSignal.timeout(10_000), headers: {"Content-Type": "application/x-www-form-urlencoded"}, body: new URLSearchParams({client_id: c.env.SLACK_CLIENT_ID!, client_secret: c.env.SLACK_CLIENT_SECRET!, code, redirect_uri: callback(c.env.CONSOLE_ORIGIN!, provider)})});
@@ -82,12 +91,15 @@ export function localOAuth() {
       } else {
         result = await figmaExchange(c.env, new URLSearchParams({code, redirect_uri: callback(c.env.CONSOLE_ORIGIN!, provider), grant_type: "authorization_code"}));
       }
-      const sealed = await sealSecret(JSON.stringify({id, provider, result}), await importSecretsKey(c.env.SECRETS_KEY!));
+      let sealed;
+      try {sealed = await sealSecret(JSON.stringify({id, provider, result}), await importSecretsKey(c.env.SECRETS_KEY!));}
+      catch {throw new ConnectionFailure("credential_storage");}
       const grant = opaque();
       await c.env.DB.prepare("UPDATE local_oauth SET status = 'ready', grantHash = ?, ciphertext = ?, iv = ? WHERE id = ? AND status = 'exchanging'").bind(await hash(grant), sealed.ciphertext, sealed.iv, id).run();
       destination.searchParams.set("grant", grant);
-    } catch {
+    } catch (error) {
       await c.env.DB.prepare("DELETE FROM local_oauth WHERE id = ?").bind(id).run(); destination.searchParams.set("error", "connection_failed");
+      destination.searchParams.set("reason", error instanceof ConnectionFailure ? error.reason : "service_error");
     }
     return c.redirect(destination.href, 302);
   });
@@ -117,7 +129,11 @@ export function localOAuth() {
 
 async function figmaExchange(env: AppEnv["Bindings"], body: URLSearchParams, refresh = false): Promise<Record<string, unknown>> {
   const response = await fetch(`https://api.figma.com/v1/oauth/${refresh ? "refresh" : "token"}`, {method: "POST", redirect: "error", signal: AbortSignal.timeout(10_000), headers: {"Content-Type": "application/x-www-form-urlencoded", Authorization: `Basic ${btoa(`${env.FIGMA_CLIENT_ID}:${env.FIGMA_CLIENT_SECRET}`)}`}, body});
-  if (!response.ok) throw new Error("Figma exchange failed");
+  if (!response.ok) {
+    let reason = response.status === 401 ? "invalid_client" : "provider_rejected";
+    try {const body = await jsonBody<{error?: unknown}>(response); if (typeof body.error === "string") reason = providerFailure(body.error);} catch { /* Discard untrusted or oversized provider errors. */ }
+    throw new ConnectionFailure(reason);
+  }
   const token = await jsonBody<{access_token?: string; refresh_token?: string; expires_in?: number}>(response);
   if (typeof token.access_token !== "string" || !token.access_token || typeof token.expires_in !== "number" || !Number.isFinite(token.expires_in) || token.expires_in <= 0 || (!refresh && typeof token.refresh_token !== "string")) throw new Error("Invalid Figma credentials");
   return {accessToken: token.access_token, ...(token.refresh_token ? {refreshToken: token.refresh_token} : {}), expiresAt: Date.now() + token.expires_in * 1000};
