@@ -18,6 +18,7 @@ const CODE_KEY = "codeKey";
 const ROLE_KEY = "role";
 const LABEL_ROLE = "label";
 const SLOT_ROLE = "slot";
+const FILE_LINK_KEY = "elf-file-key";
 const DEFAULT_HOST = "localhost:8765";
 
 interface BridgeState {
@@ -175,7 +176,7 @@ async function loadBridgeState(): Promise<BridgeState> {
     | { host?: string; token?: string }
     | undefined;
   const storedHost = (await figma.clientStorage.getAsync(HOST_KEY)) as string | undefined;
-  const session = (await figma.clientStorage.getAsync(SESSION_KEY)) as string | undefined;
+  const session = (await figma.clientStorage.getAsync(`${SESSION_KEY}:${currentFile().key}`) ?? await figma.clientStorage.getAsync(SESSION_KEY)) as string | undefined;
 
   // Drop the old handshake token from storage; pairing replaces it.
   if (legacy?.token) {
@@ -193,10 +194,12 @@ async function saveHost(host: string): Promise<void> {
 }
 
 async function saveSession(session: string): Promise<void> {
-  await figma.clientStorage.setAsync(SESSION_KEY, session);
+  await figma.clientStorage.setAsync(`${SESSION_KEY}:${currentFile().key}`, session);
+  await figma.clientStorage.deleteAsync(SESSION_KEY);
 }
 
 async function forgetSession(): Promise<void> {
+  await figma.clientStorage.deleteAsync(`${SESSION_KEY}:${currentFile().key}`);
   await figma.clientStorage.deleteAsync(SESSION_KEY);
 }
 
@@ -1414,12 +1417,14 @@ async function getNode(params: Record<string, unknown>): Promise<unknown> {
 }
 
 /** Never substitute a shared placeholder for a document identity. */
-function currentFile(): { name: string; key: string } {
-  const key = figma.fileKey;
-  if (typeof key !== "string" || !key.trim() || key === "draft") {
-    throw new Error("Figma did not expose this file’s identity. Reload the Elf Bridge development plugin using its updated manifest, then reopen it. Local plugins require enablePrivatePluginApi.");
-  }
-  return { name: figma.root.name, key };
+function nativeFileKey(): string | undefined {
+  try {return figma.fileKey;} catch {return undefined;}
+}
+function currentFile(): { name: string; key: string; verification?: {nonce: string} } {
+  const native = nativeFileKey();
+  const key = native || (typeof figma.root.getPluginData === "function" ? figma.root.getPluginData(FILE_LINK_KEY) : "");
+  if (typeof key !== "string" || !key.trim() || key === "draft") throw new Error("Copy this file’s Figma link and paste it into Elf Bridge to verify its identity.");
+  return {name: figma.root.name, key, ...(!native && uiChannel ? {verification: {nonce: uiChannel}} : {})};
 }
 
 // ---------------------------------------------------------------------------
@@ -1484,7 +1489,11 @@ function postUi(message: Record<string, unknown>): void {
 async function announceContext(channel: string): Promise<void> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
+    if (!nativeFileKey() && (!figma.root.getPluginData || !figma.root.getPluginData(FILE_LINK_KEY))) {
+      postUi({type: "file-link-required"}); return;
+    }
     const file = currentFile();
+    if (file.verification) figma.root.setSharedPluginData(NAMESPACE, "fileProof", file.verification.nonce);
     const bridge = await Promise.race([
       loadBridgeState(),
       new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error("Figma’s saved settings did not respond. Try again or reopen the plugin.")), 8000); }),
@@ -1506,6 +1515,14 @@ figma.ui.onmessage = async (message: UiMessage) => {
   if (message.type === "context") { uiChannel = message.channel; await announceContext(uiChannel); return; }
   if (message.channel !== uiChannel) return;
   try {
+    if (message.type === "set-file-link") {
+      if (nativeFileKey()) throw new Error("This file already has a native identity.");
+      const link = typeof message.url === "string" ? message.url : "";
+      const match = /^https:\/\/(?:www\.)?figma\.com\/(?:design|file|board)\/([A-Za-z0-9_-]{8,128})(?:[/?#]|$)/.exec(link);
+      if (!match) throw new Error("Paste the Figma link for this open file.");
+      figma.root.setPluginData(FILE_LINK_KEY, match[1]);
+      await announceContext(uiChannel!); return;
+    }
     if (message.type === "hide-ui") {
       figma.ui.hide();
       figma.notify("Elf remains connected while this plugin is running.", { timeout: 10000, button: { text: "Show Elf Bridge", action: () => { figma.ui.show(); return false; } } });

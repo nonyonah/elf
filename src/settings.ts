@@ -8,6 +8,8 @@
  * The server runs until Ctrl+C. Running the page's own dev server is not
  * enough: it has no /api routes and will show a 404.
  */
+import { startConnection, startSlackConnection, finishSlackConnection, finishConnection } from "./connection-service.js";
+import { readFigmaAccount, writeFigmaAccount, removeFigmaAccount, validateAccount } from "./figma/account.js";
 import { SETTINGS_API_VERSION } from "./settings-protocol.js";
 import { readDriftReport } from "./reports.js";
 import { createServer, IncomingMessage, Server, ServerResponse } from "node:http";
@@ -131,6 +133,9 @@ export async function createSettingsServer(
   const nativeSession = randomBytes(32).toString("hex"); sessions.add(nativeSession);
   const canonicalPath = (): string => { try { return realpathSync(configPath); } catch { return resolvePath(configPath); } };
   const validProof = (supplied: unknown, expected: Buffer): boolean => typeof supplied === "string" && /^[a-f0-9]{64}$/.test(supplied) && timingSafeEqual(expected, Buffer.from(supplied, "hex"));
+  let figmaGeneration = 0; let slackGeneration = 0;
+  let pendingFigma: ReturnType<typeof startConnection> | null = null;
+  let pendingBroker: ReturnType<typeof startSlackConnection> | null = null;
   let pendingSlack: {
     state: string;
     verifier: string | null;
@@ -152,7 +157,7 @@ export async function createSettingsServer(
     res.setHeader("X-Frame-Options", "DENY");
     res.setHeader("Cache-Control", "no-store");
     if (!allowedHosts.has(req.headers.host ?? "") || (origin && !allowedOrigins.has(origin)) ||
-        (path.startsWith("/api/") && path !== "/api/slack/callback" && req.headers["sec-fetch-site"] === "cross-site")) {
+        (path.startsWith("/api/") && path !== "/api/slack/callback" && path !== "/api/slack/broker-callback" && path !== "/api/figma/broker-callback" && req.headers["sec-fetch-site"] === "cross-site")) {
       res.writeHead(403, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ error: "Open Elf settings from its local address." }));
       return;
@@ -191,7 +196,7 @@ export async function createSettingsServer(
       const session = randomBytes(32).toString("hex"); sessions.add(session);
       res.writeHead(200, { "Content-Type": "application/json" }); res.end(JSON.stringify({ session })); return;
     }
-    const callback = (path === "/callback" || path === "/api/slack/callback") && req.method === "GET";
+    const callback = (path === "/callback" || path === "/api/slack/callback" || path === "/api/slack/broker-callback" || path === "/api/figma/broker-callback") && req.method === "GET";
     if (path.startsWith("/api/") && !callback && (typeof req.headers["x-elf-session"] !== "string" || !sessions.has(req.headers["x-elf-session"]))) {
       res.writeHead(401, { "Content-Type": "application/json" }); res.end(JSON.stringify({ error: "Open the private Settings link from your terminal." })); return;
     }
@@ -345,13 +350,47 @@ export async function createSettingsServer(
       return;
     }
 
+    if (path === "/api/figma/account" && req.method === "GET") {
+      const account = readFigmaAccount();
+      res.writeHead(200, {"Content-Type": "application/json"}); res.end(JSON.stringify({connected: Boolean(account), expiresAt: account?.expiresAt ?? null})); return;
+    }
+    if (path === "/api/figma/connect" && req.method === "POST") {
+      figmaGeneration++;
+      pendingFigma = startConnection("figma", req.socket.localPort!);
+      res.writeHead(200, {"Content-Type": "application/json"}); res.end(JSON.stringify({url: pendingFigma.url, authorizationOrigin: pendingFigma.origin})); return;
+    }
+    if (path === "/api/figma/disconnect" && req.method === "POST") {
+      figmaGeneration++; pendingFigma = null; removeFigmaAccount();
+      res.writeHead(200, {"Content-Type": "application/json"}); res.end(JSON.stringify({ok: true})); return;
+    }
+    if (path === "/api/figma/broker-callback" && req.method === "GET") {
+      const generation = figmaGeneration;
+      const pending = pendingFigma; let status = "error";
+      if (pending && pending.expiresAt > Date.now() && url.searchParams.get("state") === pending.state) {
+        pendingFigma = null; const grant = url.searchParams.get("grant");
+        if (grant && !url.searchParams.has("error")) {
+          try {const account = validateAccount(await finishConnection(grant, pending.verifier, pending.origin, "figma"), pending.origin); if (generation !== figmaGeneration) throw new Error("Connection canceled"); writeFigmaAccount(account); status = "connected";}
+          catch {console.error("Figma account connection failed. Reconnect from Elf Settings.");}
+        }
+      }
+      res.writeHead(302, {Location: `http://127.0.0.1:${req.socket.localPort}/?figma=${status}`}); res.end(); return;
+    }
+
     if (path === "/api/slack/connect" && req.method === "POST") {
+      slackGeneration++;
       const port = req.socket.localPort;
       if (!port) {
         res.writeHead(500, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ error: "Could not determine the local settings port." }));
         return;
       }
+      if (!getSlackClientSecret()) {
+        pendingBroker = startSlackConnection(port);
+        pendingSlack = null;
+        res.writeHead(200, {"Content-Type": "application/json"});
+        res.end(JSON.stringify({url: pendingBroker.url, authorizationOrigin: pendingBroker.origin})); return;
+      }
+      pendingBroker = null;
       const redirectUri = getSlackRedirectUri(port);
       const state = randomBytes(16).toString("hex");
       const clientSecret = getSlackClientSecret();
@@ -374,8 +413,23 @@ export async function createSettingsServer(
         state,
       );
       res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ url }));
+      res.end(JSON.stringify({ url, authorizationOrigin: "https://slack.com" }));
       return;
+    }
+
+    if (path === "/api/slack/broker-callback" && req.method === "GET") {
+      const generation = slackGeneration;
+      const pending = pendingBroker;
+      let status = "error";
+      if (pending && pending.expiresAt > Date.now() && url.searchParams.get("state") === pending.state) {
+        pendingBroker = null;
+        const grant = url.searchParams.get("grant");
+        if (grant && !url.searchParams.has("error")) {
+          try {const info = await finishSlackConnection(grant, pending.verifier, pending.origin); if (generation !== slackGeneration) throw new Error("Connection canceled"); writeSlackWebhook(configPath, info); status = "connected";}
+          catch { console.error("Slack connection failed. Reconnect from Elf Settings."); }
+        }
+      }
+      res.writeHead(302, {Location: `http://127.0.0.1:${req.socket.localPort}/?slack=${status}`}); res.end(); return;
     }
 
     if ((path === "/callback" || path === "/api/slack/callback") && req.method === "GET") {
@@ -386,6 +440,7 @@ export async function createSettingsServer(
       const state = url.searchParams.get("state") ?? "";
       const code = url.searchParams.get("code");
       const slackError = url.searchParams.get("error");
+      const generation = slackGeneration;
       const pending = pendingSlack;
 
       if (
@@ -423,6 +478,7 @@ export async function createSettingsServer(
           teamId: token.team?.id ?? "unknown",
           configuredAt: new Date().toISOString(),
         };
+        if (generation !== slackGeneration) throw new Error("Connection canceled");
         writeSlackWebhook(configPath, info);
         finish("connected");
       } catch (error) {
@@ -444,6 +500,7 @@ export async function createSettingsServer(
       return;
     }
     if (path === "/api/slack/disconnect" && req.method === "POST") {
+      slackGeneration++; pendingBroker = null; pendingSlack = null;
       try {
         removeSlackWebhook(configPath);
         res.writeHead(200, { "Content-Type": "application/json" });

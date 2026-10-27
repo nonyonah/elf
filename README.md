@@ -535,31 +535,13 @@ Exit codes: `0` — ran (drift may or may not exist), `1` — error (bad config,
 
 ## Connect Slack
 
-`elf connect slack` runs a real Slack OAuth install and stores the resulting incoming-webhook URL locally in a gitignored file (`.elf/slack-webhook.json`). The flow starts a tiny HTTP server on `localhost:3000`, opens Slack, waits for the redirect, exchanges the code, and shuts the server down.
+Run `elf connect slack`, or choose **Connect Slack** in `elf settings`. Your browser opens Slack, you pick a channel, and Elf stores the incoming webhook privately in the project's gitignored `.elf/slack-webhook.json`. Designers do not configure OAuth client IDs or secrets.
 
-### OAuth setup (recommended)
+The hosted connection service on the Elf Console Worker exchanges the provider code. A short-lived, single-use grant returns to a loopback callback, and only the local process holding its verifier can redeem it. App secrets stay on the Worker. The CLI's loopback listener uses an available port and shuts down after completion or timeout.
 
-Create a Slack app at [api.slack.com/apps](https://api.slack.com/apps), then:
+The hosted service must be activated by the maintainer before these buttons work. See [Slack and Figma app setup](docs/connection-service-setup.md) for both callback URLs, minimum scopes, app registration, and deployment order.
 
-1. **OAuth & Permissions → Redirect URLs** add `http://localhost:3000/callback`.
-2. **Bot Token Scopes** add `incoming-webhook`.
-3. Leave **PKCE disabled**. Slack treats localhost as a desktop redirect for PKCE apps and rejects bot scopes; `incoming-webhook` is a bot scope.
-4. Copy the **Client ID** and **Client Secret**. Put them in the project `.env` or `settings-next/.env` (both are gitignored), or export them in the shell:
-
-```bash
-# in .env, or exported in the shell
-ELF_SLACK_CLIENT_ID=...
-ELF_SLACK_CLIENT_SECRET=...
-
-# then
-elf connect slack
-# or
-npm run settings
-```
-
-The CLI loads the project `.env`, then `settings-next/.env`; real shell variables win. The callback is always `http://localhost:3000/callback`. The client secret is never written to the config or the webhook file. With a secret set, the CLI uses the non-PKCE exchange. If port 3000 is busy (for example, `next dev` is running), stop that process first.
-
-If no secret is set, the CLI falls back to PKCE with the built-in client ID. That path is for apps configured for PKCE and is not suitable for `incoming-webhook` on localhost.
+For a developer-owned Slack app, setting `ELF_SLACK_CLIENT_ID` and `ELF_SLACK_CLIENT_SECRET` explicitly retains the direct flow with `http://localhost:3000/callback`. Keep these values in a private environment file; end users do not need them.
 
 **Manual fallback**: `elf connect slack --webhook-url <url>` stores a manually provided webhook URL (must start with `https://hooks.slack.com/services/`). No OAuth, no browser. This is the simplest option if you only need a channel webhook.
 

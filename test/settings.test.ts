@@ -212,20 +212,21 @@ test("serves the static page and falls back to index.html", async () => {
   }
 });
 
-test("POST /api/slack/connect returns a Slack authorize URL", async () => {
+test("POST /api/slack/connect uses the hosted broker without exposing a client secret", async () => {
   const { dir, dist, configPath } = createWorkspace();
   const handle = await createSettingsServer(configPath, { distPath: dist });
   try {
     const response = await handle.fetch(`${handle.url}/api/slack/connect`, { method: "POST", headers: { "X-Elf-Request": "1" } });
     assert.equal(response.status, 200);
     const body = await response.json();
-    assert.match(body.url, /^https:\/\/slack\.com\/oauth\/v2\/authorize\?/);
+    assert.match(body.url, /^https:\/\/elf-console\.nonyonah\.workers\.dev\/api\/local-connect\/slack\/start\?/);
     const authorize = new URL(body.url);
     assert.equal(
-      authorize.searchParams.get("redirect_uri"),
-      `http://localhost:${handle.port}/callback`,
+      authorize.searchParams.get("return_uri"),
+      `http://127.0.0.1:${handle.port}/api/slack/broker-callback`,
     );
-    assert.equal(authorize.searchParams.get("code_challenge_method"), "S256");
+    assert.equal(authorize.searchParams.get("challenge")?.length, 43);
+    assert.equal(authorize.searchParams.get("client_secret"), null);
   } finally {
     await handle.close();
     rmSync(dir, { recursive: true });
@@ -427,7 +428,7 @@ test("Settings advertises API capabilities and refuses incompatible process reus
   try {
     assert.equal((await fetch(`${handle.url}/api/runtime`)).status, 401);
     const capabilities = await (await handle.fetch("/api/runtime")).json() as any;
-    assert.equal(capabilities.apiVersion, 3); assert.equal(capabilities.managed, false);
+    assert.equal(capabilities.apiVersion, 4); assert.equal(capabilities.managed, false);
     assert.ok(await reopenCompatibleSettingsServer(handle.url, configPath, identity));
     await assert.rejects(reopenCompatibleSettingsServer(handle.url, configPath, identity, true), /incompatible Elf server/);
     const unsupported = await handle.fetch("/api/project/resources", {method: "POST", headers: {"X-Elf-Request": "1"}});
@@ -437,4 +438,50 @@ test("Settings advertises API capabilities and refuses incompatible process reus
     globalThis.fetch = (async (input: any, init?: RequestInit) => String(input).endsWith("/api/runtime") ? new Response("Not found", {status: 404}) : realFetch(input, init)) as typeof fetch;
     await assert.rejects(reopenCompatibleSettingsServer(handle.url, configPath, identity), /Stop it with Ctrl\+C/);
   } finally {globalThis.fetch = realFetch; await handle.close(); rmSync(dir, {recursive: true});}
+});
+
+test("Figma browser callbacks keep tokens private, reject replay, and honor disconnect during exchange", async () => {
+  const { dir, dist, configPath } = createWorkspace();
+  const oldPath = process.env.ELF_FIGMA_ACCOUNT_PATH;
+  const originalFetch = globalThis.fetch;
+  process.env.ELF_FIGMA_ACCOUNT_PATH = join(dir, "account.json");
+  const handle = await createSettingsServer(configPath, {distPath: dist});
+  let exchanges = 0;
+  let release: (() => void) | undefined;
+  let exchangeStarted: (() => void) | undefined;
+  const started = new Promise<void>(resolve => {exchangeStarted = resolve;});
+  globalThis.fetch = (async (input: URL | RequestInfo, init?: RequestInit) => {
+    if (String(input).includes("/api/local-connect/figma/exchange")) {
+      exchanges++;
+      if (exchanges === 2) {exchangeStarted!(); await new Promise<void>(resolve => {release = resolve;});}
+      return Response.json({accessToken: "private-access", refreshToken: "private-refresh", expiresAt: Date.now() + 3600_000});
+    }
+    return originalFetch(input, init);
+  }) as typeof fetch;
+  const post = (path: string) => handle.fetch(`${handle.url}${path}`, {method: "POST", headers: {"X-Elf-Request": "1"}});
+  const connect = async () => new URL((await (await post("/api/figma/connect")).json()).url).searchParams.get("state")!;
+  const callback = (state: string) => handle.fetch(`${handle.url}/api/figma/broker-callback?state=${state}&grant=${"a".repeat(64)}`, {redirect: "manual"});
+  try {
+    const state = await connect();
+    assert.match((await callback("wrong-state")).headers.get("location")!, /figma=error/);
+    assert.equal(exchanges, 0);
+    assert.match((await callback(state)).headers.get("location")!, /figma=connected/);
+    const status = await (await handle.fetch(`${handle.url}/api/figma/account`)).json();
+    assert.equal(status.connected, true);
+    assert.equal(JSON.stringify(status).includes("private-"), false);
+    assert.match((await callback(state)).headers.get("location")!, /figma=error/);
+    assert.equal(exchanges, 1);
+    const nextState = await connect();
+    const pending = callback(nextState);
+    await started;
+    assert.equal((await post("/api/figma/disconnect")).status, 200);
+    release!();
+    assert.match((await pending).headers.get("location")!, /figma=error/);
+    assert.equal(existsSync(process.env.ELF_FIGMA_ACCOUNT_PATH!), false);
+  } finally {
+    release?.(); globalThis.fetch = originalFetch;
+    await handle.close();
+    if (oldPath === undefined) delete process.env.ELF_FIGMA_ACCOUNT_PATH; else process.env.ELF_FIGMA_ACCOUNT_PATH = oldPath;
+    rmSync(dir, {recursive: true, force: true});
+  }
 });

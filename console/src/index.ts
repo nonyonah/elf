@@ -1,3 +1,4 @@
+import { localOAuth } from "./local-oauth.js";
 import { Hono } from "hono";
 import { apiV1 } from "./api.js";
 import { getSession, requireSession, workspaceNameFor, type AppEnv, type SessionResolver } from "./auth.js";
@@ -19,6 +20,8 @@ export function createApp(options: { sessionResolver?: SessionResolver } = {}) {
 
   // Public surface. Registered before the session middleware, so it stays open.
   app.get("/api/health", (c) => c.json({ ok: true, service: "elf-console", version: "0.1.0" }));
+
+  app.route("/api/local-connect", localOAuth());
 
   // Slack's OAuth callback — public by design. It trusts only the signed,
   // expiring state minted by the authenticated install endpoint.
@@ -80,6 +83,7 @@ export default {
    */
   async scheduled(controller: ScheduledController, env: Env): Promise<void> {
     if (controller.cron === POLL_CRON) await pollFigmaSources(env);
+    await env.DB.prepare("DELETE FROM local_oauth WHERE expiresAt < ?").bind(Date.now()).run();
     await runDueJobs(env);
   },
 } satisfies ExportedHandler<Env>;

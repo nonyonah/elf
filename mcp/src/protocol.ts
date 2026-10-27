@@ -31,6 +31,7 @@ export const NOT_CONNECTED_HINT =
 export const CONTROL_PATH = "/control";
 
 export interface BridgeFileInfo {
+  verification?: {nonce: string};
   name: string;
   key: string;
 }
@@ -70,6 +71,7 @@ export interface BridgeStatusMessage {
 /** Sent by the server after a plugin handshake is accepted. */
 export interface BridgeReadyMessage {
   type: "ready";
+  fileVerification?: number;
   /** Present only when the handshake used a one-time pairing code. */
   session?: string;
   sessionExpiresAt?: string;

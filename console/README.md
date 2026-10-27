@@ -78,6 +78,14 @@ Open http://127.0.0.1:8787/ — you get one demo project (“Marketing site”) 
 | `SECRETS_KEY` | secret | AES-GCM key (base64, 32 bytes) for connection secrets |
 | `SLACK_CLIENT_ID` | secret | Slack app OAuth client ID (optional) |
 | `SLACK_CLIENT_SECRET` | secret | Slack app OAuth client secret (optional) |
+| `FIGMA_CLIENT_ID` | secret | Figma app OAuth client ID for local connections (optional) |
+| `FIGMA_CLIENT_SECRET` | secret | Figma app OAuth client secret for local connections (optional) |
+
+Local onboarding and Settings use the public, verifier-bound `/api/local-connect`
+routes on this Worker. These routes do not require a Console login. See
+[Slack and Figma connection service setup](../docs/connection-service-setup.md)
+for both app registrations, the importable Slack manifest, and migration/deploy
+order. Provider secrets belong on this Worker and must not ship in the npm package.
 
 Tokens minted for repos/plugin (`elf_push_…`, `elf_plugin_…`) are stored as SHA-256 + last4 only and shown once.
 

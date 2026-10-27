@@ -1,4 +1,5 @@
 "use client";
+import { FigmaAccount } from "@/components/figma-account";
 import { settingsFetch as fetch } from "@/lib/settings-api";
 
 import { useEffect, useRef, useState } from "react";
@@ -79,6 +80,7 @@ export function Onboarding({ initial, onFinished }: { initial: OnboardingStatus;
       if (!disposed && data.slack) setSlack(data.slack);
     }).catch(() => {});
     const params = new URLSearchParams(window.location.search);
+    if (params.has("figma")) setStep(1);
     if (params.get("slack") === "error") setError("Slack connection failed. Try again, or continue without Slack.");
     if (params.has("slack")) { params.delete("slack"); window.history.replaceState(null, "", `${window.location.pathname}${params.size ? `?${params}` : ""}`); }
     return () => { disposed = true; };
@@ -111,7 +113,7 @@ export function Onboarding({ initial, onFinished }: { initial: OnboardingStatus;
     try {
       const result = await api("/api/slack/connect");
       const target = new URL(result.url);
-      if (target.origin !== "https://slack.com") throw new Error("Slack returned an unexpected connection address.");
+      if (target.protocol !== "https:" || target.origin !== (result.authorizationOrigin ?? "https://slack.com")) throw new Error("Slack returned an unexpected connection address.");
       window.location.assign(target.href);
     } catch (cause) { setError((cause as Error).message); setBusy(false); }
   };
@@ -174,6 +176,7 @@ export function Onboarding({ initial, onFinished }: { initial: OnboardingStatus;
       </>}
 
       {step === 1 && <>
+        <FigmaAccount />
         <Card className={`${card} mb-4`}>
           <div className="flex items-center gap-2.5 px-3.5 py-3">
             <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-muted"><Shapes className="size-5" aria-hidden="true" /></span>

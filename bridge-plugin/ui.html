@@ -380,6 +380,12 @@
           <h2 id="context-heading">Reading this file…</h2>
           <p class="sub" id="context-detail">Bridge state is kept in Figma, not in the document.</p>
           <button class="secondary" id="retry-context" hidden>Try again</button>
+          <div id="file-link-form" hidden>
+            <p class="sub">Connect your Figma account in Elf Settings, then paste the link to this open file. Elf adds a verification marker and checks the file before allowing changes.</p>
+            <label for="figma-file-link">Figma file link</label>
+            <input id="figma-file-link" type="url" placeholder="https://www.figma.com/design/…" />
+            <button class="primary" id="use-file-link">Use this file link</button>
+          </div>
         </div>
       </section>
 
@@ -402,6 +408,7 @@
           />
           <div class="error" id="error" role="alert"></div>
 
+          <button class="secondary" id="change-file-link" hidden>Change file link</button>
           <button class="primary" id="pair" disabled>Pair this file</button>
           <button class="secondary" id="reconnect" hidden>Reconnect saved session</button>
           <p class="hint">Single-use · expires after 5 minutes. Request a new code in Elf Settings if needed.</p>
@@ -585,6 +592,7 @@ function pairingHmac(key, text) {
       authMode: null,
       manualClose: false,
       ready: false,
+      identityVerified: false,
       readyTimer: null,
       reconnectTimer: null,
       attempts: 0,
@@ -741,7 +749,9 @@ function pairingHmac(key, text) {
           try { message = JSON.parse(message.payload); } catch { socket.close(1000, "invalid bridge message"); return; }
         }
         if (message.type === "ready") {
+          if (state.file && state.file.verification && message.fileVerification !== 1) {socket.close(4003, "Restart the Elf bridge to enable secure file verification."); return;}
           state.ready = true;
+          state.identityVerified = !state.file || !state.file.verification;
           clearReadyTimer();
           state.attempts = 0;
           if (message.session) {
@@ -751,9 +761,9 @@ function pairingHmac(key, text) {
           } else {
             state.sessionSaved = true;
           }
-          setPhase("connected");
-          setStatus("online", "connected");
-          renderConnected();
+          if (state.file && state.file.verification) {
+            setPhase("pairing"); setStatus("pairing", "verifying file…");
+          } else {setPhase("connected"); setStatus("online", "connected"); renderConnected();}
           if (socket.readyState === WebSocket.OPEN) {
             send({
                 type: "status",
@@ -764,7 +774,11 @@ function pairingHmac(key, text) {
           return;
         }
 
-        if (message.type === "request" && state.ready) {
+        if (message.type === "file-verified") {
+          state.identityVerified = true;
+          setPhase("connected"); setStatus("online", "connected"); renderConnected(); return;
+        }
+        if (message.type === "request" && state.ready && state.identityVerified) {
           state.requestCount += 1;
           renderConnected();
           postPluginMessage(message);
@@ -782,6 +796,7 @@ function pairingHmac(key, text) {
         state.ready = false;
         clearReadyTimer();
 
+        if (event.code === 4003) {showPairing(event.reason || "This file could not be verified. Check its link and your Figma account in Settings."); return;}
         if (event.code === AUTH_FAILED) {
           if (modeUsed === "session") {
             state.session = "";
@@ -833,6 +848,7 @@ function pairingHmac(key, text) {
       setStatus("", "offline");
       $("pair").disabled = normalizedCode().length !== 12;
       $("reconnect").hidden = !state.session;
+      $("change-file-link").hidden = !state.file || !state.file.verification;
       showError(error || "");
     }
 
@@ -868,7 +884,7 @@ function pairingHmac(key, text) {
     $("pair").addEventListener("click", () => connect("code"));
     $("reconnect").addEventListener("click", () => {
       state.attempts = 0;
-      connect("session");
+      if (state.file && state.file.verification) requestContext(); else connect("session");
     });
     $("cancel-pair").addEventListener("click", () => {
       state.manualClose = true;
@@ -910,13 +926,24 @@ function pairingHmac(key, text) {
       $("context-heading").textContent = "Reading this file…";
       $("context-detail").textContent = "Bridge state is kept in Figma, not in the document.";
       $("retry-context").hidden = true;
+      $("file-link-form").hidden = true;
       contextTimer = setTimeout(() => contextError("Figma did not respond. Try again, or close and reopen the plugin."), 10000);
       postPluginMessage({ type: "context" });
     }
+    function showFileLink() {
+      clearTimeout(contextTimer); setPhase("loading");
+      $("context-spinner").hidden = true; $("retry-context").hidden = true;
+      $("context-heading").textContent = "Link this Figma file";
+      $("context-detail").textContent = "The link is checked against a fresh proof in this document.";
+      $("file-link-form").hidden = false;
+    }
+    $("use-file-link").addEventListener("click", () => postPluginMessage({type: "set-file-link", url: $("figma-file-link").value.trim()}));
+    $("change-file-link").addEventListener("click", showFileLink);
     $("retry-context").addEventListener("click", requestContext);
     window.onmessage = (event) => {
       const message = event.data && event.data.pluginMessage;
       if (!message || message.channel !== uiChannel) return;
+      if (message.type === "file-link-required") {showFileLink(); return;}
       if (message.type === "context-error") { contextError(message.message || "Could not load saved bridge settings. Try again."); return; }
 
       if (message.type === "context") {

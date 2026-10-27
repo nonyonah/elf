@@ -1,24 +1,10 @@
 /**
- * Slack OAuth PKCE flow for incoming-webhook scope.
- *
- * This implements a no-backend OAuth install that returns a channel webhook URL.
- * Apps with a local client secret use the normal OAuth exchange; apps without
- * one use PKCE. The flow:
- *
- * 1. Start a tiny HTTP server on 127.0.0.1:3000 for the callback only
- * 2. Open the user's browser to Slack's authorize URL with scope=incoming-webhook
- * 3. Wait for the redirect with the code
- * 4. Exchange it directly with Slack's token endpoint (secret or PKCE verifier)
- * 5. Extract the webhook URL and the chosen channel/team name from the response
- * 6. Shut the local server down
- *
- * The Client ID is a public, non-secret value for a PKCE app — safe to commit.
- * If you want to use your own Slack App, set ELF_SLACK_CLIENT_ID in the environment.
- *
- * Slack OAuth V2 with PKCE reference (verified 2026-10-23):
- * https://api.slack.com/authentication/oauth-v2
- * https://api.slack.com/authentication/oauth-v2#pkce
+ * Slack incoming-webhook installation through the hosted connection service.
+ * App secrets stay on the Worker. The local client redeems a short-lived,
+ * single-use grant with its own verifier and privately stores the webhook.
+ * An explicit local client secret retains the developer-only direct flow.
  */
+import { startSlackConnection, finishSlackConnection } from "./connection-service.js";
 import { createServer, IncomingMessage, Server, ServerResponse } from "node:http";
 import { randomBytes, createHash } from "node:crypto";
 import { closeSync, constants, fchmodSync, fstatSync, lstatSync, mkdirSync, openSync, readFileSync, renameSync, writeFileSync, rmSync } from "node:fs";
@@ -28,15 +14,11 @@ import { spawn } from "node:child_process";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-/** Public Client ID for the elf-tokens Slack App (PKCE, no secret).
- *  This is safe to commit because PKCE apps don't use a client secret —
- *  the code_verifier proves possession instead. The ID only identifies
- *  the app; it cannot be used to exchange codes without the verifier.
- *  Override with ELF_SLACK_CLIENT_ID env var to use your own Slack App. */
+/** Legacy direct-flow client ID; overridden by ELF_SLACK_CLIENT_ID. */
 export const DEFAULT_SLACK_CLIENT_ID = "10923381069686.12320909036695";
 
 /** Scopes we request. `incoming-webhook` is the only one needed for posting messages.
- *  It works with PKCE and returns a webhook URL + channel/team info. */
+ *  The confidential server-side exchange returns channel/team information. */
 export const SLACK_SCOPES = "incoming-webhook";
 
 /** Slack OAuth endpoints */
@@ -165,6 +147,7 @@ export function waitForCallback(
   server: Server,
   expectedState: string,
   timeoutMs = 120_000,
+  parameter: "code" | "grant" = "code",
 ): Promise<{ code: string; state: string }> {
   return new Promise((resolve, reject) => {
     let resolved = false;
@@ -179,7 +162,7 @@ export function waitForCallback(
     server.on("request", (req: IncomingMessage, res: ServerResponse) => {
       if (resolved) return;
       const url = new URL(req.url ?? "", `http://127.0.0.1`);
-      const code = url.searchParams.get("code");
+      const code = url.searchParams.get(parameter);
       const state = url.searchParams.get("state");
       const error = url.searchParams.get("error");
 
@@ -335,15 +318,24 @@ export function getSlackClientSecret(): string | undefined {
   return process.env.ELF_SLACK_CLIENT_SECRET;
 }
 
-/** Run the full PKCE OAuth flow to connect Slack and return webhook info */
+/** Connect Slack through the hosted service, or an explicit developer app. */
 export async function connectSlackOAuth(configPath: string, fetchImpl?: typeof fetch): Promise<SlackWebhookInfo> {
   const clientId = getSlackClientId();
   const clientSecret = getSlackClientSecret();
-  console.log(
-    clientSecret
-      ? "Slack OAuth: using the client secret from the environment."
-      : "Slack OAuth: ELF_SLACK_CLIENT_SECRET is not set; using PKCE.",
-  );
+  if (!clientSecret) {
+    const {server, port} = await startCallbackServer();
+    const pending = startSlackConnection(port);
+    try {
+      console.log("Opening Slack authorization in your browser…");
+      const callback = waitForCallback(server, pending.state, 120_000, "grant");
+      openBrowser(pending.url);
+      const {code: grant} = await callback;
+      const info = await finishSlackConnection(grant, pending.verifier, pending.origin, fetchImpl);
+      writeSlackWebhook(configPath, info); return info;
+    } finally {server.close();}
+  }
+
+  console.log("Slack OAuth: using the developer client secret from the environment.");
   const codeVerifier = clientSecret ? null : generateCodeVerifier();
   const codeChallenge = codeVerifier ? generateCodeChallenge(codeVerifier) : null;
   const state = randomBytes(16).toString("hex");

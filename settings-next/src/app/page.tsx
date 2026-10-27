@@ -200,7 +200,9 @@ export default function SettingsPage() {
         );
       }
       if (data?.url) {
-        window.location.href = data.url;
+        const target = new URL(data.url);
+        if (target.protocol !== "https:" || target.origin !== (data.authorizationOrigin ?? "https://slack.com")) throw new Error("Unexpected Slack connection address.");
+        window.location.href = target.href;
         return;
       }
       showToast(

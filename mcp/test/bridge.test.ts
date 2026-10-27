@@ -211,3 +211,27 @@ test("rejects a connection with no token at all", async () => {
     second.close();
   });
 });
+
+
+test("public file verification blocks writes until proof succeeds and rejects identity downgrade", async () => {
+  let approve!: () => void;
+  const checked = new Promise<void>(resolve => {approve = resolve;});
+  const bridge = new Bridge({token: TOKEN, port: 0, verifyPublicFile: async () => checked});
+  const port = await bridge.start();
+  const plugin = await FakePlugin.connect({port, token: TOKEN, handlers: {create_collection: () => ({ok: true})}});
+  try {
+    plugin.send({type: "status", file: {key: "public-file", name: "Public", verification: {nonce: "a".repeat(64)}}});
+    await new Promise(resolve => setTimeout(resolve, 30));
+    assert.equal(bridge.status.file, null);
+    await assert.rejects(bridge.request("create_collection"), /has not been verified/);
+    assert.equal(plugin.requests.length, 0);
+    approve(); await new Promise(resolve => setTimeout(resolve, 30));
+    const verifiedKey = () => bridge.status.file?.key;
+    assert.equal(verifiedKey(), "public-file");
+    await bridge.request("create_collection");
+    assert.equal(plugin.requests.length, 1);
+    plugin.sendStatus({key: "public-file", name: "Forged downgrade"});
+    await new Promise(resolve => setTimeout(resolve, 30));
+    assert.equal(bridge.status.connected, false);
+  } finally {plugin.close(); await bridge.stop();}
+});

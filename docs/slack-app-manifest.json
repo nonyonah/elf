@@ -1,0 +1,17 @@
+{
+  "display_information": {
+    "name": "Elf",
+    "description": "Design-system drift notifications from Elf",
+    "background_color": "#242424"
+  },
+  "oauth_config": {
+    "redirect_urls": [
+      "https://elf-console.nonyonah.workers.dev/api/local-connect/slack/callback",
+      "https://elf-console.nonyonah.workers.dev/api/slack/oauth/callback"
+    ],
+    "scopes": { "bot": ["incoming-webhook"] }
+  },
+  "settings": {
+    "incoming_webhooks": { "incoming_webhooks_enabled": true }
+  }
+}

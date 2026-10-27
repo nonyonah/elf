@@ -56,7 +56,7 @@ async function acquireSharedHost(config: BridgeConfig, logger: Logger): Promise<
     const require = createRequire(import.meta.url);
     const host = spawn(process.execPath, ["--import", require.resolve("tsx"), fileURLToPath(new URL("./host.ts", import.meta.url))], {
       cwd: dirname(fileURLToPath(import.meta.url)),
-      env: { ...Object.fromEntries(Object.entries(process.env).filter(([key]) => ["PATH", "HOME", "USERPROFILE", "SYSTEMROOT", "WINDIR", "TMPDIR", "TEMP", "TMP", "LANG", "LC_ALL"].includes(key))), ELF_MCP_TOKEN: config.token, ELF_MCP_PORT: String(config.port), ELF_MCP_TIMEOUT_MS: String(config.timeoutMs), ...(config.sessionStorePath ? { ELF_BRIDGE_SESSION_PATH: config.sessionStorePath } : {}) },
+      env: { ...Object.fromEntries(Object.entries(process.env).filter(([key]) => ["PATH", "HOME", "USERPROFILE", "SYSTEMROOT", "WINDIR", "TMPDIR", "TEMP", "TMP", "LANG", "LC_ALL", "ELF_FIGMA_ACCOUNT_PATH"].includes(key))), ELF_MCP_TOKEN: config.token, ELF_MCP_PORT: String(config.port), ELF_MCP_TIMEOUT_MS: String(config.timeoutMs), ...(config.sessionStorePath ? { ELF_BRIDGE_SESSION_PATH: config.sessionStorePath } : {}) },
       detached: true, stdio: ["ignore", "ignore", "ignore", "ipc"],
     });
     await new Promise<void>((resolve, reject) => {

@@ -22,6 +22,8 @@ export interface Env {
   /** Slack app OAuth credentials — "Add to Slack" installs an incoming webhook. */
   SLACK_CLIENT_ID?: string;
   SLACK_CLIENT_SECRET?: string;
+  FIGMA_CLIENT_ID?: string;
+  FIGMA_CLIENT_SECRET?: string;
 
   /**
    * Local preview only. With no CLERK_SECRET_KEY configured, this var stands

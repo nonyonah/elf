@@ -5,6 +5,8 @@ import { test } from "node:test";
 import { runInNewContext } from "node:vm";
 
 function ui() {
+  const sockets: any[] = [];
+  class Socket {static OPEN = 1; readyState = 1; onmessage: any; onclose: any; sent: string[] = []; closed: any; constructor(_url: string) {sockets.push(this);} send(value: string) {this.sent.push(value);} close(code: number, reason: string) {this.closed = {code, reason};}}
   const elements = new Map<string, any>();
   const messages: any[] = [];
   const timers = new Map<number, () => void>();
@@ -17,11 +19,11 @@ function ui() {
   }};
   const window: any = {};
   const parent = {postMessage(message: any) { messages.push(message.pluginMessage); }};
-  const context = {window, parent, document, crypto: webcrypto, TextEncoder,
+  const context = {window, parent, document, crypto: webcrypto, TextEncoder, URL, URLSearchParams, WebSocket: Socket,
     setTimeout(fn: () => void) { timers.set(++id, fn); return id; }, clearTimeout(key: number) { timers.delete(key); }};
   const html = readFileSync(new URL("../../bridge-plugin/ui.html", import.meta.url), "utf8");
   for (const match of html.matchAll(/<script>([\s\S]*?)<\/script>/g)) runInNewContext(match[1], context);
-  return {window, parent, document, elements, messages, timers};
+  return {window, parent, document, elements, messages, timers, sockets};
 }
 
 test("Desktop messages without a Window source finish loading only on the private channel", () => {
@@ -51,11 +53,12 @@ test("a stalled or failed context displays an actionable retry instead of spinni
 
 function main(getAsync: (key: string) => Promise<unknown>) {
   const messages: any[] = []; const timers = new Map<number, () => void>(); let id = 0;
-  const figma: any = {root: {name: "Design system"}, fileKey: "file", apiVersion: "1.0.0", showUI() {},
-    clientStorage: {getAsync, async setAsync() {}}, ui: {postMessage(message: any) { messages.push(message); }}};
+  const stored = new Map<string, unknown>(); const data = new Map<string, string>(); const shared = new Map<string, string>();
+  const figma: any = {root: {name: "Design system", getPluginData: (key: string) => data.get(key) ?? "", setPluginData: (key: string, value: string) => data.set(key, value), setSharedPluginData: (namespace: string, key: string, value: string) => shared.set(`${namespace}:${key}`, value)}, fileKey: "file", apiVersion: "1.0.0", showUI() {},
+    clientStorage: {getAsync: async (key: string) => stored.get(key) ?? getAsync(key), async setAsync(key: string, value: unknown) {stored.set(key, value);}, async deleteAsync(key: string) {stored.delete(key);}}, ui: {postMessage(message: any) { messages.push(message); }}};
   runInNewContext(readFileSync(new URL("../../bridge-plugin/code.js", import.meta.url), "utf8"), {figma, __html__: "", console,
     setTimeout(fn: () => void) {timers.set(++id, fn); return id;}, clearTimeout(key: number) {timers.delete(key);}});
-  return {figma, messages, timers};
+  return {figma, messages, timers, stored, data, shared};
 }
 const channel = "a".repeat(64);
 test("plugin context tolerates malformed saved host values", async () => {
@@ -85,8 +88,7 @@ test("development manifest enables real file identity and missing identity never
   const plugin = main(async () => undefined);
   plugin.figma.fileKey = undefined;
   await plugin.figma.ui.onmessage({type: "context", channel});
-  assert.equal(plugin.messages[0].type, "context-error");
-  assert.match(plugin.messages[0].message, /file’s identity/);
+  assert.equal(plugin.messages[0].type, "file-link-required");
   assert.equal(plugin.messages.some(message => message.file?.key === "draft"), false);
 });
 
@@ -102,4 +104,61 @@ test("hiding the running plugin preserves its channel and can be reversed", asyn
   await plugin.figma.ui.onmessage({type: "request", channel, id: "show", method: "show_ui"});
   assert.equal(hidden, false);
   assert.equal(plugin.messages.at(-1).ok, true);
+});
+
+test("public plugin asks for a link and produces a fresh document proof without a private API", async () => {
+  const plugin = main(async () => undefined); plugin.figma.fileKey = undefined;
+  await plugin.figma.ui.onmessage({type: "context", channel});
+  await plugin.figma.ui.onmessage({type: "set-file-link", channel, url: "https://www.figma.com.evil/design/file12345"});
+  assert.equal(plugin.data.has("elf-file-key"), false);
+  await plugin.figma.ui.onmessage({type: "set-file-link", channel, url: "https://www.figma.com/design/file12345/Design"});
+  const context = [...plugin.messages].reverse().find(message => message.type === "context");
+  assert.equal(context.file.key, "file12345");
+  assert.equal(context.file.verification.nonce, channel);
+  assert.equal(plugin.shared.get("elf:fileProof"), channel);
+  const next = "b".repeat(64);
+  await plugin.figma.ui.onmessage({type: "context", channel: next});
+  assert.equal(plugin.shared.get("elf:fileProof"), next);
+});
+
+test("saved plugin sessions are isolated by file", async () => {
+  const plugin = main(async () => undefined);
+  await plugin.figma.ui.onmessage({type: "context", channel});
+  await plugin.figma.ui.onmessage({type: "save-session", channel, session: "session-for-A"});
+  plugin.figma.fileKey = "file-B";
+  await plugin.figma.ui.onmessage({type: "context", channel});
+  assert.equal([...plugin.messages].reverse().find(message => message.type === "context").bridge.session, "");
+  await plugin.figma.ui.onmessage({type: "save-session", channel, session: "session-for-B"});
+  plugin.figma.fileKey = "file";
+  await plugin.figma.ui.onmessage({type: "context", channel});
+  assert.equal([...plugin.messages].reverse().find(message => message.type === "context").bridge.session, "session-for-A");
+});
+
+test("public link entry uses the private UI channel", () => {
+  const app = ui();
+  app.window.onmessage({data: {pluginMessage: {type: "file-link-required", channel: app.messages[0].channel}}});
+  assert.equal(app.elements.get("file-link-form").hidden, false);
+  assert.equal(app.elements.get("context-spinner").hidden, true);
+  app.document.getElementById("figma-file-link").value = "https://www.figma.com/design/file12345";
+  app.elements.get("use-file-link").listeners.click();
+  assert.equal(app.messages.at(-1).type, "set-file-link");
+  assert.equal(app.messages.at(-1).channel, app.messages[0].channel);
+});
+
+test("public UI refuses old bridges and never forwards writes before verification", () => {
+  for (const capability of [undefined, 1]) {
+    const app = ui();
+    app.window.onmessage({data: {pluginMessage: {type: "context", channel: app.messages[0].channel, file: {name: "Public", key: "file12345", verification: {nonce: "a".repeat(64)}}, bridge: {host: "localhost:8765", session: ""}}}});
+    app.document.getElementById("code").value = "abcd-efgh-jkmn";
+    app.elements.get("pair").listeners.click();
+    const socket = app.sockets[0];
+    socket.onmessage({data: JSON.stringify({type: "ready", fileVerification: capability})});
+    if (capability === undefined) {assert.equal(socket.closed.code, 4003); assert.equal(socket.sent.length, 0); continue;}
+    const before = app.messages.length;
+    socket.onmessage({data: JSON.stringify({type: "request", id: "write", method: "create_collection"})});
+    assert.equal(app.messages.length, before);
+    socket.onmessage({data: JSON.stringify({type: "file-verified"})});
+    socket.onmessage({data: JSON.stringify({type: "request", id: "write", method: "create_collection"})});
+    assert.equal(app.messages.at(-1).type, "request");
+  }
 });

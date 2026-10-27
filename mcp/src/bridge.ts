@@ -1,3 +1,4 @@
+import { verifyPublicFile } from "../../src/figma/file-identity.js";
 import { createHash, createHmac, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import type { AddressInfo } from "node:net";
 import { WebSocket, WebSocketServer } from "ws";
@@ -42,6 +43,7 @@ export interface BridgeOptions {
   pairingCodeTtlMs?: number;
   /** How long a session secret issued by pairing stays valid. */
   sessionTtlMs?: number;
+  verifyPublicFile?: typeof verifyPublicFile;
 }
 
 export interface BridgePairing {
@@ -94,6 +96,8 @@ export class Bridge {
   private boundAddress: string | null = null;
   private connectedAt: string | null = null;
   private file: BridgeFileInfo | null = null;
+  private identityGeneration = 0;
+  private publicIdentity = false;
   private plugin: BridgePluginInfo | null = null;
   private alive = false;
   private jobs: { queuedAt: number; owner: WebSocket | null; method: string; params: Record<string, unknown>; options: RequestOptions; resolve: (value: any) => void; reject: (error: Error) => void }[] = [];
@@ -239,6 +243,7 @@ export class Bridge {
       throw new BridgeError("not-connected", `No Figma plugin connected — ${NOT_CONNECTED_HINT}.`);
     }
 
+    if ((this.options.sessionStore || this.publicIdentity) && !this.file) throw new BridgeError("not-connected", "The Figma file has not been verified. Connect your account in Settings and check the plugin file link.");
     const id = randomUUID();
     const timeoutMs = options.timeoutMs ?? this.timeoutMs;
 
@@ -432,6 +437,7 @@ export class Bridge {
     this.alive = true;
     this.connectedAt = new Date().toISOString();
     this.file = null;
+    this.publicIdentity = false; this.identityGeneration++;
     this.plugin = null;
     if (auth === "code") this.logger.log("plugin paired with a one-time code");
     else if (auth === "session") this.logger.log("plugin reconnected with its saved session");
@@ -441,6 +447,7 @@ export class Bridge {
     socket.send(
       this.encodePlugin(socket, {
         type: "ready",
+        fileVerification: 1,
         ...(issued
           ? { session: issued.session, ...(issued.expiresAt ? { sessionExpiresAt: new Date(issued.expiresAt).toISOString() } : {}) }
           : {}),
@@ -544,6 +551,7 @@ export class Bridge {
     this.socket = null;
     this.connectedAt = null;
     this.file = null;
+    this.publicIdentity = false; this.identityGeneration++;
     this.plugin = null;
     this.logger.log(`plugin disconnected (code ${code})`);
     this.rejectAll("the plugin disconnected while the request was in flight");
@@ -559,7 +567,24 @@ export class Bridge {
       return;
     }
 
+    if (message.type === "status" && message.file?.verification) {
+      const socket = this.socket; const file = message.file; const generation = ++this.identityGeneration;
+      this.publicIdentity = true;
+      this.file = null; this.emitStatus();
+      if (this.lockOwner) this.releaseLock();
+      void (this.options.verifyPublicFile ?? verifyPublicFile)(file.key, file.verification!).then(() => {
+        if (this.socket !== socket || !socket || generation !== this.identityGeneration) return;
+        if (this.options.sessionStore && this.activeSession && !this.options.sessionStore.bindKey(this.activeSession, file.key)) throw new Error("Pairing belongs to a different file");
+        this.file = file; this.plugin = message.plugin ?? null; this.emitStatus();
+        socket.send(this.encodePlugin(socket, {type: "file-verified"}));
+      }).catch(() => {
+        if (this.socket === socket && generation === this.identityGeneration) socket?.close(4003, "File not verified. Connect Figma in Settings, check the file link, and retry after saving.");
+      });
+      return;
+    }
     if (message.type === "status") {
+      if (this.publicIdentity) {this.socket?.close(4003, "File verification is required for this session."); return;}
+      this.identityGeneration++;
       if (this.options.sessionStore && this.activeSession) {
         const key = message.file?.key;
         if (!key || !this.options.sessionStore.bindKey(this.activeSession, key)) {

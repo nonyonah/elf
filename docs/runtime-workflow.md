@@ -97,9 +97,14 @@ from processes running as your own OS user.
 The bundled development plugin enables `enablePrivatePluginApi` so Figma exposes
 its real file key. A missing key stops pairing setup; `draft` is never a document
 identity. Sessions created with the former placeholder need one fresh pairing.
-Figma limits this API to development/private plugins. A future Community plugin
-needs a separate explicit file-link verification flow before it can replace the
-development plugin; do not enable writes using a shared placeholder or file name.
+Figma limits this API to development/private plugins. The prepared public manifest
+(`bridge-plugin/manifest.public.json`) instead asks for the file link and a Figma
+account connection. Each plugin opening writes a fresh nonvisual shared proof;
+the local bridge reads that proof through Figma's REST API before accepting the
+file identity or forwarding writes. A copied file cannot inherit the original
+file's verified identity. Public OAuth registration and live verification are
+still required before publication; see [connection service setup](connection-service-setup.md).
+Pairing credentials are stored separately for each file.
 
 Settings now provides authenticated report viewing from
 the fixed project report path. Linked, special, and oversized report files are
