@@ -367,10 +367,10 @@ export default function SettingsPage() {
                 {slackSub}
               </p>
             </div>
-            {slack.connected && <Button variant="ghost" size="sm" className="h-7 shrink-0 rounded-lg px-2 text-xs shadow-none sm:text-xs" loading={saving === "test"} disabled={unavailable || busy} onClick={() => { void handleTestSlack(); }}>Test</Button>}
+            {slack.connected && <Button variant="default" size="sm" className="h-7 shrink-0 rounded-lg px-2 text-xs shadow-none sm:text-xs" loading={saving === "test"} disabled={unavailable || busy} onClick={() => { void handleTestSlack(); }}>Test</Button>}
             {slack.connected ? (
               <Button
-                variant="outline"
+                variant="default"
                 size="sm"
                 className="h-7 shrink-0 rounded-lg border-[0.5px] px-2.5 text-xs shadow-none sm:text-xs"
                 loading={saving === "disconnect"}
@@ -487,16 +487,16 @@ export default function SettingsPage() {
             )}
             <p className="min-w-0 max-w-[300px]">{toast.message}</p>
             {toast.retry && (
-              <button
-                type="button"
-                className="shrink-0 rounded font-medium text-foreground underline-offset-2 hover:underline"
+              <Button
+                size="sm"
+                className="h-7 shrink-0 rounded-lg px-3 text-xs shadow-none"
                 onClick={() => {
                   setToast(null);
                   void fetchConfig();
                 }}
               >
                 Retry
-              </button>
+              </Button>
             )}
             <button
               type="button"

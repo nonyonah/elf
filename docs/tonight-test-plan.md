@@ -25,10 +25,10 @@ node bin/elf-tokens.js start
 Open its private Settings link. Stop/restart any older Elf process if Settings
 reports an incompatible server. Never share the private link or pairing secrets.
 
-- [ ] Connect Slack and choose the test channel. Settings must show the selected
+- [x] Connect Slack (user confirmed live sign-in succeeds). Settings must show the selected
   workspace/channel. No manually supplied webhook should be necessary.
 - [ ] Use the explicit Slack test-message action and confirm delivery.
-- [ ] Connect Figma and return to Settings with account status connected.
+- [x] Connect Figma and return to Settings with account status connected (user confirmed).
 - [ ] Cancel each authorization once, then retry successfully.
 - [ ] Disconnect/reconnect each account. Old callbacks must not restore a
   disconnected account or leak credentials into URLs or browser responses.
