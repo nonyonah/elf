@@ -87,6 +87,7 @@ function createFigmaStub(sendToSocket) {
       return node;
     },
     findOne(predicate) {
+      if (this.type === "PAGE" && !this.loaded) throw new Error("Dynamic page must load before traversal");
       for (const child of this.children) {
         if (predicate(child)) return child;
         if (child.children) {
@@ -106,7 +107,8 @@ function createFigmaStub(sendToSocket) {
     },
   });
 
-  const page = register({ id: "0:0", name: "Page 1", type: "PAGE", ...pluginData(), ...childrenMixin() });
+  const page = register({ id: "0:0", name: "Page 1", type: "PAGE", loaded: false,
+    async loadAsync() {this.loaded = true;}, ...pluginData(), ...childrenMixin() });
 
   const createComponent = () =>
     register({

@@ -2,6 +2,7 @@
   "name": "Elf Bridge",
   "id": "248830144219504412",
   "api": "1.0.0",
+  "documentAccess": "dynamic-page",
   "main": "code.js",
   "ui": "ui.html",
   "editorType": ["figma"],

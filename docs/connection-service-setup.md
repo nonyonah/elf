@@ -92,7 +92,7 @@ the updated npm package separately after the hosted flows pass live verification
    reconnect to confirm cancellation leaves the project disconnected.
 3. Connect Figma and authorize read access. Settings displays connection status;
    credentials are never returned by its browser API.
-4. For the public plugin build, use `bridge-plugin/manifest.public.json`, paste
+4. For the public plugin build, use `dist/bridge-plugin-public/manifest.json`, paste
    the current Figma file's link, then pair with the code printed by the package.
    Save/sync the document if proof verification needs time to reach Figma's API.
 5. Reopen the plugin in that file: its saved pairing should reconnect. Try a copy
@@ -118,3 +118,18 @@ webhook is stored privately per project. Removing Figma access in Settings remov
 that machine's account file. To revoke the app's authorization at Figma itself,
 also remove Elf in Figma's connected-app settings. Plugin pairing is a separate
 credential and can be forgotten per file.
+
+## Import the public test build in Figma Desktop
+
+Run `npm run build:bridge-plugin` from the Elf repository. In Figma Desktop,
+open **Plugins → Development → Import plugin from manifest** and select
+`dist/bridge-plugin-public/manifest.json`. Keep `code.js` and `ui.html` beside it
+in that generated folder. `bridge-plugin/manifest.public.json` is a build template,
+not the file to select in the import dialog.
+
+The development and public builds share the same assigned plugin ID. Figma may
+update the existing Elf Bridge development entry rather than add a second entry.
+Close any running Elf Bridge instance first. If importing appears to do nothing,
+remove the existing entry from **Manage plugins → Development**, then import the
+generated manifest and run Elf Bridge again. Removing a local development entry
+is separate from revoking its saved file pairing.

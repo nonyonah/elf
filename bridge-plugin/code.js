@@ -564,10 +564,13 @@ function findComponentSet(parent, name, codeKey) {
  * Document-wide codeKey lookup — how instance children find their source
  * component no matter which page or frame it lives on.
  */
-function findTaggedComponent(codeKey) {
+async function findTaggedComponent(codeKey) {
     if (!codeKey)
         return null;
     for (const page of figma.root.children) {
+        // Public plugins use dynamic pages: load a page before traversing it.
+        if (typeof page.loadAsync === "function")
+            await page.loadAsync();
         const found = page.findOne((node) => {
             if (node.type !== "COMPONENT" && node.type !== "COMPONENT_SET")
                 return false;
@@ -584,12 +587,12 @@ const PADDING_FIELDS = [
     "paddingBottom",
     "paddingLeft",
 ];
-function resolveSlot(child, index) {
+async function resolveSlot(child, index) {
     if (child?.type !== "instance") {
         throw new Error(`Child ${index} has unknown type "${String(child?.type)}" — only "instance" is supported.`);
     }
     const wanted = String(child.component ?? "").trim();
-    const target = findTaggedComponent(wanted);
+    const target = await findTaggedComponent(wanted);
     if (!target) {
         throw new Error(`Child ${index} points at "${wanted}", but no component with that codeKey exists in this file yet.`);
     }
@@ -634,7 +637,7 @@ async function prepareSpec(input, currentLayout) {
             throw new Error("`size` needs finite width and height.");
         size = { width, height };
     }
-    const slots = input.children ? input.children.map((child, index) => resolveSlot(child, index)) : null;
+    const slots = input.children ? await Promise.all(input.children.map((child, index) => resolveSlot(child, index))) : null;
     return { layoutMode: input.layoutMode ?? null, padding, gap, radius, fill, stroke, size, text: input.text ?? null, slots };
 }
 /** Writes a prepared spec onto a component. Only called after all prep succeeded. */

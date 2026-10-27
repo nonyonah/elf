@@ -39,7 +39,7 @@ See [both app registrations](connection-service-setup.md).
 
 ## 2. Verify public-plugin identity and persistent pairing
 
-- [ ] Import the prepared `bridge-plugin/manifest.public.json` into Figma Desktop
+- [ ] Import the prepared `dist/bridge-plugin-public/manifest.json` into Figma Desktop
   for testing. An imported development build does not prove Community approval.
 - [ ] Open the test file, paste that file's URL, and pair using the terminal code.
   Verification must complete before any resource request can run.
