@@ -16,6 +16,9 @@ async function start(provider = "slack", returnUri = `http://127.0.0.1:3456/api/
 async function complete(provider = "slack") {
   const flow = await start(provider);
   vi.stubGlobal("fetch", async (url: string, init: RequestInit) => {
+    // Exercise workerd's Request validation before returning a provider fixture.
+    // A fetch stub alone otherwise hides unsupported runtime request options.
+    new Request(url, init);
     if (provider === "slack") {
       expect(url).toBe("https://slack.com/api/oauth.v2.access");
       expect(String(init.body)).toContain("client_secret=slack-server-secret");
@@ -36,6 +39,35 @@ beforeEach(async () => {await env.DB.prepare("DELETE FROM local_oauth").run(); a
 afterEach(() => vi.unstubAllGlobals());
 
 describe("local OAuth delivery", () => {
+  it("refreshes Figma credentials with a workerd-compatible request", async () => {
+    vi.stubGlobal("fetch", async (url: string, init: RequestInit) => {
+      new Request(url, init);
+      expect(url).toBe("https://api.figma.com/v1/oauth/refresh");
+      expect(init.redirect).toBe("manual");
+      expect(new Headers(init.headers).get("Authorization")).toBe(`Basic ${btoa("figma-id:figma-server-secret")}`);
+      return Response.json({access_token: "refreshed-private-token", expires_in: 3600});
+    });
+    const response = await request("/figma/refresh", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({refreshToken: "private-refresh-token"})});
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({accessToken: "refreshed-private-token"});
+  });
+  it("rejects provider redirects without following or delivering a grant", async () => {
+    for (const provider of ["slack", "figma"]) {
+      const flow = await start(provider);
+      let calls = 0;
+      vi.stubGlobal("fetch", async (url: string, init: RequestInit) => {
+        new Request(url, init);
+        expect(init.redirect).toBe("manual");
+        calls++;
+        return new Response(null, {status: 302, headers: {Location: "https://untrusted.test/"}});
+      });
+      const response = await request(`/${provider}/callback?code=test&state=${flow.id}`, {headers: {Cookie: flow.cookie}});
+      const target = new URL(response.headers.get("Location")!);
+      expect(target.searchParams.has("grant")).toBe(false);
+      expect(target.searchParams.get("error")).toBe("connection_failed");
+      expect(calls).toBe(1);
+    }
+  });
   it("returns fixed Figma failure reasons without leaking provider response text", async () => {
     for (const [error, expected] of [["invalid_client", "invalid_client"], ["private-token-secret", "provider_rejected"]]) {
       const flow = await start("figma");

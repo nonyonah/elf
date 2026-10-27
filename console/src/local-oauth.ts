@@ -11,6 +11,8 @@ const encoder = new TextEncoder();
 class ConnectionFailure extends Error {
   constructor(readonly reason: string) { super(reason); }
 }
+// workerd rejects redirect:"error" before sending a request. Use "manual"
+// and reject every non-2xx response so credentials never follow redirects.
 function providerFailure(value: unknown): string {
   return typeof value === "string" && ["access_denied", "invalid_client", "invalid_grant", "invalid_scope", "redirect_uri_mismatch", "unauthorized_client"].includes(value) ? value : "provider_rejected";
 }
@@ -82,7 +84,7 @@ export function localOAuth() {
       if (!code || code.length > 2048) throw new ConnectionFailure("missing_code");
       let result: Record<string, unknown>;
       if (provider === "slack") {
-      const response = await fetch("https://slack.com/api/oauth.v2.access", {method: "POST", redirect: "error", signal: AbortSignal.timeout(10_000), headers: {"Content-Type": "application/x-www-form-urlencoded"}, body: new URLSearchParams({client_id: c.env.SLACK_CLIENT_ID!, client_secret: c.env.SLACK_CLIENT_SECRET!, code, redirect_uri: callback(c.env.CONSOLE_ORIGIN!, provider)})});
+      const response = await fetch("https://slack.com/api/oauth.v2.access", {method: "POST", redirect: "manual", signal: AbortSignal.timeout(10_000), headers: {"Content-Type": "application/x-www-form-urlencoded"}, body: new URLSearchParams({client_id: c.env.SLACK_CLIENT_ID!, client_secret: c.env.SLACK_CLIENT_SECRET!, code, redirect_uri: callback(c.env.CONSOLE_ORIGIN!, provider)})});
       if (!response.ok) throw new Error("Slack exchange failed");
       const token = await jsonBody<{ok?: boolean; incoming_webhook?: {url?: string; channel?: string; channel_id?: string}; team?: {id?: string; name?: string}}>(response);
       const hook = token.incoming_webhook;
@@ -128,7 +130,7 @@ export function localOAuth() {
 }
 
 async function figmaExchange(env: AppEnv["Bindings"], body: URLSearchParams, refresh = false): Promise<Record<string, unknown>> {
-  const response = await fetch(`https://api.figma.com/v1/oauth/${refresh ? "refresh" : "token"}`, {method: "POST", redirect: "error", signal: AbortSignal.timeout(10_000), headers: {"Content-Type": "application/x-www-form-urlencoded", Authorization: `Basic ${btoa(`${env.FIGMA_CLIENT_ID}:${env.FIGMA_CLIENT_SECRET}`)}`}, body});
+  const response = await fetch(`https://api.figma.com/v1/oauth/${refresh ? "refresh" : "token"}`, {method: "POST", redirect: "manual", signal: AbortSignal.timeout(10_000), headers: {"Content-Type": "application/x-www-form-urlencoded", Authorization: `Basic ${btoa(`${env.FIGMA_CLIENT_ID}:${env.FIGMA_CLIENT_SECRET}`)}`}, body});
   if (!response.ok) {
     let reason = response.status === 401 ? "invalid_client" : "provider_rejected";
     try {const body = await jsonBody<{error?: unknown}>(response); if (typeof body.error === "string") reason = providerFailure(body.error);} catch { /* Discard untrusted or oversized provider errors. */ }
