@@ -202,3 +202,18 @@ test("changing a file link retires the old socket before reconnecting with new a
   assert.match(app.elements.get("pairing-detail").textContent, /Pairing succeeded/);
   assert.equal(app.document.body.dataset.phase, "pairing");
 });
+
+
+test("Back from Change file link returns to pairing without saving edited link or authorization",()=>{
+ const app=ui();const channel=app.messages[0].channel;
+ app.window.onmessage({data:{pluginMessage:{type:'context',channel,file:{name:'Public',key:'file12345',verification:{nonce:'a'.repeat(64),method:'strict'}},bridge:{host:'localhost:8765',session:''}}}});
+ app.elements.get('change-file-link').listeners.click();
+ app.document.getElementById('figma-file-link').value='https://www.figma.com/design/otherfile123';
+ app.document.getElementById('file-authorization').value='plugin';
+ app.elements.get('back-file-link').listeners.click();
+ assert.equal(app.document.body.dataset.phase,'disconnected');
+ assert.equal(app.elements.get('file-link-form').hidden,true);
+ assert.equal(app.messages.some(message=>message.type==='set-file-link'),false);
+ app.elements.get('change-file-link').listeners.click();
+ assert.equal(app.elements.get('file-authorization').value,'strict');
+});

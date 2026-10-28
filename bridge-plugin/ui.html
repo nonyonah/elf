@@ -125,7 +125,7 @@
     .status.online { background: var(--success-soft); color: var(--success); }
     .status.pairing { background: var(--warning-soft); color: var(--warning); }
 
-    main { flex: 1; min-height: 0; }
+    main { flex: 1; min-height: 0; overflow-y: auto; padding-bottom: 2px; }
     [data-panel] { display: none; }
     body[data-phase="loading"] [data-panel="loading"],
     body[data-phase="disconnected"] [data-panel="disconnected"],
@@ -245,6 +245,11 @@
     @keyframes spin { to { transform: rotate(360deg); } }
     .pairing-box h2 { font-size: 12.5px; }
     .pairing-box .sub { max-width: 210px; }
+    #file-link-form .sub { max-width: none; }
+    .file-link-actions { display: flex; gap: 8px; margin-top: 14px; }
+    .file-link-actions .primary, .pairing-box .file-link-actions .secondary { width: auto; height: 34px; margin: 0; }
+    .file-link-actions .primary { flex: 1; }
+    .file-link-actions .secondary { padding: 0 12px; }
     .pairing-box .secondary { width: auto; height: 28px; margin-top: 14px; padding: 0 12px; }
 
     .connected-head {
@@ -387,7 +392,7 @@
             <label class="field-label" for="file-authorization">Document authorization</label>
             <select id="file-authorization"><option value="strict">Strict URL verification (REST)</option><option value="plugin">Approve open document in Elf (no REST)</option></select>
             <p class="sub">Plugin approval requires fresh confirmation in Elf every connection. The URL selects your project; it is not independently verified in this mode.</p>
-            <button class="primary" id="use-file-link">Use this file link</button>
+            <div class="file-link-actions"><button class="secondary" id="back-file-link" type="button">Back</button><button class="primary" id="use-file-link" type="button">Use this file link</button></div>
           </div>
         </div>
       </section>
@@ -951,14 +956,21 @@ function pairingHmac(key, text) {
     }
     function showFileLink() {
       closeCurrentSocket();
+      $("figma-file-link").value = state.file ? `https://www.figma.com/design/${encodeURIComponent(state.file.key)}` : "";
       $('file-authorization').value = state.file && state.file.verification ? state.file.verification.method || 'strict' : 'plugin';
       clearTimeout(contextTimer); setPhase("loading");
       $("context-spinner").hidden = true; $("retry-context").hidden = true;
       $("context-heading").textContent = "Link this Figma file";
       $("context-detail").textContent = "Choose how Elf authorizes the file you have open.";
+      $("back-file-link").hidden = !state.file;
       $("file-link-form").hidden = false;
     }
     $("use-file-link").addEventListener("click", () => postPluginMessage({type: "set-file-link", url: $("figma-file-link").value.trim(), authorization: $('file-authorization').value}));
+    $("back-file-link").addEventListener("click", () => {
+      if (!state.file) return;
+      $("file-link-form").hidden = true;
+      if (state.session) connect("session"); else showPairing("");
+    });
     $("change-file-link").addEventListener("click", showFileLink);
     $("retry-context").addEventListener("click", requestContext);
     window.onmessage = (event) => {
