@@ -67,6 +67,8 @@ export interface DashboardConfig {
 export interface DriftConfig {
   figma: {
     authorization?: "strict" | "plugin";
+    /** Derived from local Elf imports; preserves collection-specific token identities. */
+    collectionAwareNames?: boolean;
     fileKey: string;
     apiTokenEnv: string;
     source: FigmaSource;

@@ -1,3 +1,4 @@
+import {variableCodeNames} from './core/variable-names.js';
 import {categoryFromName, cssColorToHex, slugify} from './core/normalize.js';
 import type {Token} from './core/types.js';
 import {pickTargetMode} from './figma/variables.js';
@@ -6,7 +7,8 @@ export interface ImportSnapshot {collections:any[];variables:any[];}
 /** Lossless source metadata accompanies resolved values for code and drift checks. */
 export function importedTokenDocument(snapshot:ImportSnapshot, fileKey:string, existing:Set<string>, ids?:string[], mapping:Record<string,string>={}):{content:string;names:string[];issues:string[]} {
   if (!Array.isArray(snapshot.collections) || !Array.isArray(snapshot.variables) || snapshot.variables.length > 5000 || snapshot.collections.length > 500) throw new Error('Figma token import exceeds the supported review size.');
-  const nameOf=(variable:any):string => {const raw=slugify(variable.name); const name=mapping[raw] ?? raw; if (typeof name!=='string' || name!==slugify(name)) throw new Error('Token import requires normalized code names in nameMapping.');return name;};
+  const qualifiedNames=variableCodeNames(snapshot.variables,snapshot.collections);
+  const nameOf=(variable:any):string => {const raw=qualifiedNames.get(variable.id)!; const name=Object.hasOwn(mapping,raw)?mapping[raw]:raw; if (typeof name!=='string' || name!==slugify(name)) throw new Error('Token import requires normalized code names in nameMapping.');return name;};
   const byId = new Map(snapshot.variables.map(variable => [variable.id,variable]));
   const collections = new Map(snapshot.collections.map(collection => [collection.id,collection]));
   const names = new Map<string,string>(); const issues:string[]=[];
@@ -52,7 +54,7 @@ export function importedTokenDocument(snapshot:ImportSnapshot, fileKey:string, e
     }
     const defaultName = collection.modes.find((mode:any) => mode.modeId === collection.defaultModeId)?.name;
     if (!defaultName) throw new Error(`Missing default mode for ${name}.`);
-    tokens[name]={value:modes[defaultName],type:variable.resolvedType,collection:collection.name,defaultMode:defaultName,modes,aliases,figmaId:variable.id};
+    tokens[name]={value:modes[defaultName],type:variable.resolvedType,figmaName:variable.name,collection:collection.name,collectionId:collection.id,defaultMode:defaultName,modes,aliases,figmaId:variable.id};
   }
   const document={$elfFigmaImport:1,fileKey,tokens,source:snapshot};
   const content=JSON.stringify(document,null,2)+'\n';
@@ -65,7 +67,7 @@ export function parseImportedTokens(data:any):Token[] {
   const result:Token[]=[];
   for (const [name,item] of Object.entries(data.tokens) as [string,any][]) {
     if (!item || typeof item !== 'object') throw new Error('Invalid imported token.');
-    const named = categoryFromName(name);
+    const named = categoryFromName(typeof item.figmaName==='string'?item.figmaName:name);
     const category = item.type === 'COLOR' ? 'color' : item.type === 'STRING' ? 'typography' : named !== 'other' && named !== 'shadow' ? named : null;
     if (!category || item.type === 'BOOLEAN') continue;
     const entries = Object.entries(item.modes ?? {});

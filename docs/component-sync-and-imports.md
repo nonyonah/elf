@@ -43,8 +43,10 @@ has a **Figma → code** import section. Keep the paired document open and appro
 
 The shared engine preserves collection names, every mode, source variable IDs,
 and alias source metadata. It includes resolved values for comparison and use in
-code. Existing code names are skipped; ambiguous Figma names and alias cycles
-block the import. Plans expire after ten minutes and reject changed code,
+code. Existing code names are skipped. Matching variable names across collections
+receive collection prefixes, with stable ID suffixes for remaining collisions.
+Collection IDs and original names are preserved; aliases and bridge checks use
+the same distinct code names. Alias cycles block the import. Plans expire after ten minutes and reject changed code,
 configuration, Figma content, or connection identity. Applying an import pauses
 automatic sync and creates the file exclusively; it never overwrites a file or
 writes to Figma.
@@ -53,7 +55,9 @@ The result is **Elf JSON**, with values under `tokens[name].value` and mode valu
 under `tokens[name].modes[mode]`. For example, application code can import the JSON
 and read `tokens['color-brand'].value`. Root `*.tokens.json` files marked as Elf
 imports are automatically included in checks, including projects with a legacy
-explicit token path. Imported tokens also appear as component-description token
+explicit token path. Projects with these imports use the bridge for live variable
+comparisons so collection identity stays aligned; strict document authorization
+still uses its existing verification policy. Imported tokens also appear as component-description token
 references using their original Figma variable names.
 
 This first pass does not rewrite CSS/Tailwind, adopt imported variables for

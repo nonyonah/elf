@@ -24,7 +24,7 @@ export async function fetchFigmaTokens(
   restApi: () => FigmaApi,
   connectBridge: () => Promise<BridgeCaller>,
 ): Promise<FigmaFetchResult> {
-  const variablesOptions = { modeName: config.modeName, modeStrategy: config.modeStrategy };
+  const variablesOptions = { modeName: config.modeName, modeStrategy: config.modeStrategy, collectionAwareNames:config.figma.collectionAwareNames };
   const { fileKey, teamId, source } = config.figma;
 
   if (source === "variables") {

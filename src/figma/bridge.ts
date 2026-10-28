@@ -1,3 +1,4 @@
+import {variableCodeNames} from '../core/variable-names.js';
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { NODE_STATE_DEPTH, nodeStateHash } from "../../batch/src/nodestate.js";
@@ -38,6 +39,7 @@ interface PluginVariable {
 }
 
 export interface BridgeFetchOptions {
+  collectionAwareNames?: boolean;
   modeName?: ModeName;
   modeStrategy?: ModeStrategy;
 }
@@ -81,6 +83,7 @@ export async function fetchBridgeVariables(
   ]);
   if (variables.length === 0) return [];
 
+  const codeNames = options.collectionAwareNames ? variableCodeNames(variables,collections) : new Map<string,string>();
   const collectionById = new Map(collections.map((collection) => [collection.id, collection]));
   const variableById = new Map(variables.map((variable) => [variable.id, variable]));
   const labelled = isMulti(options.modeName);
@@ -102,6 +105,7 @@ export async function fetchBridgeVariables(
         skipped.push(selection.label ? `${name} (${selection.label})` : name);
         continue;
       }
+      token.name = codeNames.get(variable.id) ?? name;
       if (labelled && selection.label) token.mode = selection.label;
       tokens.push(token);
     }
