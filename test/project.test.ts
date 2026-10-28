@@ -62,7 +62,8 @@ test('component discovery and generated-draft validation never save or call Figm
     const before = readFileSync(join(p.root, 'components/Button.figma.json'), 'utf8');
     const valid = await p.service.validateDescription('Button', { fill: 'color-primary' }, prepared.reviewHash as string);
     assert.equal(valid.valid, true);
-    await assert.rejects(p.service.validateDescription('Button', { fill: 'invented-token' }, prepared.reviewHash as string), /token/i);
+    const unresolved = await p.service.validateDescription('Button', { fill: 'invented-token' }, prepared.reviewHash as string);
+    assert.equal(unresolved.valid,true);assert.equal(unresolved.syncReady,false);
     assert.equal(readFileSync(join(p.root, 'components/Button.figma.json'), 'utf8'), before);
     assert.equal(p.calls.length, 0);
     writeFileSync(join(p.root, 'components/Button.tsx'), 'export function Button(){return <button>Changed</button>}');
@@ -291,7 +292,10 @@ test("preparation exposes unresolved token references without inventing replacem
     const prepared = await p.service.prepareComponent("Button");
     assert.match(prepared.warning as string, /Review required/);
     assert.deepEqual(prepared.sidecar, sidecar);
-    await assert.rejects(p.service.saveDescription(prepared.codeKey as string, prepared.sidecar, prepared.reviewHash as string), /token|reference/i);
+    const saved = await p.service.saveDescription(prepared.codeKey as string, prepared.sidecar, prepared.reviewHash as string);
+    assert.equal(saved.saved,true);assert.equal(saved.syncReady,false);
+    assert.deepEqual(JSON.parse(readFileSync(join(p.root,'components','Button.figma.json'),'utf8')),sidecar);
+    assert.equal((await p.service.plan()).issues.some(issue => issue.action === 'prepare-component'),true);
     assert.equal(p.calls.some(call => /^(upsert|create|delete)/.test(call)), false);
   } finally {p.cleanup();}
 });
@@ -503,5 +507,30 @@ test('CSS separator aliases validate and save reviewed component descriptions',a
   await p.service.validateDescription('Button',description,String(draft.reviewHash));
   await p.service.saveDescription('Button',description,String(draft.reviewHash));
   assert.equal((await p.service.prepareComponent('Button')).warning,null);
+ }finally{p.cleanup();}
+});
+
+test('description uploads preserve unresolved and wrong-type tokens while blocking unsafe sync',async()=>{
+ const p=project(true);try{
+  const prepared=await p.service.prepareComponent('Button');
+  const description={gap:'color-primary',fill:'missing.color'};
+  const valid=await p.service.validateDescription('Button',description,String(prepared.reviewHash));
+  assert.equal(valid.valid,true);assert.equal(valid.syncReady,false);assert.equal((valid.warnings as string[]).length,2);
+  await assert.rejects(p.service.validateDescription('Button',{gap:'missing',size:'invalid'},String(prepared.reviewHash)),/size/);
+  await assert.rejects(p.service.saveDescription('Button',{unknown:1},String(prepared.reviewHash)),/unknown field/);
+  await p.service.saveDescription('Button',description,String(prepared.reviewHash));
+  assert.deepEqual(JSON.parse(readFileSync(join(p.root,'components','Button.figma.json'),'utf8')),description);
+  const plan=await p.service.plan();
+  assert.equal(plan.entries.some(entry=>entry.kind==='component'),false);
+  assert.equal(p.calls.some(method=>/^(upsert|create|delete)/.test(method)),false);
+ }finally{p.cleanup();}
+});
+
+test('local description uploads do not require a connected Figma plugin',async()=>{
+ const p=project(true);try{
+  const offline=new ProjectService(p.path,{transaction:async()=>{throw new Error('Plugin offline');}} as unknown as BridgeRuntime);
+  const prepared=await offline.prepareComponent('Button');
+  const result=await offline.saveDescription('Button',{gap:'unresolved.spacing'},String(prepared.reviewHash));
+  assert.equal(result.saved,true);assert.equal(result.syncReady,false);
  }finally{p.cleanup();}
 });

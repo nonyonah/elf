@@ -47,7 +47,8 @@ function harness(options = {}) {
       else if (path === '/api/project/prepare-component-import') data={id:'component-import',exportName:'ImportedAlert',options:JSON.parse(body),limitations:['Review accessibility.']};
       else if (path === '/api/project/validate-component-import') data={valid:true};
       else if (path === '/api/project/apply-component-import') data={created:true,path:'ImportedAlert.tsx'};
-      else if (path === '/api/project/validate-description') data = {valid:true};
+      else if (path === '/api/project/validate-description') data = options.descriptionValidation||{valid:true};
+      else if (path === '/api/project/save-description') data = options.descriptionSave||{saved:true,syncReady:true};
       else if (path === '/api/project/pending-document') data = {file:{key:'file',name:'Open design'},ticket:'d'.repeat(64),expiresAt:Date.now()+300000};
       else if (path === '/api/project/approve-document' || path === '/api/project/strict-authorization') data = {ok:true};
       else if (path === '/api/project/plan') data = options.plan || { id: 'plan-1', entries: [{ kind: 'token', key: 'color.brand', name: 'color.brand', action: 'update' }], issues: [], expiresAt: '2026-10-27T00:10:00.000Z' };
@@ -485,4 +486,16 @@ test('approved library setup stages a fixed command without executing it and the
  assert.equal(terminals[0].options.cwd,'/project');assert.equal(terminals[0].execute,false);
  assert.equal(terminals[0].text,'npm install --ignore-scripts @mui/material @emotion/react @emotion/styled');
  assert.equal(JSON.parse(h.requests.find(item=>item.path==='/api/project/prepare-component-import').body).library,'@mui/material');
+});
+
+test('saving a description with token warnings succeeds without automatically opening sync review',async t=>{
+ const h=harness({descriptionSave:{saved:true,syncReady:false,warnings:['Missing token']}});t.after(()=>h.native.dispose());
+ await h.commands.get('elf.prepareDescription')('Button');
+ const diff=h.executed.find(item=>item.name==='vscode.diff');const uri=diff.args[1];
+ h.vscode.window.visibleTextEditors=[{document:{uri,getText:()=>JSON.stringify({gap:'missing-token'})}}];
+ h.warningResponses.push('Save reviewed description');
+ await h.commands.get('elf.saveAndReviewDescription')(uri.toString());
+ assert.equal(h.errors.length,0);
+ assert(h.infoMessages.some(item=>item.message.includes('Description uploaded and saved')));
+ assert.equal(h.requests.some(item=>item.path==='/api/project/plan'||item.path==='/api/project/apply'),false);
 });

@@ -3,6 +3,8 @@ import { extname, resolve } from "node:path";
 import { normalizeRef, type TokenIndex } from "./tokens.js";
 import type { ParsedComponent, SidecarSpec, SidecarVariant, Variant } from "./types.js";
 
+export class DescriptionTokenError extends Error {}
+
 /** Exact references win. Separator aliases must identify exactly one token. */
 export function resolveDescriptionToken(value: string, index: TokenIndex) {
   const ref = normalizeRef(value);
@@ -11,11 +13,11 @@ export function resolveDescriptionToken(value: string, index: TokenIndex) {
   const canonical = (name: string) => name.replace(/[./]/g, '-');
   const matches = [...index.entries()].filter(([key, token]) => canonical(key) === canonical(ref) || canonical(token.name) === canonical(ref));
   if (matches.length === 1) return matches[0][1];
-  if (matches.length > 1) throw new Error(`Ambiguous token reference "${ref}". Use an exact token key: ${matches.map(([key]) => key).join(', ')}.`);
+  if (matches.length > 1) throw new DescriptionTokenError(`Ambiguous token reference "${ref}". Use an exact token key: ${matches.map(([key]) => key).join(', ')}.`);
   return undefined;
 }
 function unknownToken(label: string, field: string, ref: string, index: TokenIndex): Error {
-  return new Error(`${label}: "${field}" references "${ref}", which is not a known token. Available keys: ${[...index.keys()].slice(0, 30).join(', ')}. Save the corrected Elf description draft before reviewing sync.`);
+  return new DescriptionTokenError(`${label}: "${field}" references "${ref}", which is not a known token. Available keys: ${[...index.keys()].slice(0, 30).join(', ')}. Save the corrected Elf description draft before reviewing sync.`);
 }
 
 /**
@@ -190,7 +192,7 @@ function numberOrRef(
     const target = resolveDescriptionToken(value, index);
     if (!target) throw unknownToken(label, field, normalizeRef(value), index);
     if (target.type !== "FLOAT") {
-      throw new Error(`${label}: "${field}" needs a dimension token, but "${normalizeRef(value)}" is ${target.type}.`);
+      throw new DescriptionTokenError(`${label}: "${field}" needs a dimension token, but "${normalizeRef(value)}" is ${target.type}.`);
     }
     return { variable: target.name };
   }
@@ -222,7 +224,7 @@ function colorRef(value: string, field: string, index: TokenIndex, label: string
   const target = resolveDescriptionToken(value, index);
   if (!target) throw unknownToken(label, field, normalizeRef(value), index);
   if (target.type !== "COLOR") {
-    throw new Error(`${label}: "${field}" needs a color token, but "${normalizeRef(value)}" is ${target.type}.`);
+    throw new DescriptionTokenError(`${label}: "${field}" needs a color token, but "${normalizeRef(value)}" is ${target.type}.`);
   }
   return target.name;
 }
@@ -314,10 +316,10 @@ function literalFromToken(
   const target = resolveDescriptionToken(value, index);
   if (!target) throw unknownToken(label, field, ref, index);
   if (target.type !== expected) {
-    throw new Error(`${label}: "${field}" needs a ${expected} token, but "${ref}" is ${target.type}.`);
+    throw new DescriptionTokenError(`${label}: "${field}" needs a ${expected} token, but "${ref}" is ${target.type}.`);
   }
   if (target.literal === null || typeof target.literal === "boolean") {
-    throw new Error(`${label}: "${field}" references "${ref}", an alias without a literal value.`);
+    throw new DescriptionTokenError(`${label}: "${field}" references "${ref}", an alias without a literal value.`);
   }
   return target.literal;
 }

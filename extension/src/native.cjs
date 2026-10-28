@@ -667,7 +667,8 @@ class NativeElf {
       generated = await generateDescription(this.vscode, prepared);
       if (!generated) return;
       if (owner !== this.getRuntime() || !this.vscode.workspace.isTrusted) throw new Error('The project or workspace trust changed. Prepare again.');
-      await this.api('/api/project/validate-description', 'POST', { component: prepared.codeKey, reviewHash: prepared.reviewHash, description: generated.description }, owner);
+      const validation = await this.api('/api/project/validate-description', 'POST', { component: prepared.codeKey, reviewHash: prepared.reviewHash, description: generated.description }, owner);
+      if (validation.warnings?.length) prepared.warning = validation.warnings.join('\n');
       prepared.sidecar = generated.description;
       await this.text(JSON.stringify({ assumptions: generated.assumptions, unsupported: generated.unsupported, warning: prepared.warning }, null, 2), 'json', `${prepared.name} AI review notes`);
     }
@@ -714,12 +715,13 @@ class NativeElf {
     try { description = JSON.parse(source); } catch { throw new Error('Fix the description JSON before saving.'); }
     if (await this.vscode.window.showWarningMessage(`Save this reviewed description for ${draft.prepared.name}? This pauses automatic sync and does not write to Figma.`, { modal: true }, 'Save reviewed description') !== 'Save reviewed description') return;
     if (document.getText() !== source || draft.owner !== this.getRuntime()) throw new Error('The draft or project changed. Review it again.');
-    await this.api('/api/project/save-description', 'POST', { component: draft.prepared.codeKey, reviewHash: draft.prepared.reviewHash, description }, draft.owner);
+    const saved = await this.api('/api/project/save-description', 'POST', { component: draft.prepared.codeKey, reviewHash: draft.prepared.reviewHash, description }, draft.owner);
     this.drafts.delete(document.uri.toString());
     try { await this.vscode.workspace.fs.delete(draft.uri, { useTrash: false }); } catch {}
     if (draft.before) { try { await this.vscode.workspace.fs.delete(draft.before, { useTrash: false }); } catch {} }
     this.plan = null; this.planAuto = false; this.planReplace = false;
     await this.refresh({ resources: true });
+    if (saved.syncReady === false) {void this.vscode.window.showInformationMessage('Description uploaded and saved. Some token bindings need review before Figma sync; your description is preserved.');return;}
     if (review) await this.reviewSync(false, {kind:'component',key:draft.prepared.codeKey});
     else {const next = await this.vscode.window.showInformationMessage('Reviewed description saved.', 'Review component sync'); if (next === 'Review component sync') await this.reviewSync(false,{kind:'component',key:draft.prepared.codeKey});}
   }

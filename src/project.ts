@@ -17,7 +17,7 @@ import { hashSpec, loadManifest, saveManifest, stableStringify } from "../batch/
 import { planTokens, type TokenIndex } from "../batch/src/tokens.js";
 import { componentSourceHash, componentSpecHash, planComponent, processComponent, syncTokens } from "../batch/src/sync.js";
 import { parseComponents } from "../batch/src/parser.js";
-import { loadSidecar, resolveSidecar, sidecarPathFor, validateSidecar } from "../batch/src/sidecar.js";
+import { DescriptionTokenError, loadSidecar, resolveSidecar, sidecarPathFor, validateSidecar } from "../batch/src/sidecar.js";
 import { orderComponents } from "../batch/src/graph.js";
 import { NODE_STATE_DEPTH, nodeStateHash } from "../batch/src/nodestate.js";
 import type { BatchConfig, BridgeCaller, Manifest, ParsedComponent, PlannedComponent, TokensPlan } from "../batch/src/types.js";
@@ -606,15 +606,31 @@ export class ProjectService {
       return {name:item.name, codeKey:item.codeKey, file:item.file, deprecated:item.deprecated !== undefined || deprecations.some(entry => entry.type === 'component' && (entry.name === item.name || entry.name === item.codeKey)), descriptionStatus:planned.sidecarError ? 'needs-review' : 'ready', suggestion:planned.sidecarError ? 'Generate or prepare a Figma description before syncing.' : undefined};
     }) : [] };
   }
+  private async descriptionWarnings(sidecar: Parameters<typeof resolveSidecar>[0], component: ParsedComponent, index: TokenIndex): Promise<string[]> {
+    const { variantMatrix } = await import("../batch/src/sync.js");
+    const warnings: string[] = [];
+    const inspect = (part: typeof sidecar) => {
+      try {resolveSidecar(part, variantMatrix(component), index, component.name);}
+      catch (error) {
+        if (!(error instanceof DescriptionTokenError)) throw error;
+        warnings.push(`Description can be saved. Figma sync needs token review: ${error.message}`);
+      }
+    };
+    for (const [key,value] of Object.entries(sidecar)) {
+      if (key === 'variants') {
+        for (const [label,overrides] of Object.entries(sidecar.variants ?? {})) inspect({variants:{[label]:overrides}});
+      } else inspect({[key]:value});
+    }
+    return warnings;
+  }
   async validateDescription(name: string, description: unknown, reviewHash: string): Promise<Record<string, unknown>> {
     const { config, structured, hasComponents } = this.batchConfig();
     const component = hasComponents ? parseComponents(config.componentsDir, config.componentFiles).find(item => item.name === name || item.codeKey === name) : undefined;
     if (!component || reviewHash !== this.descriptionRevision(config, component)) throw new Error("The component or description changed. Prepare it again.");
     const sidecar = validateSidecar(description as any, component.name);
     const tokens = await this.tokens(config, structured);
-    const { variantMatrix } = await import("../batch/src/sync.js");
-    resolveSidecar(sidecar, variantMatrix(component), tokens.index, component.name);
-    return { valid: true, description: sidecar };
+    const warnings = await this.descriptionWarnings(sidecar, component, tokens.index);
+    return { valid: true, description: sidecar, warnings, syncReady: warnings.length === 0 };
   }
   async prepareComponent(name: string): Promise<Record<string, unknown>> {
     const { config, hasComponents, structured } = this.batchConfig();
@@ -633,7 +649,7 @@ export class ProjectService {
     return { name: component.name, reviewHash, existing, warning, source: source.slice(0, 20_000), sourceTruncated: source.length > 20_000, dependencies: component.dependencies, tokens: [...tokens.index.entries()].slice(0, 200).map(([key, value]) => ({ key, name: value.name, type: value.type })), tokenCount: tokens.index.size, codeKey: component.codeKey, file: component.file, path: relative(config.root, sidecarPathFor(config.componentsDir, component)), variantProps: component.variantProps, sidecar, reviewRequired: true, message: "Review layout, token bindings and variants against the implementation. This is an editable description, not a rendered reconstruction." };
   }
   async saveDescription(name: string, description: unknown, reviewHash?: string): Promise<Record<string, unknown>> {
-    return this.serial(() => this.transaction( async () => {
+    return this.serial(async () => {
       const { config, hasComponents, structured } = this.batchConfig();
       if (!hasComponents) throw new Error("No component source files were discovered in this project. Add a component and try again.");
       const component = parseComponents(config.componentsDir, config.componentFiles).find(item => item.name === name || item.codeKey === name);
@@ -641,9 +657,8 @@ export class ProjectService {
       if (reviewHash !== undefined && reviewHash !== this.descriptionRevision(config, component)) throw new Error("The component or its description changed after preparation. Prepare it again before saving.");
       const sidecar = validateSidecar(description as any, component.name);
       const tokenPlan = await this.tokens(config, structured);
-      // Validate token references before saving an agent-authored description.
-      const { variantMatrix } = await import("../batch/src/sync.js");
-      resolveSidecar(sidecar, variantMatrix(component), tokenPlan.index, component.name);
+      // Preserve unresolved bindings verbatim; sync planning remains strict.
+      const warnings = await this.descriptionWarnings(sidecar, component, tokenPlan.index);
       const path = this.outputPath(relative(config.root, sidecarPathFor(config.componentsDir, component)));
       // A sidecar save must not trigger automatic Figma writes before a fresh plan.
       if (this.automatic()) this.setMonitoring();
@@ -655,7 +670,7 @@ export class ProjectService {
       const known = manifest.components[component.codeKey];
       if (known) { known.sourceHash = componentSourceHash(config.componentsDir, component); known.status = "pending"; saveManifest(config.manifestFile, manifest); }
       this.record("description", `${component.name}: reviewed description saved.`);
-      return { saved: true, path: relative(config.root, path), next: "Review a fresh sync plan before applying it." };
-    }));
+      return { saved: true, path: relative(config.root, path), warnings, syncReady: warnings.length === 0, next: warnings.length ? "Description saved. Review token bindings before Figma sync." : "Review a fresh sync plan before applying it." };
+    });
   }
 }
