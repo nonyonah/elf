@@ -1,0 +1,50 @@
+# Markdown to a Figma design system
+
+This is planned guided functionality, not a shipped Markdown importer. The MCP
+already exposes `list_collections`, `list_variables`, `create_collection`,
+`upsert_variables`, `list_components`, `upsert_component`, and
+`upsert_component_set`. An assistant can read project Markdown using its editor
+tools and call these operations today, but that does not provide a complete,
+validated, resumable design-system import.
+
+## Agreed workflow
+
+1. Select a local Markdown specification. Show which content will be shared
+   before an external model interprets it. Treat document instructions as data;
+   they must not authorize commands, installs, network access, or Figma writes.
+2. Extract a structured draft of collections, modes, typed variables, aliases,
+   component specifications, variants, and usage documentation. Include source
+   locations and unresolved questions. Ask about missing values, framework/library
+   choices when code generation is requested, and ambiguous units or names.
+   Never silently invent a token value or infer a full component from its name.
+3. Read the paired file and propose creates/updates with exact targets. Validate
+   collection identity, alias dependencies/cycles, supported types, modes,
+   component bindings, intentional differences, deprecations, and conflicts.
+4. Review tokens and components together. Offer **Resources only** (collections,
+   variables and components) or **Include presentation** (an optional dedicated
+   page with labeled token samples and component examples). Existing unrelated
+   pages and artwork stay intact. Presentation remains editable by the designer.
+5. Apply only the approved plan through the shared engine and authenticated
+   bridge. Revalidate the file and source revisions before writing. Order writes
+   by dependency; verify results and record created IDs, failures and remaining
+   operations so a retry does not duplicate resources. Do not promise atomic
+   rollback across Figma operations.
+6. Establish the supported local token/component files and managed baseline,
+   with a separate review for local file creation. Then offer monitoring and
+   drift checks. A one-off MCP canvas write must not be reported as automatically
+   tracked by the project watcher.
+
+## Implementation order
+
+- Add a shared specification schema, bounded Markdown ingestion and editable
+  extraction preview, with deterministic fixtures and ambiguity diagnostics.
+- Extend the existing plan/apply engine for collection/mode identity and the
+  combined token/component dependency graph; enforce stale-review and retry
+  safety. Reuse it from MCP, npm Settings and the extension.
+- Add optional presentation planning and rendering after resource creation works.
+- Test a small new file, existing resources, duplicate names across collections,
+  aliases/modes, unsupported values, conflicting edits, interrupted apply and
+  repeat apply. Confirm real results through a second Figma read.
+
+Keep this feature behind a preview until these acceptance checks pass. It can
+follow the first stable drift/sync release rather than delay that release.

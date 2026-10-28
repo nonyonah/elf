@@ -1,5 +1,45 @@
 # Production readiness
 
+## Release gate update — 28 October 2026
+
+The local preview now includes prose Figma documentation separately from visual
+specifications, reviewed individual sync, independent automatic-sync filtering,
+token imports with collection identity, reviewed React component import drafts,
+library selection (including shadcn/ui and HeroUI v3), and mascot branding.
+These implementation milestones do not establish public-release readiness.
+Earlier checklist entries below describe historical gaps; use actual acceptance
+results rather than treating every old unchecked item as missing code.
+
+Before calling this production-ready, record results for these remaining gates:
+
+1. Run the full release suites and artifact audits against the final commit;
+   inspect dependencies, OAuth/IPC/credential boundaries and private-file exclusion.
+2. Test npm and VSIX in a clean project without the checkout: onboarding,
+   library setup, imports, AI consent/documentation, individual/automatic sync,
+   reports, Slack deduplication and restart recovery. Record platform coverage.
+3. Exercise wrong/revoked files, stale plans, concurrent watcher/MCP clients,
+   interrupted writes/retries, intentional divergences and deprecation deadlines.
+4. Verify real assistant sessions in Cursor, Claude Code and Codex. Keep direct
+   MCP resource operations distinct from managed project sync and drift baselines.
+5. Complete external-user Figma/Slack distribution, real extension publisher,
+   version/update policy, privacy/support/recovery documentation and release CI.
+   Publish only after these gates pass and release approval is given.
+
+The Markdown-to-design-system goal is tracked in
+[its implementation plan](markdown-design-system.md). MCP primitives exist;
+guided specification ingestion, combined reviewed plans and optional presentation
+generation remain work. This is a preview follow-up, not an existing importer.
+
+### Figma plugin icon
+
+Both plugin headers now use a 28px mascot. The public build also includes
+`dist/bridge-plugin-public/plugin-icon.png`, copied from the exact mascot artwork.
+Upload it in Figma's plugin publishing/edit-listing icon field. The enclosing
+Figma title/menu icon is configured there; an HTML favicon or invented manifest
+`icon` property does not configure it. Figma currently recommends a 128 × 128px
+upload; export that size from the supplied artwork in the publishing workflow.
+See [Figma's publishing instructions](https://help.figma.com/hc/en-us/articles/360042293394-Publish-classic-plugins-to-the-Figma-Community).
+
 The npm package remains a supported product. The native extension must reach
 parity for the interactive workflow, while npm retains scripts/CI and MCP retains
 assistant integration. Use one engine, configuration, pairing store, review

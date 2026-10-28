@@ -12,4 +12,5 @@ const marker = "const PUBLIC_FILE_LINK_REQUIRED = false;";
 if (source.split(marker).length !== 2) throw new Error("Public identity build marker missing or duplicated; refusing to create an ambiguous public bundle.");
 writeFileSync(join(output, "code.js"), source.replace(marker, "const PUBLIC_FILE_LINK_REQUIRED = true;"));
 copyFileSync(join(root, "bridge-plugin", "ui.html"), join(output, "ui.html"));
+copyFileSync(join(root, "assets", "brand", "elf-mascot.png"), join(output, "plugin-icon.png"));
 console.log("Public plugin ready: dist/bridge-plugin-public/manifest.json");
