@@ -75,6 +75,7 @@ export interface BridgeReadyMessage {
   type: "ready";
   fileVerification?: number;
   documentApproval?: number;
+  projectPanel?: number;
   /** Present only when the handshake used a one-time pairing code. */
   session?: string;
   sessionExpiresAt?: string;

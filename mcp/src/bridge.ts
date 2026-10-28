@@ -1,3 +1,4 @@
+import {ProjectPanelRelay} from './project-panel.js';
 import { FileVerificationError, verifyPublicFile } from "../../src/figma/file-identity.js";
 import { createHash, createHmac, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import type { AddressInfo } from "node:net";
@@ -455,6 +456,7 @@ export class Bridge {
         type: "ready",
         fileVerification: 1,
         documentApproval: 1,
+        projectPanel: 1,
         ...(issued
           ? { session: issued.session, ...(issued.expiresAt ? { sessionExpiresAt: new Date(issued.expiresAt).toISOString() } : {}) }
           : {}),
@@ -527,7 +529,7 @@ export class Bridge {
 
     try {
       let result: unknown;
-      if (message.method === "__elf_capabilities") result = {fileVerification: 1, accountRenewal: 1, documentApproval: 1};
+      if (message.method === "__elf_capabilities") result = {fileVerification: 1, accountRenewal: 1, documentApproval: 1, projectPanel: 1};
       else if (message.method === '__elf_document_pending') result = this.documentApproval ? {file: {key: this.documentApproval.file.key, name: this.documentApproval.file.name}, ticket: this.documentApproval.ticket, expiresAt: this.documentApproval.expiresAt} : null;
       else if (message.method === '__elf_document_approve') {
         const pending = this.documentApproval;
@@ -541,6 +543,7 @@ export class Bridge {
         if ((this.file && this.file.key === message.params?.fileKey && this.file.authorization === 'plugin') || (this.documentApproval && this.documentApproval.file.key === message.params?.fileKey)) { this.documentApproval = null; this.file = null; this.releaseLock(); this.emitStatus(); this.socket?.close(4003, 'Switch the plugin to strict URL verification and reconnect.'); }
         result = {ok:true};
       }
+      else if (['__elf_project_poll','__elf_project_reply','__elf_project_unregister'].includes(message.method)) result=this.projectPanel.control(message.method,message.params??{},this.projectScope());
       else if (message.method === "__elf_pairing_refresh") result = this.refreshPairingCode();
       else if (message.method === "__elf_pairing_current") result = this.pairingCode;
       else if (message.method === "__elf_revoke") {
@@ -579,6 +582,8 @@ export class Bridge {
     this.emitStatus();
   }
 
+  private projectPanel=new ProjectPanelRelay((socket,message)=>{if(socket.readyState===WebSocket.OPEN)socket.send(this.encodePlugin(socket,message));});
+  private projectScope(){return{socket:this.socket,identity:`${this.connectedAt}:${this.identityGeneration}:${this.file?.key??""}`,fileKey:this.file?.key};}
   private receive(raw: string): void {
     let message: BridgeMessage;
     try {
@@ -588,6 +593,7 @@ export class Bridge {
       return;
     }
 
+    if ((message as any).type === 'project-operation') {this.projectPanel.plugin(message,this.projectScope());return;}
     if (message.type === "status" && message.file?.verification) {
       const socket = this.socket; const file = message.file; const generation = ++this.identityGeneration;
       if (typeof file.key !== 'string' || !/^[A-Za-z0-9_-]{8,128}$/.test(file.key) || typeof file.name !== 'string' || !/^[a-f0-9]{64}$/.test(file.verification?.nonce || '')) { socket?.close(4003, 'Invalid document context. Reopen the plugin.'); return; }

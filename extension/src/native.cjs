@@ -1,3 +1,4 @@
+const {generateComponentCode}=require('./ai-component-import.cjs');
 const { publicLink } = require('./api-policy.cjs');
 const { generateDescription } = require('./ai-description.cjs');
 const { join, basename } = require('node:path');
@@ -38,6 +39,7 @@ class NativeElf {
     this.snapshot = null; this.resources = null; this.resourceError = null; this.status = null;
     this.error = null; this.refreshing = null; this.plan = null; this.planAuto = false; this.planReplace = false;
     this.activityRoot = null; this.seenActivity = new Set(); this.lastCheckMessage = null; this.lastErrorMessage = null;
+    this.componentDrafts=new Map();
     this.drafts = new Map(); this.documents = new Map();
     if (vscode.languages?.registerCompletionItemProvider) context.subscriptions.push(vscode.languages.registerCompletionItemProvider({ scheme: 'file', pattern: '**/description-drafts/*.draft.json' }, {
       provideCompletionItems: (document, position) => {
@@ -70,6 +72,8 @@ class NativeElf {
       }
     }));
     register('elf.manage', () => this.manage());
+    register('elf.importComponent',()=>this.importComponent());
+    register('elf.saveComponentImport',uri=>this.saveComponentImport(uri));
     register('elf.importTokens', () => this.importTokens());
     register('elf.applyTokenImport', () => this.applyTokenImport());
     register('elf.cancelTokenImport', () => {this.tokenImport=null;this.events.fire();});
@@ -285,6 +289,7 @@ class NativeElf {
       { label: 'Slack', description: config?.slack?.connected ? `${config.slack.channel || 'Connected'} · disconnect` : 'Connect', command: 'elf.slack' },
       ...(config?.slack?.connected ? [{ label: 'Send Slack test message', command: 'elf.slackTest' }] : []),
       { label: 'Notification preferences', command: 'elf.preferences' },
+      {label:'Import Figma component',description:'Confirm framework/library, then review a new code draft',command:'elf.importComponent'},
       { label: 'Import Figma tokens', description:'Preview a new JSON file; existing files stay unchanged', command:'elf.importTokens' },
       { label: 'Coding assistants', description: 'Cursor, Claude Code, Codex', command: 'elf.assistants' },
       { label: 'Automatic sync', description: project?.mode === 'automatic' ? 'On · pause' : 'Off · review before enabling', command: 'elf.toggleAutomatic' },
@@ -304,6 +309,7 @@ class NativeElf {
     const automatic = project?.mode === 'automatic';
     const children = [row('Review code changes', 'elf.reviewSync', 'Preview before syncing', 'git-compare')];
     for (const [uri, draft] of this.drafts) if (draft.owner === this.getRuntime()) children.push(row(`Save and review ${draft.prepared.name} sync`, 'elf.saveAndReviewDescription', 'Description draft ready', 'check', uri));
+    for(const [uri,draft]of this.componentDrafts)if(draft.owner===this.getRuntime())children.push(row(`Create reviewed ${draft.context.options.path}`,'elf.saveComponentImport','Imported component code draft','file-add',uri));
     if (this.tokenImport && this.tokenImportOwner===this.getRuntime()) children.push(group('Figma → code token import',[
       row(this.tokenImport.path,null,`${this.tokenImport.names.length} new tokens`,'file-code'),
       ...this.tokenImport.issues.map(issue => row(issue,null,null,'info')),
@@ -481,6 +487,45 @@ class NativeElf {
     const enabled = selected.has('notify');
     await this.api('/api/config', 'PATCH', { notify: enabled ? { enabled: true, onlyOnChange: selected.has('onlyOnChange') } : { enabled: false } });
     await this.refresh();
+  }
+  async importComponent() {
+    const owner=await this.ensureRuntime();if(!owner)return;
+    const catalog=await this.api('/api/project/component-imports','POST',{},owner);
+    const component=await this.vscode.window.showQuickPick(catalog.components.map(item=>({label:item.name,description:item.id,nodeId:item.id})),{title:'Import a Figma component'});if(!component)return;
+    const framework=await this.vscode.window.showQuickPick([{label:'React (TSX)',value:'react',description:`First supported adapter · detected: ${catalog.frameworks.join(', ')||'none'}`}],{title:'Confirm component framework'});if(!framework)return;
+    const library=await this.vscode.window.showQuickPick([{label:'Native HTML elements',value:'native'},...catalog.libraries.map(name=>({label:name,value:name,description:'Declared in this project'}))],{title:'Choose a component library'});if(!library)return;
+    const reuse=await this.vscode.window.showQuickPick(catalog.reusable.map(item=>({label:item.name,description:item.file,key:item.codeKey})),{title:'Choose existing components to reuse (optional)',canPickMany:true});if(reuse===undefined)return;
+    const safe=String(component.label).replace(/[^A-Za-z0-9]/g,'');
+    const path=await this.vscode.window.showInputBox({title:'New component destination',prompt:'Existing files are never overwritten. Choose an existing project folder and PascalCase .tsx filename.',value:`Imported${safe||'Component'}.tsx`});if(!path)return;
+    const context=await this.api('/api/project/prepare-component-import','POST',{nodeId:component.nodeId,framework:framework.value,library:library.value,path,reuse:reuse.map(item=>item.key)},owner);
+    await this.text(JSON.stringify(context,null,2),'json',`${context.exportName} design context`);
+    const mode=await this.vscode.window.showQuickPick([{label:'Generate code with AI',value:'ai'},{label:'Open manual code draft',value:'manual'}],{title:'Prepare an editable import draft'});if(!mode)return;
+    const generated=mode.value==='ai'?await generateComponentCode(this.vscode,context):{code:`import React from 'react';\n\n// Review the Figma context, semantics, responsive layout, and interactions.\nexport function ${context.exportName}() {\n  return <div />;\n}\n`,assumptions:[],unsupported:context.limitations};
+    if(!generated)return;
+    await this.api('/api/project/validate-component-import','POST',{id:context.id,code:generated.code},owner);
+    if(owner!==this.getRuntime())throw new Error('The project changed. Prepare a fresh import.');
+    const directory=this.vscode.Uri.joinPath(this.context.storageUri||this.context.globalStorageUri,'component-import-drafts');
+    await this.vscode.workspace.fs.createDirectory(directory);
+    const uri=this.vscode.Uri.joinPath(directory,`${context.exportName}-${randomUUID()}.component.tsx`);
+    const before=this.vscode.Uri.joinPath(directory,`${context.exportName}-${randomUUID()}.before.tsx`);
+    await this.vscode.workspace.fs.writeFile(uri,Buffer.from(generated.code));await this.vscode.workspace.fs.writeFile(before,Buffer.from(''));
+    this.componentDrafts.set(uri.toString(),{owner,context,uri,before});
+    await this.text(JSON.stringify({assumptions:generated.assumptions,unsupported:generated.unsupported,limitations:context.limitations},null,2),'json',`${context.exportName} import review notes`);
+    await this.vscode.commands.executeCommand('vscode.diff',before,uri,`Review imported ${context.exportName}`,{preview:false});this.events.fire();
+    void this.vscode.window.showInformationMessage('Review and edit the component code, then choose Create Reviewed Component in the editor or Changes. No project files have been created.');
+  }
+  async saveComponentImport(uri) {
+    const active=this.vscode.window.activeTextEditor?.document;
+    const key=typeof uri==='string'?uri:active?.uri.toString();
+    const draft=this.componentDrafts.get(key);
+    if(!draft||draft.owner!==this.getRuntime())throw new Error('Select an Elf component import draft first.');
+    const document=active?.uri.toString()===key?active:await this.vscode.workspace.openTextDocument(draft.uri);
+    const code=document.getText();await this.api('/api/project/validate-component-import','POST',{id:draft.context.id,code},draft.owner);
+    if(await this.vscode.window.showWarningMessage(`Create ${draft.context.options.path} with this reviewed code? Automatic sync pauses. No Figma resources or dependencies will be changed. Review behavior and accessibility before use.`,{modal:true},'Create component file')!=='Create component file')return;
+    if(document.getText()!==code||draft.owner!==this.getRuntime())throw new Error('The draft or project changed. Review it again.');
+    await this.api('/api/project/apply-component-import','POST',{id:draft.context.id,code},draft.owner);
+    this.componentDrafts.delete(key);this.plan=null;await this.refresh({resources:true});
+    void this.vscode.window.showInformationMessage(`Created ${draft.context.options.path}. Review it in your application before syncing.`);
   }
   async importTokens() {
     const owner=await this.ensureRuntime(); if (!owner) return;

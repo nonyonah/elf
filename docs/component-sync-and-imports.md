@@ -70,3 +70,64 @@ MCP provides `plan_token_import` (optional filename and variable IDs) and
 `apply_token_import` (reviewed plan ID). Present the exact preview and obtain the
 user's approval before applying. The native, npm, and MCP adapters share the same
 validation and write safeguards.
+
+## Component import preview (0.3.6)
+
+Choose **Manage → Import Figma component** or **Elf: Import Figma Component**.
+Select the live Figma component, confirm React TSX, choose native HTML elements or
+one of the supported libraries declared in this project's root package manifest,
+and explicitly select local React components to reuse. Choose a new PascalCase
+`.tsx` file in an existing source folder. No dependency installation is performed.
+In a monorepo, use the intended application package as the Elf project root.
+
+Inspect the design context, then choose AI generation or a manual draft. AI uses
+an editor-provided model and requires consent before sending the displayed Figma
+node, token values, choices, and selected reuse names/paths. Local component source
+is not sent. Review assumptions and unsupported details, edit the right-hand code,
+and use **Create Reviewed Component** in the editor or its row in Changes.
+
+The shared engine checks syntax, the export name, allowed imports, restricted
+APIs, project paths, and source/Figma/connection freshness. It creates a new file
+exclusively and pauses automatic sync. It never executes generated code, loads
+project compiler plugins, installs packages, overwrites components, or writes
+Figma. Static checks are defense in depth, not a sandbox or a complete audit.
+Review semantics, library APIs, responsive layout, keyboard/focus behavior,
+accessibility, and assets in your application before using the result.
+
+The read is limited to six node levels, fifty children per node, and up to two
+hundred variables. These limits and truncation are disclosed in the context.
+React TSX is the first output adapter; Vue and Svelte generation remain pending.
+A new code file does not automatically adopt a managed Figma sync baseline or
+create a Figma description. Those need their own review before exporting code
+back into an existing design resource.
+
+npm Settings provides the same choices and a manual code editor/context for a
+coding assistant. MCP provides `list_component_imports`,
+`prepare_component_import`, `validate_component_import`, and
+`apply_component_import`. Pass the exact reviewed code to apply, and obtain
+human approval first. Drafts expire after thirty minutes; after an editor reload,
+prepare a fresh import context rather than reusing an expired approval.
+
+## Export creates and updates from the Figma plugin (0.3.6)
+
+After upgrading, close Elf MCP clients and use **Elf: Restart Shared Bridge** in
+the editor. The command preserves pairings and refuses to stop other active
+clients. Close and reopen the updated plugin, then renew document approval if
+needed. Older hosts leave the export button disabled with a restart instruction.
+
+Keep Elf running in the editor or through `elf start`. In the connected plugin:
+
+1. Choose **Export code changes to Figma** and select the registered local project.
+2. Refresh the changes. Missing resources show **Create**; edited ones show **Update**.
+3. Select a resource to review it and its required dependencies.
+4. Read the planned writes and issues, explicitly confirm replacement if there
+   are Figma conflicts, then choose **Apply reviewed changes**.
+
+Components without valid reviewed descriptions must be prepared in Elf first.
+The plugin cannot read arbitrary local paths, install dependencies, or turn on
+automatic sync. Requests are restricted to registered projects matching the
+approved Figma file. The authenticated bridge forwards only list, review, and
+apply operations to the same local project engine used by npm and the extension.
+Stale plans, dependency checks, write verification, and notifications stay in
+that engine. A pairing alone, without a running local Elf project, does not
+provide access to project code. No REST variable reads are needed in plugin mode.

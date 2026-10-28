@@ -72,8 +72,14 @@ the bridge, preserves modes and alias source data, skips existing code names,
 and rejects stale plans and overwrites. It is shared by npm Settings, MCP and
 the native extension. Imported files support checks and component token references.
 CSS/Tailwind conversion, reverse-write adoption, and direction choices at
-connection remain. Component imports must ask for
-framework/library choices and identify unsupported behavior/accessibility.
+connection remain. A React TSX component-import preview now confirms framework, supported declared
+library, reuse, and destination choices, then opens an editable AI/manual code
+draft. Shared validation rejects unsafe APIs/imports, stale contexts, and
+overwrite attempts. Native, npm, and MCP adapters exist. Vue/Svelte adapters,
+managed-baseline adoption, broader library/workspace detection, and live
+component-code acceptance remain. The plugin can now request individual reviewed
+code-to-Figma creates and updates through a registered local project. Live
+plugin-panel acceptance is still pending.
 Neither component import generation nor model output may overwrite project files or write
 to Figma without explicit reviewed approval. Do not advertise imports as shipping.
 

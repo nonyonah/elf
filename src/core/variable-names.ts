@@ -1,11 +1,11 @@
-import {createHash} from 'node:crypto';
+import {sha256Hex} from './hash.js';
 import {slugify} from './normalize.js';
 
 /** Collection-aware names shared by imports and live bridge comparisons. */
 export function variableCodeNames(variables:{id:string;name:string;collectionId:string}[],collections:{id:string;name:string}[]):Map<string,string> {
   const groups=new Map<string,typeof variables>();
   const collectionById=new Map(collections.map(item=>[item.id,item]));
-  const suffix=(id:string)=>createHash('sha256').update(id).digest('hex').slice(0,12);
+  const suffix=(id:string)=>sha256Hex(id).slice(0,12);
   for (const variable of variables) {
     if (typeof variable.id!=='string' || typeof variable.name!=='string') throw new Error('Figma returned an invalid variable.');
     const key=slugify(variable.name);const group=groups.get(key)??[];group.push(variable);groups.set(key,group);

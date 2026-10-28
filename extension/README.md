@@ -87,3 +87,11 @@ reviews. Planned resources can also be reviewed individually. Required dependenc
 are listed before applying. **Manage → Import Figma tokens** previews a new JSON
 file with modes and alias source data; it never overwrites existing code.
 See the [workflow and limitations](https://github.com/nonyonah/elf/blob/main/docs/component-sync-and-imports.md).
+
+### Component code import preview
+
+**Manage → Import Figma component** confirms React TSX, a supported declared library
+or native elements, selected local reuse, and a new destination. AI/manual drafts
+open in a diff; **Create Reviewed Component** applies only reviewed code. It does
+not install dependencies or adopt a managed Figma baseline. React is the first
+output adapter. See the [component import and plugin export guide](https://github.com/nonyonah/elf/blob/main/docs/component-sync-and-imports.md).

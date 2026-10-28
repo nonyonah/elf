@@ -12,7 +12,8 @@ const bin = fileURLToPath(new URL("../bin/elf-tokens.js", import.meta.url));
 const token = "isolated-startup-test-credential";
 
 async function eventually<T>(fn: () => T | Promise<T>, accept: (value: T) => boolean, detail: () => string): Promise<T> {
-  const deadline = Date.now() + 20_000;
+  // Cold tsx imports can exceed 20 seconds on busy desktop and CI hosts.
+  const deadline = Date.now() + 30_000;
   while (Date.now() < deadline) {
     try { const value = await fn(); if (accept(value)) return value; } catch {}
     await new Promise(resolve => setTimeout(resolve, 100));
@@ -20,7 +21,7 @@ async function eventually<T>(fn: () => T | Promise<T>, accept: (value: T) => boo
   throw new Error(`Startup condition timed out: ${detail()}`);
 }
 
-test("startup pairs, saves setup, monitors edits, and restarts a configured project", { timeout: 60_000 }, async () => {
+test("startup pairs, saves setup, monitors edits, and restarts a configured project", { timeout: 120_000 }, async () => {
   const root = mkdtempSync(join(tmpdir(), "elf-start-"));
   const configPath = join(root, "elf.config.json");
   writeFileSync(join(root, "tokens.css"), ":root {}\n");

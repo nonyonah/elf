@@ -2,7 +2,7 @@
   "name": "elf-design-system",
   "displayName": "Elf",
   "description": "Connect your project and Figma, monitor design drift, and review sync changes.",
-  "version": "0.3.5",
+  "version": "0.3.6",
   "publisher": "elf-local",
   "license": "MIT",
   "repository": {
@@ -235,6 +235,16 @@
       {
         "command": "elf.cancelTokenImport",
         "title": "Elf: Cancel Token Import"
+      },
+      {
+        "command": "elf.importComponent",
+        "title": "Elf: Import Figma Component",
+        "icon": "$(cloud-download)"
+      },
+      {
+        "command": "elf.saveComponentImport",
+        "title": "Elf: Create Reviewed Component",
+        "icon": "$(file-add)"
       }
     ],
     "menus": {
@@ -322,6 +332,11 @@
           "command": "elf.saveDescription",
           "when": "resourceFilename =~ /\\.draft\\.json$/ && elf.running",
           "group": "navigation@2"
+        },
+        {
+          "command": "elf.saveComponentImport",
+          "when": "resourceFilename =~ /\\.component\\.tsx$/ && elf.running",
+          "group": "navigation@1"
         }
       ]
     }

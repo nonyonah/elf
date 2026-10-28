@@ -41,6 +41,10 @@ function harness(options = {}) {
       else if (path === '/api/project/components') data = {components:options.components || [{name:'Button',file:'Button.tsx',codeKey:'button.tsx#Button'}]};
       else if (path === '/api/project/plan-token-import') data = {id:'import-1',path:'figma.tokens.json',content:'{"tokens":{}}',names:['color-new'],issues:[],limitations:['New JSON file only.']};
       else if (path === '/api/project/apply-token-import') data = {imported:1,path:'figma.tokens.json'};
+      else if (path === '/api/project/component-imports') data={components:[{id:'remote',name:'Alert'}],frameworks:['react'],libraries:[],reusable:[]};
+      else if (path === '/api/project/prepare-component-import') data={id:'component-import',exportName:'ImportedAlert',options:JSON.parse(body),limitations:['Review accessibility.']};
+      else if (path === '/api/project/validate-component-import') data={valid:true};
+      else if (path === '/api/project/apply-component-import') data={created:true,path:'ImportedAlert.tsx'};
       else if (path === '/api/project/validate-description') data = {valid:true};
       else if (path === '/api/project/pending-document') data = {file:{key:'file',name:'Open design'},ticket:'d'.repeat(64),expiresAt:Date.now()+300000};
       else if (path === '/api/project/approve-document' || path === '/api/project/strict-authorization') data = {ok:true};
@@ -443,4 +447,16 @@ test('token import previews read-only content and requires explicit confirmation
  assert.equal(h.requests.some(item=>item.path==='/api/project/apply-token-import'),false);
  h.warningResponses.push('Create token file');await h.commands.get('elf.applyTokenImport')();
  assert.deepEqual(JSON.parse(h.requests.find(item=>item.path==='/api/project/apply-token-import').body),{planId:'import-1'});
+});
+
+test('component import confirms framework/library/reuse choices and creates only an explicitly approved draft',async t=>{
+ const h=harness();t.after(()=>h.native.dispose());await h.native.refresh();
+ h.quickPicks.push({label:'Alert',nodeId:'remote'},{value:'react'},{value:'native'},[],{value:'manual'});h.inputResponses.push('ImportedAlert.tsx');
+ await h.commands.get('elf.importComponent')();assert.equal(h.errors.length,0);
+ const prepared=h.requests.find(item=>item.path==='/api/project/prepare-component-import');assert.deepEqual(JSON.parse(prepared.body),{nodeId:'remote',framework:'react',library:'native',path:'ImportedAlert.tsx',reuse:[]});
+ assert.equal(h.requests.some(item=>item.path==='/api/project/apply-component-import'),false);
+ const uri=h.executed.find(item=>item.name==='vscode.diff').args[1];
+ await h.commands.get('elf.saveComponentImport')(uri.toString());assert.equal(h.requests.some(item=>item.path==='/api/project/apply-component-import'),false);
+ h.warningResponses.push('Create component file');await h.commands.get('elf.saveComponentImport')(uri.toString());
+ assert.equal(h.errors.length,0);assert.match(JSON.parse(h.requests.find(item=>item.path==='/api/project/apply-component-import').body).code,/export function ImportedAlert/);
 });

@@ -16,9 +16,10 @@ function ui() {
   const document = { body: { dataset: {phase: "loading"} }, getElementById(key: string) {
     if (!elements.has(key)) elements.set(key, { value: "", hidden: false, textContent: "", listeners: {} as any,
       addEventListener(event: string, listener: unknown) { this.listeners[event] = listener; },
-      classList: {toggle() {}, add() {}, remove() {}} });
+      children: [] as any[], replaceChildren(){this.children=[];},appendChild(child:any){this.children.push(child);}, classList: {toggle() {}, add() {}, remove() {}} });
     return elements.get(key);
   }};
+  (document as any).createElement=(_tag:string)=>({value:'',textContent:'',className:'',children:[] as any[],listeners:{} as any,addEventListener(event:string,listener:unknown){this.listeners[event]=listener;},appendChild(child:any){this.children.push(child);}});
   const window: any = {};
   const parent = {postMessage(message: any) { messages.push(message.pluginMessage); }};
   const context = {window, parent, document, crypto: webcrypto, TextEncoder, URL, URLSearchParams, WebSocket: Socket,
@@ -216,4 +217,24 @@ test("Back from Change file link returns to pairing without saving edited link o
  assert.equal(app.messages.some(message=>message.type==='set-file-link'),false);
  app.elements.get('change-file-link').listeners.click();
  assert.equal(app.elements.get('file-authorization').value,'strict');
+});
+
+
+test('plugin export presents an individual review before it can request an apply',async()=>{
+ const app=ui();const channel=app.messages[0].channel;
+ app.window.onmessage({data:{pluginMessage:{type:'context',channel,file:{name:'File',key:'file123456'},bridge:{host:'localhost:8765',session:''}}}});
+ app.document.getElementById('code').value='abcd-efgh-jkmn';app.elements.get('pair').listeners.click();const socket=app.sockets[0];
+ socket.onmessage({data:JSON.stringify({type:'ready',projectPanel:1})});
+ app.elements.get('export-code').listeners.click();
+ const latest=()=>JSON.parse(socket.sent.at(-1));
+ const answer=async(result:unknown)=>{socket.onmessage({data:JSON.stringify({type:'project-result',id:latest().id,ok:true,result})});await new Promise(resolve=>setImmediate(resolve));};
+ assert.equal(latest().action,'projects');
+ app.document.getElementById('export-project').value='project-owner';await answer({projects:[{id:'project-owner',label:'Project'}]});
+ assert.equal(latest().action,'list');
+ const entries=[{kind:'token',key:'color-brand',name:'color-brand',action:'create'}];await answer({entries,issues:[]});
+ assert.equal(app.elements.get('export-apply').hidden,true);
+ app.elements.get('export-items').children[0].listeners.click();assert.equal(latest().action,'plan');assert.equal(latest().params.selection.key,'color-brand');
+ await answer({id:'review-id',entries,issues:[]});assert.equal(app.elements.get('export-apply').hidden,false);
+ assert.equal(socket.sent.some((raw:string)=>JSON.parse(raw).action==='apply'),false);
+ app.elements.get('export-apply').listeners.click();assert.equal(latest().action,'apply');assert.equal(latest().params.planId,'review-id');
 });

@@ -1,3 +1,4 @@
+import {startPluginProject} from './plugin-project.js';
 import { discoverProject } from "./discovery.js";
 import { deliverSyncNotifications } from "./sync-notifications.js";
 import { existsSync, readFileSync, realpathSync } from "node:fs";
@@ -48,6 +49,7 @@ export async function main(argv: string[]): Promise<number> {
   else console.log("Using the existing Elf bridge. Open the paired plugin in your Figma file.");
 
   const project = new ProjectService(configPath, runtime);
+  const stopPluginProject=await startPluginProject(project,runtime);
   const alerts = new SyncAlerts(configPath);
   let watcher: ReturnType<typeof watch> | null = null;
   let running = false;
@@ -168,6 +170,13 @@ export async function main(argv: string[]): Promise<number> {
         if (body.selection !== undefined && (!body.selection || typeof body.selection !== 'object' || !['token','component','style'].includes((body.selection as any).kind) || typeof (body.selection as any).key !== 'string')) throw new Error('Invalid resource selection.');
         return project.plan(body.selection as any);
       }
+      if (action === 'component-imports') return project.listComponentImports();
+      if (action === 'prepare-component-import') return project.prepareComponentImport(body as any);
+      if (action === 'validate-component-import') {if(typeof body.id!=='string')throw new Error('Prepare a component import.');return project.validateComponentImport(body.id,body.code);}
+      if (action === 'apply-component-import') {
+        if (typeof body.id!=='string') throw new Error('Review a component draft first.');
+        return project.applyComponentImport(body.id,body.code);
+      }
       if (action === 'plan-token-import') {
         if (body.path !== undefined && typeof body.path !== 'string' || body.ids !== undefined && (!Array.isArray(body.ids) || body.ids.some(id => typeof id !== 'string'))) throw new Error('Invalid import selection.');
         return project.planTokenImport(body.path as string | undefined,body.ids as string[] | undefined);
@@ -261,6 +270,7 @@ export async function main(argv: string[]): Promise<number> {
   const close = async (): Promise<void> => {
     if (closed) return;
     closed = true; stopping = true;
+    await stopPluginProject();
     if (timer) clearTimeout(timer);
     if (polling) clearInterval(polling);
     await watcher?.close();

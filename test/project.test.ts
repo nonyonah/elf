@@ -436,3 +436,44 @@ test('individual sync cannot override an invalid required component dependency',
   assert.equal(p.calls.some(method=>/upsert|create/.test(method)),false);
  } finally {p.cleanup();}
 });
+
+
+test('component import prepares context, validates reviewed code and exclusively creates one local file',async()=>{
+ const p=project(true);try{
+  p.refs.push({id:'remote-component',name:'Figma Alert'});p.nodes['remote-component']={id:'remote-component',name:'Figma Alert',type:'COMPONENT',width:180,height:40,children:[]};
+  const options={nodeId:'remote-component',framework:'react' as const,library:'native',path:'ImportedAlert.tsx',reuse:[]};
+  const catalog=await p.service.listComponentImports();assert.equal((catalog.components as any[])[0].name,'Figma Alert');
+  const context=await p.service.prepareComponentImport(options);
+  const code='export function ImportedAlert(){return <section aria-label="Notice">Hello</section>}';
+  assert.equal((await p.service.validateComponentImport(context.id as string,code)).valid,true);
+  assert.throws(()=>readFileSync(join(p.root,options.path)));
+  await p.service.applyComponentImport(context.id as string,code);
+  assert.match(readFileSync(join(p.root,options.path),'utf8'),/ImportedAlert/);
+  assert.equal(p.calls.some(method=>/upsert|create/.test(method)),false);
+  await assert.rejects(p.service.applyComponentImport(context.id as string,code),/expired/);
+  await assert.rejects(p.service.prepareComponentImport(options),/exists/);
+  await assert.rejects(p.service.prepareComponentImport({...options,path:'Other.tsx',library:'not-installed'}),/library/);
+  await assert.rejects(p.service.prepareComponentImport({...options,path:'../Outside.tsx'}),/source folder|inside/);
+ }finally{p.cleanup();}
+});
+test('component import refuses changed source or Figma and unsafe code without creating output',async()=>{
+ const p=project(true);try{
+  p.refs.push({id:'remote',name:'Remote'});p.nodes.remote={id:'remote',type:'COMPONENT',width:80,height:1,children:[]};
+  const options={nodeId:'remote',framework:'react' as const,library:'native',path:'ImportedDivider.tsx',reuse:[]};
+  const context=await p.service.prepareComponentImport(options);
+  await assert.rejects(p.service.validateComponentImport(context.id as string,"import fs from 'node:fs';export function ImportedDivider(){return <div/>}"),/confirmed/);
+  p.nodes.remote.width=100;
+  await assert.rejects(p.service.applyComponentImport(context.id as string,'export function ImportedDivider(){return <hr/>}'),/changed/);
+  assert.throws(()=>readFileSync(join(p.root,options.path)));
+ }finally{p.cleanup();}
+});
+test('reviewed replacement restores an edited Figma token even when the code value has not changed',async()=>{
+ const p=project();try{
+  await p.service.apply((await p.service.plan()).id);
+  p.variables[0].valuesByMode.Value.value='#abcdef';
+  const plan=await p.service.plan({kind:'token',key:'color-primary'});
+  await assert.rejects(p.service.apply(plan.id),/Figma has edits/);
+  await p.service.apply(plan.id,{overwriteConflicts:true});
+  assert.equal(p.variables[0].valuesByMode.Value.value,'#112233');
+ }finally{p.cleanup();}
+});

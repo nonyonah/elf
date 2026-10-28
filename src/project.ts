@@ -1,3 +1,4 @@
+import {validateImportedComponent,type ComponentImportOptions} from './component-import.js';
 import {importedTokenDocument, type ImportSnapshot} from './token-import.js';
 import {discoverProject, readSource} from './discovery.js';
 import { deliverSyncNotifications } from "./sync-notifications.js";
@@ -33,6 +34,7 @@ export class ProjectService {
   get activity(): Activity[] { return readActivity(this.configPath); }
   private reviewed = new Map<string, InternalPlan>();
   private importReviews = new Map<string,{id:string;path:string;content:string;names:string[];issues:string[];fingerprint:string;expiresAt:string;ids?:string[]}>();
+  private componentImports=new Map<string,{options:ComponentImportOptions;fingerprint:string;expires:number;reusePaths:string[]}>();
   private tail: Promise<unknown> = Promise.resolve();
   constructor(readonly configPath: string, private readonly runtime: BridgeRuntime) { this.migrate(); }
 
@@ -205,6 +207,73 @@ export class ProjectService {
       this.reviewed.clear();
       this.record('description',`${plan.names.length} Figma tokens imported into ${plan.path}.`);
       return {imported:plan.names.length,path:plan.path};
+    }));
+  }
+  private importEnvironment():{frameworks:string[];libraries:string[];dependencies:string[];components:{name:string;codeKey:string;file:string}[];fingerprint:string} {
+    const root=realpathSync(dirname(this.configPath));
+    const path=join(root,'package.json');
+    const manifest=existsSync(path)?JSON.parse(readSource(path)):{};
+    const dependencies=Object.keys({...manifest.dependencies,...manifest.devDependencies}).sort();
+    const {config,hasComponents}=this.batchConfig();
+    const components=hasComponents?parseComponents(config.componentsDir,config.componentFiles).filter(item=>item.deprecated===undefined).map(item=>({name:item.name,codeKey:item.codeKey,file:relative(root,resolve(config.componentsDir,item.file))})):[];
+    return {frameworks:[...(dependencies.includes('react')||components.some(item=>/\.[jt]sx$/.test(item.file))?['react']:[]),...(dependencies.includes('vue')||components.some(item=>item.file.endsWith('.vue'))?['vue']:[]),...(dependencies.includes('svelte')||components.some(item=>item.file.endsWith('.svelte'))?['svelte']:[])],libraries:dependencies.filter(name=>/^(?:@mui\/material|@chakra-ui\/react|@radix-ui\/react-[a-z-]+|@heroui\/react|antd|@mantine\/core)$/.test(name)),dependencies,components,fingerprint:hashSpec({manifest,components:components.map(item=>({...item,source:readSource(resolve(root,item.file))})),sources:this.importSources().hash})};
+  }
+  async listComponentImports():Promise<Record<string,unknown>> {
+    return this.serial(()=>this.transaction(async client=>{
+      const {components}=await client.call<{components:any[]}>('list_components',{deep:true});
+      const environment=this.importEnvironment();
+      return {components:components.map(item=>({id:item.id,name:item.name})),frameworks:environment.frameworks,libraries:environment.libraries,reusable:environment.components.filter(item=>/\.(?:jsx|tsx|js)$/.test(item.file)),supportedFrameworks:['react'],limitations:['React TSX is the first supported output. No dependencies are installed.','Figma does not capture complete behavior, accessibility, or responsive intent.']};
+    }));
+  }
+  async prepareComponentImport(options:ComponentImportOptions):Promise<Record<string,unknown>> {
+    return this.serial(()=>this.transaction(async client=>{
+      if (!options || typeof options.nodeId!=='string' || options.framework!=='react' || typeof options.library!=='string' || typeof options.path!=='string' || !Array.isArray(options.reuse) || options.reuse.length>50 || options.reuse.some(key=>typeof key!=='string')) throw new Error('Confirm a Figma component, React framework, library, output path, and reuse choices.');
+      const root=realpathSync(dirname(this.configPath));
+      if(options.path.split(/[\\/]/).some(part=>part==='..'||part.startsWith('.')&&part!=='.'||['node_modules','vendor','dist','build'].includes(part)))throw new Error('Choose a source folder, not project metadata, dependencies, or generated output.');
+      const target=this.outputPath(options.path);
+      if (isAbsolute(options.path) || !/^[A-Z][A-Za-z0-9]*\.tsx$/.test(basename(options.path))) throw new Error('Choose a new PascalCase .tsx file inside the project.');
+      if (existsSync(target)) throw new Error('This output already exists. Choose a new filename; existing components are never overwritten.');
+      const environment=this.importEnvironment();
+      if (options.library!=='native' && !environment.libraries.includes(options.library)) throw new Error('Select native elements or a supported library already declared in this project.');
+      const reusable=options.reuse.map(key=>environment.components.find(item=>item.codeKey===key));
+      if(reusable.some(item=>item && !/\.(?:jsx|tsx|js)$/.test(item.file)))throw new Error('Choose React-compatible local components for reuse.');
+      if (reusable.some(item=>!item)) throw new Error('Select existing local components for reuse.');
+      const refs=await client.call<{components:any[]}>('list_components',{deep:true});
+      if (!refs.components.some(item=>item.id===options.nodeId)) throw new Error('Select a component from the connected Figma file.');
+      const {node}=await client.call<{node:any}>('get_node',{nodeId:options.nodeId,depth:6});
+      if (!node || !['COMPONENT','COMPONENT_SET'].includes(node.type)) throw new Error('This node is not a Figma component or component set.');
+      if (Buffer.byteLength(JSON.stringify(node))>100000) throw new Error('This component is too large for a bounded draft. Split it into smaller components.');
+      const snapshot=await this.importSnapshot(client);
+      const context={variableCount:snapshot.variables.length,variablesTruncated:snapshot.variables.length>200,readLimits:{depth:6,childrenPerNode:50},node,variables:snapshot.variables.slice(0,200),collections:snapshot.collections,reuse:reusable,options:{...options},exportName:basename(options.path,'.tsx')};
+      if (Buffer.byteLength(JSON.stringify(context))>180000) throw new Error('Component and token context exceeds the review limit.');
+      for (const [id,review] of this.componentImports) if (review.expires<Date.now()) this.componentImports.delete(id);
+      if (this.componentImports.size>=20) this.componentImports.delete(this.componentImports.keys().next().value!);
+      const id=randomUUID();
+      this.componentImports.set(id,{options:{...options,reuse:[...options.reuse]},fingerprint:hashSpec({environment:environment.fingerprint,node,snapshot}),expires:Date.now()+30*60_000,reusePaths:reusable.map(item=>resolve(root,item!.file))});
+      return {id,...context,limitations:['Editable visual starting point; not a complete or pixel-perfect reconstruction.','Confirm semantics, keyboard/focus behavior, responsive layout, variants, and library APIs.','Syntax and restricted API checks do not replace a security or accessibility review.']};
+    }));
+  }
+  async validateComponentImport(id:string,code:unknown):Promise<Record<string,unknown>> {
+    const review=this.componentImports.get(id);
+    if (!review || review.expires<Date.now()) throw new Error('Prepare a fresh component import.');
+    validateImportedComponent(code,review.options,realpathSync(dirname(this.configPath)),review.reusePaths);
+    return {valid:true};
+  }
+  async applyComponentImport(id:string,code:unknown):Promise<Record<string,unknown>> {
+    return this.serial(()=>this.transaction(async client=>{
+      const review=this.componentImports.get(id);
+      if (!review || review.expires<Date.now()) throw new Error('The component import expired. Prepare a new draft.');
+      const {node}=await client.call<{node:unknown}>('get_node',{nodeId:review.options.nodeId,depth:6});
+      const snapshot=await this.importSnapshot(client);
+      if (hashSpec({environment:this.importEnvironment().fingerprint,node,snapshot})!==review.fingerprint) throw new Error('Code, configuration, connection, or Figma changed. Prepare a new component import.');
+      const target=this.outputPath(review.options.path);
+      if (existsSync(target)) throw new Error('This component file now exists. Nothing was overwritten.');
+      const source=validateImportedComponent(code,review.options,realpathSync(dirname(this.configPath)),review.reusePaths);
+      if (this.automatic()) this.setMonitoring();
+      writeFileSync(target,source.endsWith('\n')?source:source+'\n',{flag:'wx',mode:0o600});
+      this.componentImports.delete(id);this.reviewed.clear();
+      this.record('description',`Figma component imported into ${review.options.path}. Review behavior and accessibility before using it.`);
+      return {path:review.options.path,created:true};
     }));
   }
   generatedPaths(): string[] { const { config } = this.batchConfig(); return [config.manifestFile, realpathSync(this.configPath), join(config.root, "drift-report.md"), join(config.root, "drift-status.json")]; }
@@ -430,7 +499,7 @@ export class ProjectService {
     }
     this.record("sync", `Applying ${plan.view.entries.length} reviewed resource changes.`);
     try {
-    const result = await syncTokens(plan.tokens, plan.manifest, client, false, false, () => {}, { variables: variableKeys, styles: styleKeys });
+    const result = await syncTokens(plan.tokens, plan.manifest, client, true, false, () => {}, { variables: variableKeys, styles: styleKeys });
     saveManifest(plan.config.manifestFile, plan.manifest);
     if (result.aborted) { this.record("error", result.aborted); throw new Error(result.aborted); }
     const outcomes = new Map();

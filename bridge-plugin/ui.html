@@ -130,6 +130,7 @@
     body[data-phase="loading"] [data-panel="loading"],
     body[data-phase="disconnected"] [data-panel="disconnected"],
     body[data-phase="pairing"] [data-panel="pairing"],
+    body[data-phase="export"] [data-panel="export"],
     body[data-phase="connected"] [data-panel="connected"] { display: block; }
 
     .card {
@@ -327,6 +328,7 @@
     .advanced .field-label { margin-top: 10px; }
     .advanced .primary { height: 30px; margin-top: 8px; font-size: 11px; }
 
+    .resource-action { height:auto; min-height:34px; padding:8px; margin-top:8px; text-align:left; justify-content:flex-start; overflow-wrap:anywhere; }
     footer {
       flex-shrink: 0;
       padding-top: 12px;
@@ -472,14 +474,23 @@
             </div>
           </dl>
 
+          <button class="primary" id="export-code" disabled>Export code changes to Figma</button>
           <button class="secondary" id="hide-window">Hide window</button>
           <p class="file-meta" style="margin-top: 8px">The connection continues while the plugin runs. Show it again from Elf Settings. Closing the plugin or file stops it.</p>
           <button class="secondary disconnect" id="disconnect">Disconnect this file</button>
         </div>
       </section>
+      <section data-panel="export" aria-labelledby="export-heading"><div class="card">
+        <h2 id="export-heading">Code → Figma</h2><p class="sub">Review tokens and components from the connected project. Missing resources are created; changed resources are updated after approval.</p>
+        <label class="field-label" for="export-project">Local project</label><select id="export-project"></select>
+        <div class="file-link-actions"><button class="secondary" id="export-back">Back</button><button class="primary" id="export-refresh">Refresh changes</button></div>
+        <p class="sub" id="export-status" role="status" aria-live="polite"></p><div id="export-items"></div>
+        <label id="export-conflicts-label" hidden class="sub"><input type="checkbox" id="export-conflicts" /> Replace the Figma edits listed in this review</label>
+        <button class="primary" id="export-apply" hidden>Apply reviewed changes</button>
+      </div></section>
     </main>
 
-    <footer>Scoped to this file · nothing is written into the document</footer>
+    <footer>Scoped to this file · review changes before applying</footer>
   </div>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
@@ -761,6 +772,9 @@ function pairingHmac(key, text) {
         if (message.type === "ready") {
           if (state.file && state.file.verification && state.file.verification.method === 'plugin' && message.documentApproval !== 1) {socket.close(4003, 'Restart the updated Elf bridge to enable document approval.'); return;}
           if (state.file && state.file.verification && message.fileVerification !== 1) {socket.close(4003, "Restart the Elf bridge to enable secure file verification."); return;}
+          state.projectPanel = message.projectPanel === 1;
+          $("export-code").disabled = !state.projectPanel;
+          $("export-code").textContent = state.projectPanel ? "Export code changes to Figma" : "Restart updated Elf bridge to enable exports";
           state.ready = true;
           state.identityVerified = !state.file || !state.file.verification;
           clearReadyTimer();
@@ -785,6 +799,11 @@ function pairingHmac(key, text) {
           return;
         }
 
+        if (message.type === 'project-result') {
+          const pending = projectRequests.get(message.id);
+          if (pending) {clearTimeout(pending.timer);projectRequests.delete(message.id);if(message.ok)pending.resolve(message.result);else pending.reject(new Error(message.error||'Project operation failed.'));}
+          return;
+        }
         if (message.type === "file-verified") {
           state.identityVerified = true;
           setPhase("connected"); setStatus("online", "connected"); renderConnected(); return;
@@ -809,6 +828,7 @@ function pairingHmac(key, text) {
       socket.onclose = (event) => {
         if (state.socket !== socket) return;
         const modeUsed = state.authMode;
+        cancelProjectRequests();
         state.socket = null;
         state.authMode = null;
         state.ready = false;
@@ -948,7 +968,39 @@ function pairingHmac(key, text) {
       contextTimer = setTimeout(() => contextError("Figma did not respond. Try again, or close and reopen the plugin."), 10000);
       postPluginMessage({ type: "context" });
     }
+    const projectRequests=new Map();let exportPlan=null,exportBusy=false;
+    function cancelProjectRequests(){for(const pending of projectRequests.values()){clearTimeout(pending.timer);pending.reject(new Error('The document connection changed. Review again.'));}projectRequests.clear();exportPlan=null;}
+    function projectOperation(action,params={}) {
+      if(!state.ready||!state.identityVerified||!state.projectPanel)return Promise.reject(new Error('Connect and approve this document, then restart the updated bridge if needed.'));
+      const id=Array.from(crypto.getRandomValues(new Uint8Array(16)),b=>b.toString(16).padStart(2,'0')).join('');
+      return new Promise((resolve,reject)=>{const timer=setTimeout(()=>{projectRequests.delete(id);reject(new Error('The project did not respond. Refresh and review again.'));},125000);projectRequests.set(id,{resolve,reject,timer});state.send({type:'project-operation',id,owner:$('export-project').value,action,params});});
+    }
+    async function exportWork(work) {
+      if(exportBusy)return;exportBusy=true;$('export-project').disabled=true;$('export-refresh').disabled=true;$('export-apply').disabled=true;$('export-status').textContent='Reading the local project…';
+      try{await work();}catch(error){$('export-status').textContent=error.message;}finally{exportBusy=false;$('export-project').disabled=false;$('export-refresh').disabled=false;$('export-apply').disabled=Boolean(exportPlan?.issues?.some(issue=>issue.kind==='conflict'&&issue.blocksApply!==false)&&!$('export-conflicts').checked);}
+    }
+    function renderExport(plan,reviewed) {
+      exportPlan=reviewed?plan:null;
+      $('export-items').replaceChildren();$('export-conflicts').checked=false;
+      $('export-conflicts-label').hidden=!reviewed||!plan.issues?.some(issue=>issue.kind==='conflict'&&issue.blocksApply!==false);
+      $('export-apply').hidden=!reviewed||!plan.entries?.length;
+      for(const entry of (plan.entries||[]).slice(0,200)) {
+        const item=document.createElement(reviewed?'p':'button');item.className=reviewed?'sub':'secondary resource-action';
+        item.textContent=`${entry.name} · ${entry.action==='create'?'Create':'Update'} ${entry.kind}${reviewed?'':' · Review'}`;
+        if(!reviewed)item.addEventListener('click',()=>{void exportWork(async()=>{const next=await projectOperation('plan',{selection:{kind:entry.kind,key:entry.key}});renderExport(next,true);$('export-status').textContent='Review these changes, then apply. Required dependencies are included.';});});
+        $('export-items').appendChild(item);
+      }
+      for(const issue of (plan.issues||[]).slice(0,100)) {const item=document.createElement('p');item.className='sub';item.textContent=issue.message;$('export-items').appendChild(item);}
+    }
+    async function refreshExports(){exportPlan=null;$('export-apply').hidden=true;const plan=await projectOperation('list');renderExport(plan,false);$('export-status').textContent=plan.entries?.length?'Choose one resource to review. Only reviewed changes are applied.':'No supported changes to export. Prepare missing component descriptions in Elf.';}
+    $('export-code').addEventListener('click',()=>{setPhase('export');void exportWork(async()=>{const result=await projectOperation('projects');$('export-project').replaceChildren();for(const project of result.projects){const option=document.createElement('option');option.value=project.id;option.textContent=project.label;$('export-project').appendChild(option);}if(!result.projects.length){$('export-status').textContent='Start Elf in your editor or run elf start for this file, then reopen this panel.';return;}await refreshExports();});});
+    $('export-back').addEventListener('click',()=>{setPhase(state.ready&&state.identityVerified?'connected':'disconnected');});
+    $('export-refresh').addEventListener('click',()=>{void exportWork(refreshExports);});
+    $('export-project').addEventListener('change',()=>{exportPlan=null;void exportWork(refreshExports);});
+    $('export-conflicts').addEventListener('change',()=>{$('export-apply').disabled=exportBusy||!$('export-conflicts').checked;});
+    $('export-apply').addEventListener('click',()=>{const plan=exportPlan;if(!plan)return;void exportWork(async()=>{const result=await projectOperation('apply',{planId:plan.id,overwriteConflicts:$('export-conflicts').checked});exportPlan=null;$('export-apply').hidden=true;await refreshExports();$('export-status').textContent=`${result.synced} resources synced. ${$('export-status').textContent}`;});});
     function closeCurrentSocket() {
+      cancelProjectRequests();
       clearReadyTimer(); clearReconnectTimer();
       const socket = state.socket;
       state.socket = null; state.ready = false; state.identityVerified = false;
