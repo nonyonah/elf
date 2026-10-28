@@ -59,6 +59,9 @@ function harness(options = {}) {
       else if (path === '/api/figma/connect') data = { url: options.connectUrl || 'https://www.figma.com/oauth?state=private', authorizationOrigin: options.connectOrigin || 'https://www.figma.com' };
       else if (path === '/api/slack/connect') data = { url: options.connectUrl || 'https://slack.com/oauth?state=private', authorizationOrigin: options.connectOrigin || 'https://slack.com' };
       else if (path === '/api/report') data = { markdown: '# Drift' };
+      else if (path === '/api/project/prepare-documentation') data={id:'docs-review',name:'Button',codeKey:'button.tsx#Button',file:'Button.tsx',source:'export function Button(){return <button/>}',documentation:'Existing documentation',figmaDescription:'Existing documentation',documentationMode:true};
+      else if (path === '/api/project/save-documentation') data={saved:true};
+      else if (path === '/api/project/sync-documentation') data={synced:true};
       else if (path === '/api/project/prepare-component') data = options.prepared || {
         name: 'Button', codeKey: 'button.tsx#Button', path: 'components/Button.figma.json',
         reviewHash: 'a'.repeat(64), sidecar: { layoutMode: 'HORIZONTAL' }, warning: null,
@@ -567,4 +570,15 @@ test('automatic sync can be enabled with pending conflicts without requesting re
  assert.deepEqual(JSON.parse(h.requests.find(item=>item.path==='/api/project/apply').body),{planId:'partial',enableAuto:true,overwriteConflicts:false});
  assert.equal(h.warningMessages.some(item=>item.message.includes('replaces Figma edits')),false);
  assert(h.infoMessages.some(item=>item.message.includes('Automatic sync enabled')));
+});
+
+test('manual Figma documentation opens prose and syncs only through documentation endpoints',async t=>{
+ const h=harness();t.after(()=>h.native.dispose());
+ await h.commands.get('elf.prepareDocumentation')('Button');
+ const diff=h.executed.find(item=>item.name==='vscode.diff');const draft=diff.args[1];
+ assert.match(draft.fsPath,/\.documentation\.md$/);
+ h.vscode.window.visibleTextEditors=[{document:{uri:draft,getText:()=> 'Immediate action. Label describes the result.'}}];
+ h.warningResponses.push('Save and sync documentation');await h.commands.get('elf.saveAndReviewDescription')(draft.toString());
+ assert.equal(h.errors.length,0);assert(h.requests.some(item=>item.path==='/api/project/sync-documentation'));
+ assert.equal(h.requests.some(item=>item.path==='/api/project/save-description'||item.path==='/api/project/plan'||item.path==='/api/project/apply'),false);
 });

@@ -238,3 +238,17 @@ test('plugin export presents an individual review before it can request an apply
  assert.equal(socket.sent.some((raw:string)=>JSON.parse(raw).action==='apply'),false);
  app.elements.get('export-apply').listeners.click();assert.equal(latest().action,'apply');assert.equal(latest().params.planId,'review-id');
 });
+
+test('component documentation patches only Description and rejects concurrent edits',async()=>{
+ const plugin=main(async()=>undefined);
+ const component=new Proxy({id:'doc-node',name:'Button',type:'COMPONENT',description:'Old prose',width:120,getSharedPluginData:()=> 'Button.tsx#Button'}, {set(target,key,value){if(key!=='description')throw new Error('Visual mutation forbidden');(target as any)[key]=value;return true;}});
+ plugin.figma.getNodeByIdAsync=async(id:string)=>id==='doc-node'?component:null;
+ await plugin.figma.ui.onmessage({type:'context',channel});
+ await plugin.figma.ui.onmessage({type:'request',channel,id:'doc-get',method:'get_component_description',params:{nodeId:'doc-node'}});
+ assert.equal(plugin.messages.at(-1).result.description,'Old prose');
+ const params={nodeId:'doc-node',description:'Immediate action. Label describes the result.',expectedDescription:'Old prose',expectedCodeKey:'Button.tsx#Button'};
+ await plugin.figma.ui.onmessage({type:'request',channel,id:'doc-set',method:'set_component_description',params});
+ assert.equal(plugin.messages.at(-1).ok,true);assert.equal(component.description,params.description);assert.equal(component.width,120);
+ await plugin.figma.ui.onmessage({type:'request',channel,id:'doc-stale',method:'set_component_description',params:{...params,description:'Unreviewed replacement'}});
+ assert.equal(plugin.messages.at(-1).ok,false);assert.equal(component.description,params.description);
+});

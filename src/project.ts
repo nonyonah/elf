@@ -36,6 +36,7 @@ export class ProjectService {
   private reviewed = new Map<string, InternalPlan>();
   private importReviews = new Map<string,{id:string;path:string;content:string;names:string[];issues:string[];fingerprint:string;expiresAt:string;ids?:string[]}>();
   private componentImports=new Map<string,{options:ComponentImportOptions;fingerprint:string;expires:number;reusePaths:string[]}>();
+  private documentationReviews=new Map<string,{component:string;revision:string;fileKey:string;nodeId:string;remote:string;codeKey:unknown;path:string;local:string;expires:number}>();
   private tail: Promise<unknown> = Promise.resolve();
   constructor(readonly configPath: string, private readonly runtime: BridgeRuntime) { this.migrate(); }
 
@@ -638,6 +639,62 @@ export class ProjectService {
       const planned = planComponent(config, tokens.index, item);
       return {name:item.name, codeKey:item.codeKey, file:item.file, deprecated:item.deprecated !== undefined || deprecations.some(entry => entry.type === 'component' && (entry.name === item.name || entry.name === item.codeKey)), descriptionStatus:planned.sidecarError ? 'needs-review' : 'ready', suggestion:planned.sidecarError ? 'Generate or prepare a Figma description before syncing.' : undefined};
     }) : [] };
+  }
+  async prepareDocumentation(name:string):Promise<Record<string,unknown>> {
+    return this.serial(()=>this.transaction(async client=>{
+      const {config,hasComponents}=this.batchConfig();
+      const component=hasComponents?parseComponents(config.componentsDir,config.componentFiles).find(item=>item.name===name||item.codeKey===name):undefined;
+      if(!component)throw new Error('Choose a component from this project.');
+      const source=readSource(resolve(config.componentsDir,component.file));
+      const prepared={name:component.name,codeKey:component.codeKey,reviewHash:this.descriptionRevision(config,component),file:component.file,source:source.slice(0,20000),sourceTruncated:source.length>20000,variantProps:component.variantProps,path:relative(config.root,sidecarPathFor(config.componentsDir,component))};
+      const refs=await client.call<{components:any[]}>('list_components',{deep:true});
+      const exact=refs.components.filter(item=>item.codeKey===prepared.codeKey);
+      const candidates=exact.length?exact:refs.components.filter(item=>item.name===prepared.name);
+      if(candidates.length!==1)throw new Error('Select a unique existing Figma component. Create/link it through the visual sync flow first if it does not exist.');
+      const remote=await client.call<any>('get_component_description',{nodeId:candidates[0].id});
+      if(remote.codeKey&&remote.codeKey!==prepared.codeKey)throw new Error('This Figma name belongs to another component. Link or rename it explicitly before editing documentation.');
+      const path=this.outputPath(String(prepared.path).replace(/\.figma\.json$/,'.figma-description.md'));
+      const local=existsSync(path)?readSource(path):'';
+      if(local.length>4000||typeof remote.description!=='string'||remote.description.length>4000)throw new Error('Documentation exceeds the 4000-character review limit.');
+      for(const [id,review]of this.documentationReviews)if(review.expires<Date.now())this.documentationReviews.delete(id);
+      if(this.documentationReviews.size>=20)this.documentationReviews.delete(this.documentationReviews.keys().next().value!);
+      const id=randomUUID();
+      this.documentationReviews.set(id,{component:String(prepared.codeKey),revision:String(prepared.reviewHash),fileKey:loadConfig(this.configPath).figma.fileKey,nodeId:remote.nodeId,codeKey:remote.codeKey,remote:remote.description,path,local,expires:Date.now()+30*60_000});
+      return {id,name:prepared.name,codeKey:prepared.codeKey,file:prepared.file,source:prepared.source,sourceTruncated:prepared.sourceTruncated,variantProps:prepared.variantProps,documentation:local||remote.description,figmaDescription:remote.description,nodeId:remote.nodeId,path:relative(realpathSync(dirname(this.configPath)),path),documentationMode:true};
+    }));
+  }
+  private documentationReview(id:string,text:unknown) {
+    const review=this.documentationReviews.get(id);
+    if(!review||review.expires<Date.now())throw new Error('Prepare a fresh documentation review.');
+    if(typeof text!=='string'||!text.trim()||text.length>4000)throw new Error('Write a nonempty description under 4000 characters.');
+    if(loadConfig(this.configPath).figma.fileKey!==review.fileKey)throw new Error('The configured Figma file changed. Prepare documentation again.');
+    this.outputPath(relative(realpathSync(dirname(this.configPath)),review.path));
+    const {config,hasComponents}=this.batchConfig();
+    const component=hasComponents?parseComponents(config.componentsDir,config.componentFiles).find(item=>item.codeKey===review.component):undefined;
+    if(!component||this.descriptionRevision(config,component)!==review.revision)throw new Error('Component source or visual specification changed. Prepare documentation again.');
+    if((existsSync(review.path)?readSource(review.path):'')!==review.local)throw new Error('Local documentation changed. Prepare a fresh review.');
+    return review;
+  }
+  async saveDocumentation(id:string,text:string):Promise<Record<string,unknown>> {
+    return this.serial(async()=>{
+      const review=this.documentationReview(id,text);
+      const temporary=`${review.path}.${randomUUID()}.tmp`;
+      try{writeFileSync(temporary,text,{flag:'wx',mode:0o600});renameSync(temporary,review.path);}finally{rmSync(temporary,{force:true});}
+      review.local=text;
+      return {saved:true,id,path:relative(realpathSync(dirname(this.configPath)),review.path),documentationOnly:true};
+    });
+  }
+  async syncDocumentation(id:string,text:string):Promise<Record<string,unknown>> {
+    return this.serial(()=>this.transaction(async client=>{
+      const review=this.documentationReview(id,text);
+      if(review.local!==text)throw new Error('Save this reviewed documentation before syncing.');
+      await client.call('set_component_description',{nodeId:review.nodeId,description:text,expectedDescription:review.remote,expectedCodeKey:review.codeKey});
+      const verified=await client.call<any>('get_component_description',{nodeId:review.nodeId});
+      if(verified.description!==text)throw new Error('Figma documentation could not be verified. Re-read it before retrying.');
+      this.documentationReviews.delete(id);
+      this.record('description',`${review.component}: Figma documentation updated. Appearance unchanged.`);
+      return {synced:true,documentationOnly:true,nodeId:review.nodeId};
+    }));
   }
   private async descriptionWarnings(sidecar: Parameters<typeof resolveSidecar>[0], component: ParsedComponent, index: TokenIndex): Promise<string[]> {
     const { variantMatrix } = await import("../batch/src/sync.js");

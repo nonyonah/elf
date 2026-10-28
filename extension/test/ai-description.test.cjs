@@ -22,3 +22,13 @@ test('missing models, malformed output, and untrusted workspaces fail without ap
   assert.throws(()=>parseDraft('{"description":{}}'),/assumptions/);
   assert.throws(()=>parseDraft('x'.repeat(128001)),/too large/);
 });
+
+test('documentation generation requests prose without visual specs and rejects visual output',async()=>{
+ const docs={...prepared,documentationMode:true,documentation:'Existing usage notes'};
+ const h=harness(true,JSON.stringify({description:{documentation:'Immediate action. Label describes the result.'},assumptions:[],unsupported:[]}));
+ const result=await generateDescription(h.vscode,docs);
+ assert.equal(result.description.documentation,'Immediate action. Label describes the result.');
+ assert.match(promptFor(docs),/human-readable Figma component documentation/);
+ assert.match(promptFor(docs),/not a visual specification/);
+ const bad=harness();await assert.rejects(generateDescription(bad.vscode,docs),/No project files/);
+});

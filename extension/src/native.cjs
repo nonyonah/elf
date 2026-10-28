@@ -117,7 +117,9 @@ class NativeElf {
     register('elf.notifications', () => this.notifications());
     register('elf.preferences', () => this.preferences());
     register('elf.prepareDescription', component => this.prepareDescription(component));
-    register('elf.generateDescription', component => this.prepareDescription(component, true));
+    register('elf.generateDescription', component => this.prepareDocumentation(component,true));
+    register('elf.prepareDocumentation',component=>this.prepareDocumentation(component));
+    register('elf.generateVisualSpec',component=>this.prepareDescription(component,true));
     register('elf.recoverDescription', () => this.recoverDescription());
     register('elf.descriptionContext', () => this.descriptionContext());
     register('elf.saveDescription', () => this.saveDescription());
@@ -312,7 +314,7 @@ class NativeElf {
     const project = this.snapshot?.project;
     const automatic = project?.mode === 'automatic';
     const children = [row('Review code changes', 'elf.reviewSync', 'Preview before syncing', 'git-compare')];
-    for (const [uri, draft] of this.drafts) if (draft.owner === this.getRuntime()) children.push(row(`Save and review ${draft.prepared.name} sync`, 'elf.saveAndReviewDescription', 'Description draft ready', 'check', uri));
+    for (const [uri, draft] of this.drafts) if (draft.owner === this.getRuntime()) children.push(row(draft.documentation?`Save and sync ${draft.prepared.name} documentation`:`Save and review ${draft.prepared.name} sync`, 'elf.saveAndReviewDescription', 'Description draft ready', 'check', uri));
     for(const [uri,draft]of this.componentDrafts)if(draft.owner===this.getRuntime())children.push(row(`Create reviewed ${draft.context.options.path}`,'elf.saveComponentImport','Imported component code draft','file-add',uri));
     if (this.tokenImport && this.tokenImportOwner===this.getRuntime()) children.push(group('Figma → code token import',[
       row(this.tokenImport.path,null,`${this.tokenImport.names.length} new tokens`,'file-code'),
@@ -566,9 +568,9 @@ class NativeElf {
   async componentChildren() {
     const result = await this.api('/api/project/components', 'POST', {});
     return (result.components || []).map(component => group(component.name, [
-      ...(component.descriptionStatus === 'needs-review' && !component.deprecated ? [row('Generate Figma description', 'elf.generateDescription', component.suggestion, 'sparkle', component.codeKey), row('Prepare description manually', 'elf.prepareDescription', null, 'edit', component.codeKey)] : []),
-      ...(!component.deprecated ? [row('Sync component to Figma…', 'elf.reviewResource', 'Includes required dependencies', 'git-compare', {kind:'component',key:component.codeKey}), row('Edit Figma description', 'elf.prepareDescription', null, 'edit', component.codeKey)] : []),
-    ], {expanded:!component.deprecated,contextValue:component.deprecated?undefined:'elf.component',syncSelection:{kind:'component',key:component.codeKey},description:component.deprecated ? 'Deprecated · retained' : component.descriptionStatus === 'needs-review' ? 'Description needed' : 'Description ready · review sync',icon:component.descriptionStatus === 'needs-review' ? 'lightbulb' : 'symbol-class'}));
+      ...(component.descriptionStatus === 'needs-review' && !component.deprecated ? [row('Generate visual specification', 'elf.generateVisualSpec', component.suggestion, 'sparkle', component.codeKey), row('Prepare visual specification manually', 'elf.prepareDescription', null, 'edit', component.codeKey)] : []),
+      ...(!component.deprecated ? [row('Generate Figma documentation', 'elf.generateDescription', 'Updates only the Description field', 'sparkle', component.codeKey),row('Write Figma documentation', 'elf.prepareDocumentation', 'Plain language, no token bindings', 'edit', component.codeKey),row('Sync component to Figma…', 'elf.reviewResource', 'Includes required dependencies', 'git-compare', {kind:'component',key:component.codeKey}), row('Edit visual specification', 'elf.prepareDescription', null, 'edit', component.codeKey)] : []),
+    ], {expanded:!component.deprecated,contextValue:component.deprecated?undefined:'elf.component',syncSelection:{kind:'component',key:component.codeKey},description:component.deprecated ? 'Deprecated · retained' : component.descriptionStatus === 'needs-review' ? 'Visual specification needed' : 'Visual specification ready · review sync',icon:component.descriptionStatus === 'needs-review' ? 'lightbulb' : 'symbol-class'}));
   }
   async reviewSync(automatic = false, selection) {
     const owner = await this.ensureRuntime();
@@ -660,6 +662,41 @@ class NativeElf {
     const base = this.context.storageUri || this.context.globalStorageUri;
     return base ? this.vscode.Uri.joinPath(base, 'description-drafts') : this.vscode.Uri.file(join(tmpdir(), 'elf-extension-drafts'));
   }
+  async prepareDocumentation(component,useAI=false,recoveredContent) {
+    const owner=await this.ensureRuntime();if(!owner)return;
+    if(typeof component!=='string') {
+      const catalog=await this.api('/api/project/components','POST',{},owner);
+      const choice=await this.vscode.window.showQuickPick(catalog.components.map(item=>({label:item.name,component:item.codeKey})),{title:'Choose a component to document'});if(!choice)return;component=choice.component;
+    }
+    const prepared=await this.api('/api/project/prepare-documentation','POST',{component},owner);
+    let text=typeof recoveredContent==='string'?recoveredContent:prepared.documentation||'';
+    if(useAI){
+      await this.text(JSON.stringify(prepared,null,2),'json',`${prepared.name} documentation context`);
+      const generated=await generateDescription(this.vscode,prepared);if(!generated)return;
+      text=generated.description.documentation;
+      await this.text(JSON.stringify({assumptions:generated.assumptions,unsupported:generated.unsupported},null,2),'json',`${prepared.name} documentation review notes`);
+    }
+    if(owner!==this.getRuntime())throw new Error('The project changed. Prepare a fresh review.');
+    const directory=this.draftDirectory();await this.vscode.workspace.fs.createDirectory(directory);
+    const name=String(prepared.codeKey).replace(/[^a-z0-9._-]+/gi,'-').slice(0,80);
+    const id=randomUUID(),uri=this.vscode.Uri.joinPath(directory,`${name}-${id}.documentation.md`),before=this.vscode.Uri.joinPath(directory,`${name}-${id}.before.md`);
+    await this.vscode.workspace.fs.writeFile(uri,Buffer.from(text));await this.vscode.workspace.fs.writeFile(before,Buffer.from(prepared.figmaDescription||''));
+    this.drafts.set(uri.toString(),{owner,prepared,uri,before,documentation:true});
+    await this.vscode.commands.executeCommand('vscode.diff',before,uri,`Review ${prepared.name} Figma documentation`,{preview:false});this.events.fire();
+    void this.vscode.window.showInformationMessage('Review the prose on the right. Save and sync updates only Figma’s Description field; appearance stays unchanged.');
+  }
+  async saveDocumentationDraft(document,draft,sync) {
+    const text=document.getText();
+    if(!text.trim()||text.length>4000)throw new Error('Write a description under 4000 characters.');
+    if(await this.vscode.window.showWarningMessage(sync?'Save this prose and sync only Figma’s Description field? Appearance stays unchanged.':'Save this prose locally? Figma will stay unchanged.',{modal:true},sync?'Save and sync documentation':'Save documentation')!==(sync?'Save and sync documentation':'Save documentation'))return;
+    if(document.getText()!==text||draft.owner!==this.getRuntime())throw new Error('Draft or project changed. Review again.');
+    await this.api('/api/project/save-documentation','POST',{id:draft.prepared.id,text},draft.owner);
+    if(sync){
+      await this.api('/api/project/sync-documentation','POST',{id:draft.prepared.id,text},draft.owner);
+      this.drafts.delete(document.uri.toString());this.events.fire();
+      void this.vscode.window.showInformationMessage('Figma Description updated. Component appearance unchanged.');
+    }else void this.vscode.window.showInformationMessage('Documentation saved locally. Use Save and sync to update Figma’s Description field.');
+  }
   async prepareDescription(component, useAI = false, recoveredContent) {
     if (typeof component !== 'string') {
       const { components } = await this.api('/api/project/components', 'POST', {});
@@ -712,10 +749,11 @@ class NativeElf {
   async recoverDescription() {
     const document=this.vscode.window.activeTextEditor?.document;
     const directory=this.draftDirectory().fsPath;
-    if (!document || document.uri.scheme !== 'file' || require('node:path').dirname(document.uri.fsPath) !== directory || !document.uri.fsPath.endsWith('.draft.json')) throw new Error('Select the right-hand Elf description draft to recover.');
+    if (!document || document.uri.scheme !== 'file' || require('node:path').dirname(document.uri.fsPath) !== directory || !(document.uri.fsPath.endsWith('.draft.json')||document.uri.fsPath.endsWith('.documentation.md'))) throw new Error('Select the right-hand Elf description draft to recover.');
     const content=document.getText();
     if (Buffer.byteLength(content)>128000) throw new Error('Draft is too large.');
-    await this.prepareDescription(undefined,false,content);
+    if(document.uri.fsPath.endsWith('.documentation.md'))await this.prepareDocumentation(undefined,false,content);
+    else await this.prepareDescription(undefined,false,content);
     void this.vscode.window.showInformationMessage('Draft recovered against the current source revision. Review it again before saving; previous approval and AI notes were not restored.');
   }
   async saveDescription(uri, review = false) {
@@ -727,6 +765,7 @@ class NativeElf {
     const document = editor?.document;
     const draft = document && this.drafts.get(document.uri.toString());
     if (!draft || draft.owner !== this.getRuntime()) throw new Error('Open a description using Elf: Prepare Component Description first.');
+    if(draft.documentation)return this.saveDocumentationDraft(document,draft,review);
     const source = document.getText(); let description;
     try { description = JSON.parse(source); } catch { throw new Error('Fix the description JSON before saving.'); }
     if (await this.vscode.window.showWarningMessage(`Save this reviewed description for ${draft.prepared.name}? Automatic sync stays in its current mode; when enabled, eligible reviewed changes can sync after saving.`, { modal: true }, 'Save reviewed description') !== 'Save reviewed description') return;

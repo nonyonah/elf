@@ -22,6 +22,8 @@ function project(components = false) {
     if (method === "list_collections") return { collections };
     if (method === "list_variables") return { variables: variables.map(item => ({ ...item })) };
     if (method === "list_components") return { components: refs };
+    if(method==='get_component_description') {const node=nodes[params.nodeId];return {nodeId:node.id,name:node.name,codeKey:node.codeKey??null,description:node.description??''};}
+    if(method==='set_component_description') {const node=nodes[params.nodeId];if((node.description??'')!==params.expectedDescription||(node.codeKey??null)!==params.expectedCodeKey)throw new Error('Component documentation changed');node.description=params.description;return {nodeId:node.id,description:node.description};}
     if (method === "get_node") return { node: nodes[params.nodeId] };
     if (method === "create_collection") return { collection: { id: "collection" } };
     if (method === "upsert_variables") {
@@ -628,5 +630,37 @@ test('reviewed description saves remain eligible for the next automatic sync pas
   await p.service.autoSync();
   const button=p.refs.find(item=>item.name==='Button');
   assert.equal(p.nodes[button.id].width,180);
+ }finally{p.cleanup();}
+});
+
+test('prose documentation sync updates only the Description field without resolving visual tokens',async()=>{
+ const p=project(true);try{
+  p.refs.push({id:'doc-node',name:'Button',codeKey:'Button.tsx#Button'});p.nodes['doc-node']={id:'doc-node',name:'Button',type:'COMPONENT',codeKey:'Button.tsx#Button',description:'Old prose',width:120,height:40,children:[]};
+  writeFileSync(join(p.root,'components','Button.figma.json'),JSON.stringify({gap:'missing.token'}));
+  const before={...p.nodes['doc-node']};const sidecar=readFileSync(join(p.root,'components','Button.figma.json'),'utf8');
+  const prepared=await p.service.prepareDocumentation('Button');
+  const text='Immediate action. Use a clear label describing the result.';
+  await p.service.saveDocumentation(String(prepared.id),text);
+  await p.service.syncDocumentation(String(prepared.id),text);
+  assert.deepEqual(p.nodes['doc-node'],{...before,description:text});
+  assert.equal(readFileSync(join(p.root,'components','Button.figma.json'),'utf8'),sidecar);
+  assert.equal(p.calls.some(method=>/upsert|create/.test(method)),false);
+  await assert.rejects(p.service.syncDocumentation(String(prepared.id),text),/fresh/);
+ }finally{p.cleanup();}
+});
+
+test('documentation sync rejects remote edits, source changes and a changed file',async()=>{
+ const p=project(true);try{
+  p.refs.push({id:'doc-node',name:'Button',codeKey:'Button.tsx#Button'});p.nodes['doc-node']={id:'doc-node',name:'Button',type:'COMPONENT',codeKey:'Button.tsx#Button',description:'Original'};
+  let prepared=await p.service.prepareDocumentation('Button');
+  await p.service.saveDocumentation(String(prepared.id),'Reviewed prose');p.nodes['doc-node'].description='A designer edited this';
+  await assert.rejects(p.service.syncDocumentation(String(prepared.id),'Reviewed prose'),/changed/);
+  assert.equal(p.nodes['doc-node'].description,'A designer edited this');
+  prepared=await p.service.prepareDocumentation('Button');
+  writeFileSync(join(p.root,'components','Button.tsx'),'export function Button(){return <button>Different</button>}');
+  await assert.rejects(p.service.saveDocumentation(String(prepared.id),'Reviewed prose'),/source/);
+  prepared=await p.service.prepareDocumentation('Button');
+  const raw=JSON.parse(readFileSync(p.path,'utf8'));raw.figma.fileKey='another-file';writeFileSync(p.path,JSON.stringify(raw));
+  await assert.rejects(p.service.saveDocumentation(String(prepared.id),'Reviewed prose'),/Figma file changed/);
  }finally{p.cleanup();}
 });

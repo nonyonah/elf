@@ -199,6 +199,9 @@ export async function main(argv: string[]): Promise<number> {
       }
       if (action === "monitor") { project.setMonitoring(); return { ok: true }; }
       if (action === "check") { check(); return { ok: true }; }
+      if(action==='prepare-documentation'&&typeof body.component==='string')return project.prepareDocumentation(body.component);
+      if(action==='save-documentation'&&typeof body.id==='string'&&typeof body.text==='string')return project.saveDocumentation(body.id,body.text);
+      if(action==='sync-documentation'&&typeof body.id==='string'&&typeof body.text==='string')return project.syncDocumentation(body.id,body.text);
       if (action === "prepare-component" && typeof body.component === "string") return project.prepareComponent(body.component);
       if (action === "save-description" && typeof body.component === "string") {
         if (typeof body.reviewHash !== "string" || !/^[a-f0-9]{64}$/.test(body.reviewHash)) throw new Error("Prepare and review the component description before saving.");

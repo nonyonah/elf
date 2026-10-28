@@ -2,7 +2,7 @@
   "name": "elf-design-system",
   "displayName": "Elf",
   "description": "Connect your project and Figma, monitor design drift, and review sync changes.",
-  "version": "0.3.11",
+  "version": "0.3.12",
   "publisher": "elf-local",
   "license": "MIT",
   "repository": {
@@ -157,7 +157,7 @@
       },
       {
         "command": "elf.prepareDescription",
-        "title": "Elf: Prepare Component Description"
+        "title": "Elf: Prepare Component Visual Specification"
       },
       {
         "command": "elf.saveDescription",
@@ -190,7 +190,7 @@
       },
       {
         "command": "elf.generateDescription",
-        "title": "Elf: Generate Component Description with AI"
+        "title": "Elf: Generate Figma Documentation"
       },
       {
         "command": "elf.descriptionContext",
@@ -219,7 +219,7 @@
       },
       {
         "command": "elf.saveAndReviewDescription",
-        "title": "Elf: Save and Review Component Sync",
+        "title": "Elf: Save and Sync Reviewed Description",
         "icon": "$(check)"
       },
       {
@@ -245,6 +245,16 @@
         "command": "elf.saveComponentImport",
         "title": "Elf: Create Reviewed Component",
         "icon": "$(file-add)"
+      },
+      {
+        "command": "elf.prepareDocumentation",
+        "title": "Elf: Write Figma Documentation",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "elf.generateVisualSpec",
+        "title": "Elf: Generate Component Visual Specification",
+        "icon": "$(sparkle)"
       }
     ],
     "menus": {
@@ -317,7 +327,7 @@
           "group": "inline@1"
         },
         {
-          "command": "elf.generateDescription",
+          "command": "elf.generateVisualSpec",
           "when": "view == elf.changes && viewItem == elf.issue",
           "group": "inline@2"
         },
@@ -330,12 +340,12 @@
       "editor/title": [
         {
           "command": "elf.saveAndReviewDescription",
-          "when": "resourceFilename =~ /\\.draft\\.json$/ && elf.running",
+          "when": "(resourceFilename =~ /\\.draft\\.json$/ || resourceFilename =~ /\\.documentation\\.md$/) && elf.running",
           "group": "navigation@1"
         },
         {
           "command": "elf.saveDescription",
-          "when": "resourceFilename =~ /\\.draft\\.json$/ && elf.running",
+          "when": "(resourceFilename =~ /\\.draft\\.json$/ || resourceFilename =~ /\\.documentation\\.md$/) && elf.running",
           "group": "navigation@2"
         },
         {

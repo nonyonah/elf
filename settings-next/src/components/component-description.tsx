@@ -41,7 +41,7 @@ export function ComponentDescription({prepared, onClose, onSaved}: {prepared: Pr
     } catch (cause) {setError((cause as Error).message);} finally {setBusy(false);}
   };
   return <section aria-labelledby="component-review-heading" className="mb-5">
-    <h2 ref={heading} tabIndex={-1} id="component-review-heading" className="mb-2 text-[11px] font-semibold uppercase tracking-[0.04em] text-muted-foreground">Component description</h2>
+    <h2 ref={heading} tabIndex={-1} id="component-review-heading" className="mb-2 text-[11px] font-semibold uppercase tracking-[0.04em] text-muted-foreground">Component visual specification</h2>
     <Card className="gap-0 rounded-2xl border-[0.5px] border-border bg-card shadow-none before:hidden">
       <div className="space-y-3 px-3.5 py-3">
         <div><h3 className="text-[13px] font-medium">Review {prepared.name}</h3><p className="mt-1 break-all text-[11px] text-faint">{prepared.file}</p></div>

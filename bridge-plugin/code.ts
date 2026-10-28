@@ -1408,6 +1408,18 @@ async function nodePayload(node: SceneNode, depth: number): Promise<Record<strin
   return payload;
 }
 
+async function componentDocumentation(params: Record<string, unknown>, write: boolean): Promise<unknown> {
+  if(typeof params.nodeId!=='string')throw new Error('Choose an existing component.');
+  const node=await figma.getNodeByIdAsync(params.nodeId);
+  if(!node || (node.type!=='COMPONENT' && node.type!=='COMPONENT_SET'))throw new Error('Select an existing component or component set.');
+  if(write) {
+    if(typeof params.description!=='string'||!params.description.trim()||params.description.length>4000)throw new Error('Description must be nonempty text under 4000 characters.');
+    if(typeof params.expectedDescription!=='string'||node.description!==params.expectedDescription||codeKeyOf(node)!==params.expectedCodeKey)throw new Error('Component documentation changed. Prepare a fresh review.');
+    node.description=params.description;
+  }
+  return {nodeId:node.id,name:node.name,codeKey:codeKeyOf(node),description:node.description};
+}
+
 async function getNode(params: Record<string, unknown>): Promise<unknown> {
   const nodeId = String(params.nodeId ?? "").trim();
   if (!nodeId) throw new Error("`nodeId` is required.");
@@ -1479,6 +1491,10 @@ async function handle(method: string, params: Record<string, unknown>): Promise<
       return upsertTextStyle(params);
     case "upsert_effect_style":
       return upsertEffectStyle(params);
+    case "get_component_description":
+      return componentDocumentation(params, false);
+    case "set_component_description":
+      return componentDocumentation(params, true);
     case "get_node":
       return getNode(params);
     default:

@@ -428,7 +428,7 @@ test("Settings advertises API capabilities and refuses incompatible process reus
   try {
     assert.equal((await fetch(`${handle.url}/api/runtime`)).status, 401);
     const capabilities = await (await handle.fetch("/api/runtime")).json() as any;
-    assert.equal(capabilities.apiVersion, 13); assert.equal(capabilities.managed, false);
+    assert.equal(capabilities.apiVersion, 14); assert.equal(capabilities.managed, false);
     assert.ok(await reopenCompatibleSettingsServer(handle.url, configPath, identity));
     await assert.rejects(reopenCompatibleSettingsServer(handle.url, configPath, identity, true), /incompatible Elf server/);
     const unsupported = await handle.fetch("/api/project/resources", {method: "POST", headers: {"X-Elf-Request": "1"}});
