@@ -314,7 +314,7 @@ export default function SettingsPage() {
   if (onboarding?.active) return <Onboarding initial={onboarding} onFinished={() => { void fetchConfig(); }} />;
 
   return (
-    <main className="mx-auto w-full max-w-[420px] px-5 pb-6 pt-8">
+    <main className="mx-auto w-full min-w-0 max-w-[420px] [overflow-wrap:anywhere] px-5 pb-6 pt-8">
       <div className="mb-1 flex items-center justify-between gap-3"><div className="flex items-center gap-3"><img src="/brand/elf-mascot.png" width={32} height={32} alt="" /><div><p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Elf</p><h1 className="text-[15px] font-medium leading-[1.55]">Settings</h1></div></div><Notifications activity={onboarding?.activity} projectKey={project?.configPath ?? onboarding?.root ?? ""} /></div>
       {project?.configPath ? (
         <p
@@ -352,7 +352,7 @@ export default function SettingsPage() {
           Slack
         </h2>
         <Card className="mb-5 gap-0 rounded-2xl border-[0.5px] border-border bg-card shadow-none before:hidden">
-          <div className="flex items-center gap-2.5 px-3.5 py-3">
+          <div className="flex flex-wrap items-center gap-2.5 px-3.5 py-3">
             <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-white ring-1 ring-black/5 dark:ring-white/10">
               <img
                 src="https://a.slack-edge.com/80588/marketing/img/icons/icon_slack_hash_colored.png"
@@ -362,7 +362,7 @@ export default function SettingsPage() {
                 className="size-6"
               />
             </span>
-            <div className="min-w-0 flex-1">
+            <div className="min-w-[min(100%,9rem)] flex-1">
               <p className="text-[13px] font-medium leading-[1.55]">
                 {slackTitle}
               </p>
@@ -409,8 +409,8 @@ export default function SettingsPage() {
           Notifications
         </h2>
         <Card className="mb-5 gap-0 rounded-2xl border-[0.5px] border-border bg-card shadow-none before:hidden">
-          <div className="flex items-center gap-2.5 px-3.5 py-3">
-            <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2.5 px-3.5 py-3">
+            <div className="min-w-[min(100%,9rem)] flex-1">
               <p className="text-[13px] font-medium leading-[1.55]">
                 Notify on drift
               </p>
@@ -429,8 +429,8 @@ export default function SettingsPage() {
               aria-label="Notify on drift"
             />
           </div>
-          <div className="flex items-center gap-2.5 border-t-[0.5px] border-border px-3.5 py-3">
-            <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2.5 border-t-[0.5px] border-border px-3.5 py-3">
+            <div className="min-w-[min(100%,9rem)] flex-1">
               <p className="text-[13px] font-medium leading-[1.55]">
                 Only when counts changed
               </p>

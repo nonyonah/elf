@@ -12,6 +12,13 @@ results rather than treating every old unchecked item as missing code.
 
 Before calling this production-ready, record results for these remaining gates:
 
+Settings layout check: an isolated mock browser run passed card-control
+containment and no horizontal overflow at 320, 375, 420 and 800px, dropdown item
+visibility, and cancellation without a strict-authorization request. The headless
+keyboard-focus assertion did not pass; verify ArrowDown, item activation, Escape
+and focus return in the live Settings page before release. RTL and 200% zoom
+have not been verified in this pass.
+
 1. Run the full release suites and artifact audits against the final commit;
    inspect dependencies, OAuth/IPC/credential boundaries and private-file exclusion.
 2. Test npm and VSIX in a clean project without the checkout: onboarding,
@@ -28,7 +35,10 @@ Before calling this production-ready, record results for these remaining gates:
 The Markdown-to-design-system goal is tracked in
 [its implementation plan](markdown-design-system.md). MCP primitives exist;
 guided specification ingestion, combined reviewed plans and optional presentation
-generation remain work. This is a preview follow-up, not an existing importer.
+generation remain work. This is the final planned feature addition before
+production acceptance and release hardening, not an existing importer. Its input
+is the user's existing Claude-generated project `.md`; its output includes Figma
+usage documentation as well as supported design-system resources.
 
 ### Figma plugin icon
 

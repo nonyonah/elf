@@ -150,7 +150,7 @@ export function Onboarding({ initial, onFinished }: { initial: OnboardingStatus;
   const titles = ["Your project", "Connect Figma", "Stay in the loop"];
 
   return (
-    <main className="mx-auto w-full max-w-[420px] px-5 pb-6 pt-8">
+    <main className="mx-auto w-full min-w-0 max-w-[420px] [overflow-wrap:anywhere] px-5 pb-6 pt-8">
       <p className="mb-1 text-[15px] font-medium leading-[1.55]">Set up elf</p>
       <p className="mb-5 truncate text-[11.5px] leading-[1.55] text-faint" title={status.root}>{status.root}</p>
       <div className="mb-5 flex items-center gap-3"><img src="/brand/elf-mascot.png" width={40} height={40} alt="" /><div><p className="text-[15px] font-semibold">Elf</p><p className="text-[12px] text-muted-foreground">Your design system companion</p></div></div>
@@ -189,9 +189,9 @@ export function Onboarding({ initial, onFinished }: { initial: OnboardingStatus;
       {step === 1 && <>
         <FigmaAccount />
         <Card className={`${card} mb-4`}>
-          <div className="flex items-center gap-2.5 px-3.5 py-3">
+          <div className="flex flex-wrap items-center gap-2.5 px-3.5 py-3">
             <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-muted"><Shapes className="size-5" aria-hidden="true" /></span>
-            <div className="min-w-0 flex-1"><p className="text-[13px] font-medium leading-[1.55]">{connected ? "Connected" : offline ? "Elf is offline" : "Waiting for Figma"}</p><p role="status" className="text-[12px] leading-[1.55] text-muted-foreground">{connected ? status.bridge.file?.name : offline ? "Keep the elf terminal running" : "Open the Elf bridge plugin in your file"}</p></div>
+            <div className="min-w-[min(100%,9rem)] flex-1"><p className="text-[13px] font-medium leading-[1.55]">{connected ? "Connected" : offline ? "Elf is offline" : "Waiting for Figma"}</p><p role="status" className="text-[12px] leading-[1.55] text-muted-foreground">{connected ? status.bridge.file?.name : offline ? "Keep the elf terminal running" : "Open the Elf bridge plugin in your file"}</p></div>
             {connected && <Check className="size-4 shrink-0 text-success" aria-label="Connected" />}
           </div>
           {!connected && <ol className="space-y-3 border-t-[0.5px] border-border px-3.5 py-3 text-[12px] leading-[1.55] text-muted-foreground">
@@ -208,13 +208,13 @@ export function Onboarding({ initial, onFinished }: { initial: OnboardingStatus;
       {step === 2 && <>
         <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.04em] text-muted-foreground">Slack · optional</h2>
         <Card className={`${card} mb-5`}>
-          <div className="flex items-center gap-2.5 px-3.5 py-3">
+          <div className="flex flex-wrap items-center gap-2.5 px-3.5 py-3">
             <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-white ring-1 ring-black/5 dark:ring-white/10"><img src="https://a.slack-edge.com/80588/marketing/img/icons/icon_slack_hash_colored.png" alt="" width={24} height={24} className="size-6" /></span>
-            <div className="min-w-0 flex-1"><p className="text-[13px] font-medium leading-[1.55]">{slack.connected ? "Connected" : "Not connected"}</p><p className="text-[12px] leading-[1.55] text-muted-foreground">{slack.connected ? [slack.teamName, slack.channel].filter(Boolean).join(" · ") : "Send drift notifications to your team"}</p></div>
+            <div className="min-w-[min(100%,9rem)] flex-1"><p className="text-[13px] font-medium leading-[1.55]">{slack.connected ? "Connected" : "Not connected"}</p><p className="text-[12px] leading-[1.55] text-muted-foreground">{slack.connected ? [slack.teamName, slack.channel].filter(Boolean).join(" · ") : "Send drift notifications to your team"}</p></div>
             <Button variant={slack.connected ? "destructive" : "default"} size="sm" className={smallButton} loading={busy} disabled={busy || offline} onClick={() => { void (slack.connected ? disconnectSlack() : connectSlack()); }}>{slack.connected ? "Disconnect" : "Connect Slack"}</Button>
           </div>
           {slack.connected && <div className="flex items-center justify-between gap-2 border-t-[0.5px] border-border px-3.5 py-3"><p role="status" className="text-[12px] text-muted-foreground">{slackTested ? "Test message sent" : "Check that messages reach your channel"}</p><Button variant="default" size="sm" className={`${smallButton} border-[0.5px]`} disabled={busy} onClick={() => { void testSlack(); }}>Send test</Button></div>}
-          {slack.connected && <div className="flex items-center gap-2.5 border-t-[0.5px] border-border px-3.5 py-3"><div className="min-w-0 flex-1"><p className="text-[13px] font-medium leading-[1.55]">Notify on drift</p><p className="text-[12px] leading-[1.55] text-muted-foreground">Only when the drift state changes</p></div><Switch checked={notify} onCheckedChange={setNotify} disabled={busy} aria-label="Notify on drift" className="h-5 w-9 shrink-0 p-[2px] [--thumb-size:--spacing(4)]" thumbClassName="data-checked:translate-x-4" /></div>}
+          {slack.connected && <div className="flex flex-wrap items-center gap-2.5 border-t-[0.5px] border-border px-3.5 py-3"><div className="min-w-[min(100%,9rem)] flex-1"><p className="text-[13px] font-medium leading-[1.55]">Notify on drift</p><p className="text-[12px] leading-[1.55] text-muted-foreground">Only when the drift state changes</p></div><Switch checked={notify} onCheckedChange={setNotify} disabled={busy} aria-label="Notify on drift" className="h-5 w-9 shrink-0 p-[2px] [--thumb-size:--spacing(4)]" thumbClassName="data-checked:translate-x-4" /></div>}
         </Card>
         <Card className={`${card} mb-4`}><div className="flex items-start gap-2.5 px-3.5 py-3"><Radio className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden="true" /><div><p className="text-[13px] font-medium leading-[1.55]">Ready to monitor</p><p className="mt-0.5 text-[12px] leading-[1.55] text-muted-foreground">Elf checks for drift when you save. Your Figma file stays as it is. Reports appear in your project{slack.connected && notify ? " and Slack" : ""}.</p></div></div></Card>
         <p className="mb-5 text-[11.5px] leading-[1.55] text-faint">Keep this terminal and the Figma plugin open. You can change notification preferences in Settings.</p>
