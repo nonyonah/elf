@@ -142,7 +142,7 @@ Recipes follow [Material UI installation](https://mui.com/material-ui/getting-st
 
 Description references accept an exact token key first, then a unique separator-equivalent key (`spacing.2` → `spacing-2`). Ambiguous aliases are rejected. Type checks still apply, and missing references show available keys. Editing a private AI draft does not update a component sidecar until **Save reviewed description** succeeds.
 
-Description uploads can be saved with missing, ambiguous, or wrong-type token bindings. Validation and saving return `warnings` and `syncReady: false` while preserving the description exactly as reviewed. Schema, source-revision, path, and variant checks remain enforced. Saving pauses automatic sync; sync planning still blocks unresolved component bindings. Elf never invents token values or silently removes bindings to make an upload succeed. The extension and npm Settings confirm the local save without launching a failing sync review automatically.
+Description uploads can be saved with missing, ambiguous, or wrong-type token bindings. Validation and saving return `warnings` and `syncReady: false` while preserving the description exactly as reviewed. Schema, source-revision, path, and variant checks remain enforced. Saving preserves the current sync mode; automatic runs skip unresolved component bindings. Elf never invents token values or silently removes bindings to make an upload succeed. The extension and npm Settings confirm the local save without launching a failing sync review automatically.
 
 #### shadcn/ui and HeroUI v3
 
@@ -157,3 +157,7 @@ References: [shadcn installation](https://ui.shadcn.com/docs/installation), [Her
 Overview provides **Review and sync changes** and **Enable automatic sync**. Project component groups start expanded and include **Sync component to Figma**, with the same individual-review action available beside the component row. Description readiness means the sidecar validates; it is not a pending-change count.
 
 A native review picker lists the planned creates/updates and specific blocking issues, then offers **Apply sync** or **Apply and enable automatic sync**. Dismissing it leaves the review in Changes without writing. A clean empty plan reports **Already in sync**; automatic sync can still be enabled for subsequent edits. Figma conflicts still require explicit replacement confirmation. Missing-token issues display their actual validation reason rather than a generic “no supported changes” message.
+
+### Continuous automatic sync
+
+Automatic sync can be enabled while resources need review. Each run computes a fresh plan and keeps only independent safe writes. A conflict, unsupported description, intentional token difference, or unavailable dependency holds that resource and writes that depend on it; other eligible tokens, components, and styles continue syncing. Removed/deprecated resources are retained. Enabling automatic sync never implicitly replaces Figma edits, even if a replacement flag was previously selected. Reviewed description saves preserve the current mode, so eligible saved descriptions can sync on the next watcher pass. Project imports still pause automatic writes for their separate review flow. Pairing, document authorization, stale-plan checks and write verification remain required.

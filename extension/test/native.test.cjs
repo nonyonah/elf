@@ -559,3 +559,12 @@ test('picker replacement still requires the explicit Figma-conflict confirmation
  assert.equal(h.requests.some(item=>item.path==='/api/project/apply'),false);
  assert(h.warningMessages.some(item=>item.message.includes('replaces Figma edits')));
 });
+
+test('automatic sync can be enabled with pending conflicts without requesting replacement',async t=>{
+ const h=harness({plan:{id:'partial',entries:[{kind:'token',key:'safe',name:'Safe token',action:'create'}],issues:[{kind:'conflict',key:'other',message:'Figma edit pending',blocksApply:true},{kind:'removed',key:'removed',message:'Retained in Figma'}]}});t.after(()=>h.native.dispose());await h.native.refresh();
+ h.quickPicks.push({action:'apply'});await h.commands.get('elf.toggleAutomatic')();
+ assert.equal(h.errors.length,0);
+ assert.deepEqual(JSON.parse(h.requests.find(item=>item.path==='/api/project/apply').body),{planId:'partial',enableAuto:true,overwriteConflicts:false});
+ assert.equal(h.warningMessages.some(item=>item.message.includes('replaces Figma edits')),false);
+ assert(h.infoMessages.some(item=>item.message.includes('Automatic sync enabled')));
+});

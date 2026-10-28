@@ -61,8 +61,8 @@ export function ProjectControls({ runtime, onChanged }: { runtime: ProjectRuntim
     if (!plan) return;
     setBusy("apply"); setError(null);
     try {
-      const result = await run("apply", { planId: plan.id, enableAuto, overwriteConflicts: replace });
-      setMessage(`${result.synced} ${result.synced === 1 ? "resource" : "resources"} synced${result.issues?.length ? "; some items still need attention" : ""}.`);
+      const result = await run("apply", { planId: plan.id, enableAuto, overwriteConflicts: replace && !enableAuto });
+      setMessage(`${enableAuto ? "Automatic sync enabled. " : ""}${result.synced} ${result.synced === 1 ? "resource" : "resources"} synced${result.issues?.length ? "; some items still need attention" : ""}.`);
       setPlan(null); onChanged();
     } catch (cause) { setError((cause as Error).message); }
     finally { setBusy(null); }
@@ -74,7 +74,6 @@ export function ProjectControls({ runtime, onChanged }: { runtime: ProjectRuntim
     finally { setBusy(null); }
   };
   const conflicts = plan?.issues.some(issue => issue.kind === "conflict" && issue.blocksApply !== false) ?? false;
-  const unresolved = plan?.issues.some(issue => issue.kind !== "unsupported") ?? false;
   const integration = runtime.integration;
   const quote = (value: string) => "'" + value.replace(/'/g, "'\\''") + "'";
   const command = integration ? [integration.command, ...integration.args].map(quote).join(" ") : "";
@@ -99,10 +98,10 @@ export function ProjectControls({ runtime, onChanged }: { runtime: ProjectRuntim
           <p className="mb-3 mt-1 text-[11.5px] leading-[1.55] text-faint">Only the listed changes will be applied. Other items stay unchanged for review. A fresh review is required if code or Figma changes.</p>
           {plan.entries.length > 0 && <ul className="mb-3 max-h-52 space-y-2 overflow-auto text-[12px] leading-[1.55]">{plan.entries.map(entry => <li className="flex items-start justify-between gap-3" key={`${entry.kind}:${entry.key}`}><span className="min-w-0 break-words">{entry.name}<span className="ml-1 text-faint">· {entry.kind}</span></span><span className="shrink-0 text-muted-foreground">{entry.action === "create" ? "Create" : "Update"}<Button size="sm" className={`${button} ml-2`} disabled={busy !== null} onClick={() => void review(false,{kind:entry.kind,key:entry.key})}>Review only</Button></span></li>)}</ul>}
           {plan.issues.length > 0 && <details open className="mb-3 text-[12px] leading-[1.55]"><summary className="cursor-pointer text-warning">{plan.issues.length} {plan.issues.length === 1 ? "item needs" : "items need"} attention</summary><ul className="mt-2 max-h-48 space-y-2 overflow-auto text-muted-foreground">{plan.issues.map((issue, index) => <li key={`${issue.key}:${index}`} className="break-words"><p>{issue.message}</p>{issue.action === "prepare-component" && issue.component && <Button size="sm" className={`${button} mt-2`} disabled={busy !== null} loading={busy === "prepare"} onClick={() => void prepare(issue.component!)}>Prepare description</Button>}</li>)}</ul></details>}
-          {conflicts && <label className="mb-3 flex items-start gap-2 text-[12px] leading-[1.55]"><input type="checkbox" className="mt-0.5 accent-primary" checked={replace} onChange={event => setReplace(event.target.checked)} /><span>Replace Figma edits affecting the planned changes with code values</span></label>}
-          {runtime.mode !== "automatic" && !selection && <label className="mb-3 flex items-start gap-2 text-[12px] leading-[1.55]"><input type="checkbox" className="mt-0.5 accent-primary" checked={enableAuto} disabled={unresolved} onChange={event => setEnableAuto(event.target.checked)} /><span>Keep syncing supported changes after this review{unresolved && <span className="block text-[11.5px] text-faint">Resolve conflicts and removed resources first.</span>}</span></label>}
-          {runtime.mode === "automatic" && <p className="mb-3 text-[11.5px] leading-[1.55] text-faint">Automatic sync stays enabled and resumes once conflicts are resolved.</p>}
-          <div className="flex items-center justify-end gap-2"><Button variant="default" size="sm" className={button} disabled={busy !== null} onClick={() => setPlan(null)}>Cancel</Button><Button size="sm" className={button} loading={busy === "apply"} disabled={busy !== null || (conflicts && !replace) || (enableAuto && unresolved) || (!plan.entries.length && !enableAuto)} onClick={() => { void apply(); }}>{enableAuto ? "Apply and enable" : "Apply sync"}</Button></div>
+          {conflicts && !enableAuto && <label className="mb-3 flex items-start gap-2 text-[12px] leading-[1.55]"><input type="checkbox" className="mt-0.5 accent-primary" checked={replace} onChange={event => setReplace(event.target.checked)} /><span>Replace Figma edits affecting the planned changes with code values</span></label>}
+          {runtime.mode !== "automatic" && !selection && <label className="mb-3 flex items-start gap-2 text-[12px] leading-[1.55]"><input type="checkbox" className="mt-0.5 accent-primary" checked={enableAuto} onChange={event => setEnableAuto(event.target.checked)} /><span>Keep syncing supported changes after this review<span className="block text-[11.5px] text-faint">Blocked resources and their dependents stay pending while safe changes continue.</span></span></label>}
+          {runtime.mode === "automatic" && <p className="mb-3 text-[11.5px] leading-[1.55] text-faint">Automatic sync continues for safe resources. Conflicting resources and their dependents stay pending.</p>}
+          <div className="flex items-center justify-end gap-2"><Button variant="default" size="sm" className={button} disabled={busy !== null} onClick={() => setPlan(null)}>Cancel</Button><Button size="sm" className={button} loading={busy === "apply"} disabled={busy !== null || (conflicts && !replace && !enableAuto) || (!plan.entries.length && !enableAuto)} onClick={() => { void apply(); }}>{enableAuto ? "Apply and enable" : "Apply sync"}</Button></div>
         </div>}
       </Card>
     </section>

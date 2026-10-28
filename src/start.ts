@@ -100,7 +100,7 @@ export async function main(argv: string[]): Promise<number> {
             const sync = await project.autoSync();
             if (sync.paused && notify) {
               const alert = createHash("sha256").update(JSON.stringify(sync.conflicts)).digest("hex");
-              await alerts.update(alert, () => postNotification(resolveNotifyWebhook(config.notify, configPath)!.url, config.notify!.format, { text: "Elf paused automatic sync because conflicts, removed resources, or intentional differences need review. Open Elf Settings to resolve them." }));
+              await alerts.update(alert, () => postNotification(resolveNotifyWebhook(config.notify, configPath)!.url, config.notify!.format, { text: "Elf is watching for changes. Some resources and their dependents need review and were skipped; safe independent changes continue syncing. Open Elf to review pending items." }));
             } else if (!sync.paused) await alerts.update(null);
           } catch (error) {
             project.record("error", (error as Error).message);

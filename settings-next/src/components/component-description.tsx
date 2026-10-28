@@ -65,7 +65,7 @@ export function ComponentDescription({prepared, onClose, onSaved}: {prepared: Pr
         <details className="text-[12px]"><summary className="cursor-pointer font-medium">View component source{prepared.sourceTruncated ? " (excerpt)" : ""}</summary><pre className="mt-2 max-h-52 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-background p-2 font-mono text-[11px]">{prepared.source}</pre></details>
         {!description && <p role="alert" className="text-[12px] text-destructive">The advanced description must be a valid JSON object.</p>}
         <label className="flex items-start gap-2 text-[12px] leading-[1.55]"><input type="checkbox" className="mt-0.5 accent-primary" checked={reviewed} disabled={busy || !description} onChange={event => setReviewed(event.target.checked)} /><span>I reviewed the layout, content, variants and token bindings.</span></label>
-        <p className="break-words text-[11.5px] leading-[1.55] text-faint">Saves {prepared.path} locally and pauses automatic sync. Review a fresh sync plan before applying changes to Figma.</p>
+        <p className="break-words text-[11.5px] leading-[1.55] text-faint">Saves {prepared.path} locally. Automatic sync stays in its current mode; when enabled, eligible reviewed changes can sync after saving.</p>
         {error && <p role="alert" className="text-[12px] text-destructive">{error}</p>}
         <div className="flex flex-wrap justify-end gap-2"><Button size="sm" className={button} disabled={busy} onClick={onClose}>Cancel</Button><Button size="sm" className={button} loading={busy} disabled={busy || !reviewed || !description} onClick={() => void save()}>Save reviewed description</Button></div>
       </div>

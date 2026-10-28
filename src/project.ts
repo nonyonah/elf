@@ -116,10 +116,9 @@ export class ProjectService {
       const fresh = await this.build(client);
       if (reviewed.selection) this.selectPlan(fresh, reviewed.selection);
       if (fresh.fingerprint !== reviewed.fingerprint) throw new Error("Code, configuration, or Figma changed after review. Review a fresh plan before applying.");
-      if (fresh.view.issues.some(issue => issue.kind === "conflict" && issue.blocksApply !== false) && !options.overwriteConflicts) throw new Error("Figma has edits. Keep them, or explicitly choose to replace the conflicts in this reviewed plan.");
+      if (!options.enableAuto && fresh.view.issues.some(issue => issue.kind === "conflict" && issue.blocksApply !== false) && !options.overwriteConflicts) throw new Error("Figma has edits. Keep them, or explicitly choose to replace the conflicts in this reviewed plan.");
       if (options.enableAuto && reviewed.selection) throw new Error('Individual sync cannot enable automatic sync. Review the full project first.');
-      if (options.enableAuto && loadConfig(this.configPath).intentionalDifferences?.length) throw new Error("Intentional differences are configured. Keep monitoring enabled and review writes individually.");
-      if (options.enableAuto && fresh.view.issues.some(issue => issue.kind !== "unsupported")) throw new Error("Resolve conflicts and removed resources before enabling automatic sync.");
+      if (options.enableAuto) this.retainAutomaticEntries(fresh);
       this.reviewed.delete(id);
       const result = await this.execute(fresh, client);
       if (options.enableAuto) {
@@ -133,14 +132,11 @@ export class ProjectService {
   async autoSync(): Promise<Record<string, unknown>> {
     return this.serial(() => this.transaction( async client => {
       if (!this.automatic()) return { synced: 0, paused: false, issues: [] };
-      if (loadConfig(this.configPath).intentionalDifferences?.length) return {synced: 0, paused: true, conflicts: ["Intentional differences require reviewed sync."]};
       const plan = await this.build(client);
       if (!this.automatic()) return { synced: 0, paused: false, issues: [] };
-      if (plan.view.issues.some(issue => issue.kind === "conflict" || issue.kind === "removed")) {
-        this.record("conflict", "Sync paused: Figma edits or removed resources need review.");
-        return { synced: 0, conflicts: plan.view.issues, paused: true };
-      }
-      return this.execute(plan, client);
+      this.retainAutomaticEntries(plan);
+      const result = await this.execute(plan, client);
+      return {...result, paused:plan.view.entries.length===0 && plan.view.issues.length>0, conflicts:plan.view.issues, automatic:true};
     }));
   }
   async resources(): Promise<Record<string, unknown>> {
@@ -500,6 +496,7 @@ export class ProjectService {
           }
         };
         visit(component.sidecar);
+        visit(component.params); visit(component.setParams); Object.values(component.variantParams??{}).forEach(visit);
         for (const dep of component.parsed.dependencies) include('component', dep);
         if (key !== selection.key && component.sidecarError) throw new Error(`${component.parsed.name}: prepare and review this required dependency's description before syncing ${selection.key}.`);
       }
@@ -527,6 +524,27 @@ export class ProjectService {
     plan.view.entries = plan.view.entries.filter(entry => selected.has(`${entry.kind}:${entry.key}`));
     plan.view.issues = plan.view.issues.filter(issue => [...selected].some(id => id.slice(id.indexOf(':') + 1) === issue.key));
     for (const issue of plan.view.issues) if (issue.kind === 'conflict') issue.blocksApply = true;
+  }
+  /** Exclude a blocked resource and every write that depends on it, retaining independent work. */
+  private retainAutomaticEntries(plan: InternalPlan): void {
+    const variables=[plan.tokens.primitives,...(plan.tokens.semanticCollections??[plan.tokens.semantic])].flatMap(section=>section.variables);
+    const canonical=(name:string)=>name.replace(/[./]/g,'-');
+    for(const difference of loadConfig(this.configPath).intentionalDifferences??[]) {
+      for(const variable of variables.filter(item=>[item.name,item.codeKey].some(name=>canonical(name)===canonical(difference.name)))) {
+        plan.view.issues.push({kind:'unsupported',key:variable.codeKey,message:`${variable.name}: intentional difference retained; automatic writes skipped.`});
+      }
+    }
+    const safe=new Set<string>();
+    for(const entry of plan.view.entries) {
+      const scoped:InternalPlan={...plan,view:{...plan.view,entries:[...plan.view.entries],issues:plan.view.issues.map(issue=>({...issue}))}};
+      try {
+        this.selectPlan(scoped,{kind:entry.kind,key:entry.key});
+        if(scoped.view.issues.length===0)safe.add(`${entry.kind}:${entry.key}`);
+      } catch (error) {
+        plan.view.issues.push({kind:'unsupported',key:entry.key,message:`${entry.name}: required dependency needs review: ${(error as Error).message}`});
+      }
+    }
+    plan.view.entries=plan.view.entries.filter(entry=>safe.has(`${entry.kind}:${entry.key}`));
   }
   private async execute(plan: InternalPlan, client: BridgeCaller): Promise<Record<string, unknown>> {
     const variableKeys = writes(plan.view, "token"); const componentKeys = writes(plan.view, "component"); const styleKeys = writes(plan.view, "style");
@@ -675,8 +693,7 @@ export class ProjectService {
       // Preserve unresolved bindings verbatim; sync planning remains strict.
       const warnings = await this.descriptionWarnings(sidecar, component, tokenPlan.index);
       const path = this.outputPath(relative(config.root, sidecarPathFor(config.componentsDir, component)));
-      // A sidecar save must not trigger automatic Figma writes before a fresh plan.
-      if (this.automatic()) this.setMonitoring();
+      // A reviewed save keeps the user’s selected mode. Automatic sync re-plans and filters unsafe bindings.
       const temporary = `${path}.${randomUUID()}.tmp`;
       try { writeFileSync(temporary, `${JSON.stringify(sidecar, null, 2)}\n`, { flag: "wx", mode: 0o600 }); renameSync(temporary, path); }
       finally { rmSync(temporary, { force: true }); }

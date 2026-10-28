@@ -322,7 +322,6 @@ class NativeElf {
     ]));
     if (!this.plan) return children;
     const conflicts = this.plan.issues?.some(issue => issue.kind === 'conflict' && issue.blocksApply !== false);
-    const unresolved = this.plan.issues?.some(issue => issue.kind !== 'unsupported');
     if (this.plan.entries?.length) {
       children.push(group(`${this.plan.entries.length} planned ${this.plan.entries.length === 1 ? 'change' : 'changes'}`, this.plan.entries.map(entry => row(entry.name, 'elf.reviewResource', `${entry.kind} · ${entry.action === 'create' ? 'Create' : 'Update'}`, entry.kind === 'component' ? 'symbol-class' : entry.kind === 'style' ? 'symbol-enum' : 'symbol-color', {kind:entry.kind,key:entry.key}, {contextValue:'elf.sync-resource',tooltip:'Review just this resource and its required dependencies'}))));
     } else {
@@ -338,8 +337,8 @@ class NativeElf {
         { contextValue: issue.action ? 'elf.issue' : undefined, tooltip: issue.message },
       ))));
     }
-    if (conflicts) children.push(row('Replace Figma edits affecting planned changes', 'elf.toggleReplace', this.planReplace ? 'On' : 'Off', this.planReplace ? 'checkbox' : 'square'));
-    if (!automatic && !this.planSelection) children.push(row('Keep syncing supported changes after this review', 'elf.toggleEnableAuto', unresolved ? 'Unavailable' : this.planAuto ? 'On' : 'Off', this.planAuto ? 'checkbox' : 'square', undefined, { tooltip: unresolved ? 'Resolve conflicts and removed resources first.' : 'Keep automatic sync enabled after applying this review.' }));
+    if (conflicts && !this.planAuto) children.push(row('Replace Figma edits affecting planned changes', 'elf.toggleReplace', this.planReplace ? 'On' : 'Off', this.planReplace ? 'checkbox' : 'square'));
+    if (!automatic && !this.planSelection) children.push(row('Keep syncing supported changes after this review', 'elf.toggleEnableAuto', this.planAuto ? 'On · safe changes only' : 'Off', this.planAuto ? 'checkbox' : 'square', undefined, { tooltip: 'Sync safe changes automatically; conflicting resources and their dependents stay pending.' }));
     if (this.plan.entries?.length || this.planAuto) children.push(row(this.planAuto ? 'Apply and enable automatic sync' : 'Apply sync', 'elf.applySync', null, 'check', undefined, { color: 'charts.green', contextValue: 'elf.plan-action' }));
     children.push(row('Cancel review', 'elf.cancelPlan', null, 'close'));
     return children;
@@ -576,10 +575,9 @@ class NativeElf {
     const plan = await this.api('/api/project/plan', 'POST', selection ? {selection:{kind:selection.kind,key:selection.key}} : {});
     if (owner !== this.getRuntime()) throw new Error('The project changed. Review a fresh sync plan.');
     if (selection && (plan.selection?.key!==selection.key || plan.selection?.kind!==selection.kind)) throw new Error('Update and restart Elf before reviewing individual resources.');
-    const unresolved = plan.issues?.some(issue => issue.kind !== 'unsupported');
     this.planSelection = selection;
     this.plan = plan; this.planOwner = this.getRuntime();
-    this.planAuto = automatic && this.snapshot?.project?.mode !== 'automatic' && !unresolved;
+    this.planAuto = automatic && this.snapshot?.project?.mode !== 'automatic';
     this.planReplace = false;
     void this.vscode.commands.executeCommand('setContext', 'elf.hasPlan', Boolean(this.plan));
     this.events.fire();
@@ -588,14 +586,14 @@ class NativeElf {
     const conflicts=plan.issues?.some(issue=>issue.kind==='conflict' && issue.blocksApply!==false);
     const options=[...(!plan.entries?.length&&!plan.issues?.length?[{label:'Already in sync',description:'No supported code changes to apply.',action:'inspect'}]:[]),...(plan.entries||[]).map(entry=>({label:entry.name,description:`${entry.action==='create'?'Create':'Update'} ${entry.kind}`,detail:entry.key,action:'inspect'})),
       ...(plan.issues||[]).map(issue=>({label:issue.message,description:issue.kind,action:'issue',issue})),
-      ...(automatic&&unresolved?[{label:'Automatic sync is blocked',description:'Resolve conflicts and removed resources first. Manual review is still available.',action:'blocked'}]:[]),
-      ...(plan.entries?.length||this.planAuto?[{label:conflicts?'Replace Figma edits and apply sync':this.planAuto?'Apply and enable automatic sync':'Apply sync',description:`${plan.entries?.length||0} reviewed changes${selection?' · this component/resource and dependencies':''}`,action:'apply'}]:[]),
+      ...(automatic&&plan.issues?.length?[{label:'Items needing review will be skipped',description:'Independent safe changes keep syncing. Figma edits and intentional differences are preserved.',action:'blocked'}]:[]),
+      ...(plan.entries?.length||this.planAuto?[{label:this.planAuto?'Apply safe changes and enable automatic sync':conflicts?'Replace Figma edits and apply sync':'Apply sync',description:`${plan.entries?.length||0} reviewed changes${selection?' · this component/resource and dependencies':''}`,action:'apply'}]:[]),
       {label:'Keep review open in Changes',action:'sidebar'},{label:'Cancel review',action:'cancel'}];
     const choice=await this.vscode.window.showQuickPick(options,{title:selection?'Review component/resource sync':automatic?'Review and enable automatic sync':'Review sync to Figma',placeHolder:'Inspect the changes and issues, then choose Apply. Nothing is written until you apply.',matchOnDescription:true,matchOnDetail:true,ignoreFocusOut:true});
     if(!choice||choice.action==='sidebar')return;
     if(this.plan!==plan||this.planOwner!==this.getRuntime())throw new Error('The review changed. Prepare a fresh sync review.');
     if(choice.action==='cancel'){this.cancelPlan();return;}
-    if(choice.action==='apply'){if(conflicts)this.planReplace=true;await this.applySync();return;}
+    if(choice.action==='apply'){if(conflicts&&!this.planAuto)this.planReplace=true;await this.applySync();return;}
     if(choice.action==='issue'&&choice.issue?.action==='prepare-component'&&choice.issue.component){await this.prepareDescription(choice.issue.component);return;}
     if(choice.action==='inspect'||choice.action==='issue'||choice.action==='blocked') {
       await this.text(JSON.stringify(plan,null,2),'json','Figma sync review');
@@ -608,18 +606,16 @@ class NativeElf {
     if (this.planOwner !== this.getRuntime()) throw new Error('The project changed. Review a fresh sync plan.');
     const enableAuto = this.planAuto; const replace = this.planReplace;
     const conflicts = plan.issues?.some(issue => issue.kind === 'conflict' && issue.blocksApply !== false);
-    const unresolved = plan.issues?.some(issue => issue.kind !== 'unsupported');
-    if (conflicts && !this.planReplace) throw new Error('Replace Figma edits for this plan before applying it.');
-    if (this.planAuto && unresolved) throw new Error('Resolve conflicts and removed resources before enabling automatic sync.');
-    if (conflicts) {
+    if (!enableAuto && conflicts && !this.planReplace) throw new Error('Replace Figma edits for this plan before applying it.');
+    if (conflicts && !enableAuto) {
       const choice = await this.vscode.window.showWarningMessage('This plan replaces Figma edits affecting the planned changes. Continue?', { modal: true }, 'Replace and apply');
       if (choice !== 'Replace and apply') return;
     }
     if (this.plan !== plan || this.planOwner !== this.getRuntime() || this.planAuto !== enableAuto || this.planReplace !== replace) throw new Error('The review changed. Review the plan again.');
-    const result = await this.api('/api/project/apply', 'POST', { planId: plan.id, enableAuto, overwriteConflicts: conflicts }, this.planOwner);
+    const result = await this.api('/api/project/apply', 'POST', { planId: plan.id, enableAuto, overwriteConflicts: conflicts && !enableAuto }, this.planOwner);
     this.plan = null; this.planAuto = false; this.planReplace = false;
     await this.refresh({ resources: true });
-    void this.vscode.window.showInformationMessage(`${result.synced} ${result.synced === 1 ? 'resource' : 'resources'} synced${result.issues?.length ? '; some items still need attention' : ''}.`);
+    void this.vscode.window.showInformationMessage(`${enableAuto ? 'Automatic sync enabled. ' : ''}${result.synced} ${result.synced === 1 ? 'resource' : 'resources'} synced${result.issues?.length ? '; some items still need attention' : ''}.`);
   }
   cancelPlan() {
     this.plan = null; this.planAuto = false; this.planReplace = false; this.events.fire();
@@ -630,7 +626,6 @@ class NativeElf {
   }
   toggleEnableAuto() {
     if (!this.plan || this.snapshot?.project?.mode === 'automatic') return;
-    if (this.plan.issues?.some(issue => issue.kind !== 'unsupported')) throw new Error('Resolve conflicts and removed resources before enabling automatic sync.');
     this.planAuto = !this.planAuto; this.events.fire();
   }
   async report() {
@@ -734,7 +729,7 @@ class NativeElf {
     if (!draft || draft.owner !== this.getRuntime()) throw new Error('Open a description using Elf: Prepare Component Description first.');
     const source = document.getText(); let description;
     try { description = JSON.parse(source); } catch { throw new Error('Fix the description JSON before saving.'); }
-    if (await this.vscode.window.showWarningMessage(`Save this reviewed description for ${draft.prepared.name}? This pauses automatic sync and does not write to Figma.`, { modal: true }, 'Save reviewed description') !== 'Save reviewed description') return;
+    if (await this.vscode.window.showWarningMessage(`Save this reviewed description for ${draft.prepared.name}? Automatic sync stays in its current mode; when enabled, eligible reviewed changes can sync after saving.`, { modal: true }, 'Save reviewed description') !== 'Save reviewed description') return;
     if (document.getText() !== source || draft.owner !== this.getRuntime()) throw new Error('The draft or project changed. Review it again.');
     const saved = await this.api('/api/project/save-description', 'POST', { component: draft.prepared.codeKey, reviewHash: draft.prepared.reviewHash, description }, draft.owner);
     this.drafts.delete(document.uri.toString());

@@ -17,7 +17,7 @@ export function registerProjectTools(server: McpServer, project: ProjectService)
   add('require_strict_file_verification', 'After user request, require independently verified URL identity again. Pauses auto-sync and closes this project’s plugin-only connection. REST quotas apply.', {}, () => project.useStrictAuthorization());
   add("check_drift", "Check the configured code sources against the connected Figma file and write a drift report. Does not write to Figma.", {}, () => project.check());
   add("plan_sync", "Preview exact supported writes, conflicts, removed resources and missing descriptions. Present the result to the user before applying.", {selection:z.object({kind:z.enum(["token","component","style"]),key:z.string().min(1)}).optional()}, args => project.plan(args.selection));
-  add("apply_sync", "Apply a previously reviewed, unexpired plan. Rejects stale plans. Enable automatic sync or replace Figma edits only when the user explicitly requested that choice.", {
+  add("apply_sync", "Apply a previously reviewed, unexpired plan. Rejects stale plans. Enable automatic sync or replace Figma edits only when the user explicitly requested that choice. Enabling automatic sync applies only safe independent entries; conflicts, intentional differences and dependent writes stay pending.", {
     planId: z.string().min(1), enableAuto: z.boolean().optional(), overwriteConflicts: z.boolean().optional(),
   }, args => project.apply(args.planId, args));
   add('component_library_setup','Inspect a curated library installation command and provider/framework setup steps. No execution or writes.',{library:z.string()},args=>project.componentLibrarySetup(args.library));
@@ -34,7 +34,7 @@ export function registerProjectTools(server: McpServer, project: ProjectService)
   add("validate_component_description", "Validate a generated draft against its source revision, schema and variants. Unresolved token bindings return warnings and syncReady:false without blocking local saving. Does not save or write to Figma.", {
     component: z.string().min(1), description: z.record(z.string(), z.unknown()), reviewHash: z.string().regex(/^[a-f0-9]{64}$/),
   }, args => project.validateDescription(args.component, args.description, args.reviewHash));
-  add("save_component_description", "Save an explicitly reviewed Figma description for a local component. Preserves unresolved token bindings with warnings; Figma sync remains blocked until they resolve. Validates schema and paths. Pass the reviewHash from prepare_component to reject stale drafts. Pauses automatic sync; does not write to Figma. Use plan_sync next.", {
+  add("save_component_description", "Save an explicitly reviewed Figma description for a local component. Preserves unresolved token bindings with warnings; Figma sync remains blocked until they resolve. Validates schema and paths. Pass the reviewHash from prepare_component to reject stale drafts. Preserves the current sync mode; when automatic sync is enabled, eligible reviewed changes may sync after saving. The save itself does not write to Figma.", {
     component: z.string().min(1), description: z.record(z.string(), z.unknown()), reviewHash: z.string().regex(/^[a-f0-9]{64}$/),
   }, args => project.saveDescription(args.component, args.description, args.reviewHash));
 }

@@ -267,7 +267,7 @@ test("component drafts are actionable and stale code or descriptions cannot be a
   } finally {p.cleanup();}
 });
 
-test("reviewing an invalid description preserves it until save and pauses automatic writes", async () => {
+test("reviewing and saving a description preserves automatic mode without writing Figma inside the save", async () => {
   const p = project(true);
   try {
     await p.service.apply((await p.service.plan()).id, {enableAuto: true});
@@ -278,7 +278,7 @@ test("reviewing an invalid description preserves it until save and pauses automa
     assert.equal(readFileSync(path, "utf8"), "{ invalid description");
     const writes = p.calls.filter(call => /^(upsert|create|delete)/.test(call)).length;
     await p.service.saveDescription(prepared.codeKey as string, prepared.sidecar, prepared.reviewHash as string);
-    assert.equal(p.service.automatic(), false);
+    assert.equal(p.service.automatic(), true);
     assert.equal(p.calls.filter(call => /^(upsert|create|delete)/.test(call)).length, writes);
     assert.equal((await p.service.plan()).issues.some(issue => issue.action === "prepare-component"), false);
   } finally {p.cleanup();}
@@ -312,8 +312,10 @@ test("intentional differences pause automatic writes and require an explicit man
     assert.equal((await p.service.autoSync()).paused, true);
     assert.equal(p.calls.filter(call => /^(upsert|create|delete)/.test(call)).length, writes);
     const plan = await p.service.plan();
-    await assert.rejects(p.service.apply(plan.id, {enableAuto: true}), /Intentional differences/);
-    await p.service.apply(plan.id);
+    const enabled=await p.service.apply(plan.id, {enableAuto: true});
+    assert.equal(enabled.synced,0);assert.equal(p.service.automatic(),true);
+    assert.equal(p.variables[0].valuesByMode.Value.value,"#112233");
+    await p.service.apply((await p.service.plan()).id);
     assert.equal(p.variables[0].valuesByMode.Value.value, "#334455");
   } finally {p.cleanup();}
 });
@@ -573,5 +575,58 @@ test('HeroUI v3 requires v3 packages plus React 19 and Tailwind 4 without upgrad
   setup=await p.service.componentLibrarySetup('@heroui/react');assert.equal(setup.installed,true);assert.deepEqual(setup.prerequisites,[]);
   await p.service.rememberComponentLibrary('@heroui/react');
   assert.equal((await p.service.listComponentImports()).preferredLibrary,'@heroui/react');
+ }finally{p.cleanup();}
+});
+
+test('automatic sync skips a conflicted token and dependent component while syncing independent resources',async()=>{
+ const p=project(true);try{
+  await p.service.apply((await p.service.plan()).id,{enableAuto:true});
+  const button=p.refs.find(item=>item.name==='Button');const beforeNode=JSON.stringify(p.nodes[button.id]);
+  p.variables[0].valuesByMode.Value.value='#abcdef';
+  writeFileSync(join(p.root,'tokens.css'),':root { --color-primary: #445566; --spacing-2: 8px; }');
+  writeFileSync(join(p.root,'components','Button.figma.json'),JSON.stringify({fill:'color.primary',size:{width:180,height:40}}));
+  writeFileSync(join(p.root,'components','Independent.tsx'),'export function Independent(){return <div/>}');
+  writeFileSync(join(p.root,'components','Independent.figma.json'),JSON.stringify({size:{width:80,height:40}}));
+  const result=await p.service.autoSync();
+  assert.equal(result.paused,false);assert.equal(p.service.automatic(),true);
+  assert.equal(p.variables.find(item=>item.codeKey==='color-primary').valuesByMode.Value.value,'#abcdef');
+  assert(p.variables.some(item=>item.codeKey==='spacing-2'));
+  assert(p.refs.some(item=>item.name==='Independent'));
+  assert.equal(JSON.stringify(p.nodes[button.id]),beforeNode);
+ }finally{p.cleanup();}
+});
+
+test('enabling automatic sync with conflicts applies safe entries without replacing Figma edits',async()=>{
+ const p=project();try{
+  await p.service.apply((await p.service.plan()).id);
+  p.variables[0].valuesByMode.Value.value='#abcdef';
+  writeFileSync(join(p.root,'tokens.css'),':root { --color-primary: #445566; --spacing-2: 8px; }');
+  const result=await p.service.apply((await p.service.plan()).id,{enableAuto:true,overwriteConflicts:true});
+  assert.equal(p.service.automatic(),true);assert.equal(result.synced,1);
+  assert.equal(p.variables.find(item=>item.codeKey==='color-primary').valuesByMode.Value.value,'#abcdef');
+  assert(p.variables.some(item=>item.codeKey==='spacing-2'));
+ }finally{p.cleanup();}
+});
+
+test('intentional differences hold only the selected token and leave independent automatic changes running',async()=>{
+ const p=project();try{
+  await p.service.apply((await p.service.plan()).id,{enableAuto:true});
+  const raw=JSON.parse(readFileSync(p.path,'utf8'));raw.intentionalDifferences=[{name:'color-primary',figmaValue:'#112233',codeValue:'#334455',reason:'Platform contrast'}];writeFileSync(p.path,JSON.stringify(raw));
+  writeFileSync(join(p.root,'tokens.css'),':root { --color-primary: #334455; --spacing-2: 8px; }');
+  const result=await p.service.autoSync();
+  assert.equal(result.paused,false);assert.equal(p.variables[0].valuesByMode.Value.value,'#112233');
+  assert(p.variables.some(item=>item.codeKey==='spacing-2'));
+ }finally{p.cleanup();}
+});
+
+test('reviewed description saves remain eligible for the next automatic sync pass',async()=>{
+ const p=project(true);try{
+  await p.service.apply((await p.service.plan()).id,{enableAuto:true});
+  const prepared=await p.service.prepareComponent('Button');
+  await p.service.saveDescription('Button',{size:{width:180,height:40}},String(prepared.reviewHash));
+  assert.equal(p.service.automatic(),true);
+  await p.service.autoSync();
+  const button=p.refs.find(item=>item.name==='Button');
+  assert.equal(p.nodes[button.id].width,180);
  }finally{p.cleanup();}
 });
