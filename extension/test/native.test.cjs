@@ -133,7 +133,7 @@ test('native views separate daily status, changes, and activity from management'
   await h.native.refresh();
   assert.deepEqual(h.views.map(view => view.id), ['elf.overview', 'elf.changes', 'elf.activityView']);
   const overview = await h.native.getChildren();
-  assert.deepEqual(overview.map(item => item.label), ['project', 'Figma file', '2 differences', 'Drift details']);
+  assert.deepEqual(overview.map(item => item.label), ['project', 'Figma file', 'Review and sync changes', 'Enable automatic sync…', '2 differences', 'Drift details']);
   assert.equal(overview[0].description, 'Monitoring');
   const changes = await h.native.getChildren(undefined, 'changes');
   assert(changes.some(item => item.label === 'Review code changes'));
@@ -519,4 +519,43 @@ test('shadcn setup warns about CLI execution and stages the command without runn
  assert(h.warningMessages.some(item=>item.message.includes('downloads and executes code')));
  assert.equal(h.requests.filter(item=>item.path==='/api/project/component-imports').length,2);
  assert.equal(JSON.parse(h.requests.find(item=>item.path==='/api/project/prepare-component-import').body).library,'shadcn');
+});
+
+test('ready components expose expanded manual sync and an inline review action',async t=>{
+ const h=harness({components:[{name:'Button',codeKey:'button',descriptionStatus:'ready'}]});t.after(()=>h.native.dispose());
+ const components=await h.native.componentChildren();
+ assert.equal(components[0].expanded,true);assert.equal(components[0].contextValue,'elf.component');
+ assert(components[0].children.some(item=>item.label==='Sync component to Figma…'));
+ await h.commands.get('elf.reviewResource')(components[0]);
+ assert.deepEqual(JSON.parse(h.requests.find(item=>item.path==='/api/project/plan').body).selection,{kind:'component',key:'button'});
+ assert(h.executed.some(item=>item.name==='workbench.view.extension.elf'));
+});
+
+test('manual review picker applies only after explicitly choosing Apply sync',async t=>{
+ const h=harness();t.after(()=>h.native.dispose());await h.native.refresh();
+ h.quickPicks.push({action:'apply'});await h.commands.get('elf.reviewSync')();
+ const apply=h.requests.find(item=>item.path==='/api/project/apply');assert(apply);
+ assert.equal(JSON.parse(apply.body).enableAuto,false);
+});
+
+test('automatic review picker can enable watching even when there are no initial changes',async t=>{
+ const h=harness({plan:{id:'empty',entries:[],issues:[]}});t.after(()=>h.native.dispose());await h.native.refresh();
+ await h.commands.get('elf.toggleAutomatic')();
+ assert(h.native.syncChildren().some(item=>item.label==='Already in sync'));
+ h.quickPicks.push({action:'apply'});await h.commands.get('elf.toggleAutomatic')();
+ const apply=h.requests.find(item=>item.path==='/api/project/apply');assert(apply);
+ assert.equal(JSON.parse(apply.body).enableAuto,true);
+});
+
+test('dismissing the picker leaves review open and never writes to Figma',async t=>{
+ const h=harness();t.after(()=>h.native.dispose());await h.native.refresh();
+ await h.commands.get('elf.toggleAutomatic')();
+ assert(h.native.plan);assert.equal(h.requests.some(item=>item.path==='/api/project/apply'),false);
+});
+
+test('picker replacement still requires the explicit Figma-conflict confirmation',async t=>{
+ const h=harness({plan:{id:'conflict',entries:[{kind:'component',key:'Button',name:'Button',action:'update'}],issues:[{kind:'conflict',key:'Button',message:'Figma changed',blocksApply:true}]}});t.after(()=>h.native.dispose());await h.native.refresh();
+ h.quickPicks.push({action:'apply'});await h.commands.get('elf.reviewSync')();
+ assert.equal(h.requests.some(item=>item.path==='/api/project/apply'),false);
+ assert(h.warningMessages.some(item=>item.message.includes('replaces Figma edits')));
 });

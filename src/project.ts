@@ -438,7 +438,7 @@ export class ProjectService {
       if (component.variants.length > 50 || specs.some(spec => spec && Array.isArray(spec.children) && spec.children.length + (spec.text ? 1 : 0) > 50)) {
         issues.push({ kind: "unsupported", key, message: `${component.parsed.name}: its variant or child count exceeds the verified component limit. Split the description into smaller components before syncing.` }); continue;
       }
-      if (component.sidecarError) { issues.push({ kind: "unsupported", key, component: component.parsed.codeKey, action: "prepare-component", message: `${component.parsed.name}: prepare and review its Figma description before syncing.` }); continue; }
+      if (component.sidecarError) { issues.push({ kind: "unsupported", key, component: component.parsed.codeKey, action: "prepare-component", message: `${component.parsed.name}: ${component.sidecarError} Prepare and review its Figma description before syncing.` }); continue; }
       if (known?.nodeHash && remote && nodeStateHash(snapshot.nodes[remote.id]) !== known.nodeHash) issues.push({ kind: "conflict", key, message: `${component.parsed.name}: the Figma component was edited.` });
       if (known?.sourceHash && known.sourceHash !== component.sourceHash && known.specHash === specHash) {
         issues.push({ kind: "unsupported", key, component: component.parsed.codeKey, action: "prepare-component", message: `${component.parsed.name}: implementation changed without an updated Figma description. Review the description before syncing.` }); continue;

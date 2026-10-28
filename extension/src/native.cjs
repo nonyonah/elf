@@ -27,6 +27,7 @@ function group(label, children, options = {}) {
     kind: 'group', label, icon: options.icon || 'list-flat', children, collapsible: true,
     expanded: options.expanded !== false, description: options.description,
     color: options.color, tooltip: options.tooltip,
+    contextValue:options.contextValue, syncSelection:options.syncSelection,
   };
 }
 
@@ -92,6 +93,7 @@ class NativeElf {
     register('elf.reviewSync', automatic => this.reviewSync(automatic === true));
     register('elf.applySync', () => this.applySync());
     register('elf.reviewResource', async entry => {
+      if(entry?.syncSelection)entry=entry.syncSelection;
       if (!entry) {
         const plan = await this.api('/api/project/plan','POST',{});
         entry = await this.vscode.window.showQuickPick((plan.entries || []).map(item => ({label:item.name,description:item.kind,kind:item.kind,key:item.key})),{title:'Review one resource sync'});
@@ -269,6 +271,8 @@ class NativeElf {
       ...(project?.bridge?.pendingApproval ? [row('Approve open Figma document', 'elf.approveDocument', project.bridge.pendingApproval.name, 'shield')] : []),
       ...(project?.bridge?.file?.authorization === 'plugin' ? [row('Document approved for this connection', null, 'URL not independently verified', 'shield')] : []),
       ...(project?.authorization !== 'plugin' && this.snapshot.figma?.verificationLimit ? [row('Figma verification paused', null, `Retry after ${new Date(this.snapshot.figma.verificationLimit.retryAt).toLocaleString()}`, 'clock', undefined, { tooltip: 'Figma imposed a REST API rate limit. Reconnecting the account does not bypass it. Saved pairing remains unchanged.' })] : []),
+      row('Review and sync changes', 'elf.reviewSync', 'Manual sync to Figma', 'git-compare'),
+      row(project?.mode === 'automatic' ? 'Pause automatic sync' : 'Enable automatic sync…', 'elf.toggleAutomatic', project?.mode === 'automatic' ? 'On' : 'Review before enabling', 'sync'),
       row(summary, 'elf.report', last?.checkedAt ? new Date(last.checkedAt).toLocaleTimeString() : undefined, last?.status === 'failed' ? 'error' : last?.status === 'drift' ? 'warning' : 'pulse'),
       ...(!project?.running ? [row(project?.configured ? 'Resume monitoring' : 'Set up project', 'elf.setup', null, 'play')] : []),
       ...(this.error || project?.error || project?.attention ? [row('Needs attention', 'elf.report', this.error || project.error || project.attention, 'warning')] : []),
@@ -322,7 +326,7 @@ class NativeElf {
     if (this.plan.entries?.length) {
       children.push(group(`${this.plan.entries.length} planned ${this.plan.entries.length === 1 ? 'change' : 'changes'}`, this.plan.entries.map(entry => row(entry.name, 'elf.reviewResource', `${entry.kind} · ${entry.action === 'create' ? 'Create' : 'Update'}`, entry.kind === 'component' ? 'symbol-class' : entry.kind === 'style' ? 'symbol-enum' : 'symbol-color', {kind:entry.kind,key:entry.key}, {contextValue:'elf.sync-resource',tooltip:'Review just this resource and its required dependencies'}))));
     } else {
-      children.push(row('No supported changes to apply', null, 'Review the issues below', 'info'));
+      children.push(row(this.plan.issues?.length?'Sync needs review':'Already in sync', null, this.plan.issues?.length?'Review the specific issues below':this.planAuto?'Enable automatic sync for future edits':'No pending supported code changes', 'info'));
     }
     if (this.plan.issues?.length) {
       children.push(group(`${this.plan.issues.length} ${this.plan.issues.length === 1 ? 'item needs' : 'items need'} attention`, this.plan.issues.map(issue => row(
@@ -564,8 +568,8 @@ class NativeElf {
     const result = await this.api('/api/project/components', 'POST', {});
     return (result.components || []).map(component => group(component.name, [
       ...(component.descriptionStatus === 'needs-review' && !component.deprecated ? [row('Generate Figma description', 'elf.generateDescription', component.suggestion, 'sparkle', component.codeKey), row('Prepare description manually', 'elf.prepareDescription', null, 'edit', component.codeKey)] : []),
-      ...(!component.deprecated ? [row('Review this component sync', 'elf.reviewResource', 'Includes required dependencies', 'git-compare', {kind:'component',key:component.codeKey}), row('Edit Figma description', 'elf.prepareDescription', null, 'edit', component.codeKey)] : []),
-    ], {expanded:component.descriptionStatus === 'needs-review' && !component.deprecated,description:component.deprecated ? 'Deprecated · retained' : component.descriptionStatus === 'needs-review' ? 'Description needed' : 'Ready to review',icon:component.descriptionStatus === 'needs-review' ? 'lightbulb' : 'symbol-class'}));
+      ...(!component.deprecated ? [row('Sync component to Figma…', 'elf.reviewResource', 'Includes required dependencies', 'git-compare', {kind:'component',key:component.codeKey}), row('Edit Figma description', 'elf.prepareDescription', null, 'edit', component.codeKey)] : []),
+    ], {expanded:!component.deprecated,contextValue:component.deprecated?undefined:'elf.component',syncSelection:{kind:'component',key:component.codeKey},description:component.deprecated ? 'Deprecated · retained' : component.descriptionStatus === 'needs-review' ? 'Description needed' : 'Description ready · review sync',icon:component.descriptionStatus === 'needs-review' ? 'lightbulb' : 'symbol-class'}));
   }
   async reviewSync(automatic = false, selection) {
     const owner = await this.ensureRuntime();
@@ -579,9 +583,24 @@ class NativeElf {
     this.planReplace = false;
     void this.vscode.commands.executeCommand('setContext', 'elf.hasPlan', Boolean(this.plan));
     this.events.fire();
+    await this.vscode.commands.executeCommand('workbench.view.extension.elf');
     await this.vscode.commands.executeCommand('elf.changes.focus');
-    if (!plan.entries?.length) void this.vscode.window.showInformationMessage('No supported changes to apply. Review the listed issues.');
-    else void this.vscode.window.showInformationMessage(`Review the ${plan.entries.length} planned ${plan.entries.length === 1 ? 'change' : 'changes'} in Elf, then apply. A fresh review is required if code or Figma changes.`);
+    const conflicts=plan.issues?.some(issue=>issue.kind==='conflict' && issue.blocksApply!==false);
+    const options=[...(!plan.entries?.length&&!plan.issues?.length?[{label:'Already in sync',description:'No supported code changes to apply.',action:'inspect'}]:[]),...(plan.entries||[]).map(entry=>({label:entry.name,description:`${entry.action==='create'?'Create':'Update'} ${entry.kind}`,detail:entry.key,action:'inspect'})),
+      ...(plan.issues||[]).map(issue=>({label:issue.message,description:issue.kind,action:'issue',issue})),
+      ...(automatic&&unresolved?[{label:'Automatic sync is blocked',description:'Resolve conflicts and removed resources first. Manual review is still available.',action:'blocked'}]:[]),
+      ...(plan.entries?.length||this.planAuto?[{label:conflicts?'Replace Figma edits and apply sync':this.planAuto?'Apply and enable automatic sync':'Apply sync',description:`${plan.entries?.length||0} reviewed changes${selection?' · this component/resource and dependencies':''}`,action:'apply'}]:[]),
+      {label:'Keep review open in Changes',action:'sidebar'},{label:'Cancel review',action:'cancel'}];
+    const choice=await this.vscode.window.showQuickPick(options,{title:selection?'Review component/resource sync':automatic?'Review and enable automatic sync':'Review sync to Figma',placeHolder:'Inspect the changes and issues, then choose Apply. Nothing is written until you apply.',matchOnDescription:true,matchOnDetail:true,ignoreFocusOut:true});
+    if(!choice||choice.action==='sidebar')return;
+    if(this.plan!==plan||this.planOwner!==this.getRuntime())throw new Error('The review changed. Prepare a fresh sync review.');
+    if(choice.action==='cancel'){this.cancelPlan();return;}
+    if(choice.action==='apply'){if(conflicts)this.planReplace=true;await this.applySync();return;}
+    if(choice.action==='issue'&&choice.issue?.action==='prepare-component'&&choice.issue.component){await this.prepareDescription(choice.issue.component);return;}
+    if(choice.action==='inspect'||choice.action==='issue'||choice.action==='blocked') {
+      await this.text(JSON.stringify(plan,null,2),'json','Figma sync review');
+      void this.vscode.window.showInformationMessage('Review remains open in Elf → Changes. Choose Apply sync there when ready.');
+    }
   }
   async applySync() {
     if (!this.plan) throw new Error('Review sync before applying changes.');

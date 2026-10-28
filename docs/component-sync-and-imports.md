@@ -151,3 +151,9 @@ Both are first-class library selections in the extension, npm Settings, and MCP 
 HeroUI uses the v3 package line (`@heroui/react@^3`, `@heroui/styles@^3`). Elf checks declared React/React DOM 19+ and Tailwind v4 prerequisites and does not upgrade them automatically. HeroUI v2 does not count as ready. Import Tailwind before HeroUI styles in your application CSS; no HeroUIProvider is needed. Generated context includes v3 guidance, and draft validation rejects the v2 provider import. Dependency declaration checks do not replace peer resolution, CSS setup, or application testing.
 
 References: [shadcn installation](https://ui.shadcn.com/docs/installation), [HeroUI v3 quick start](https://heroui.com/en/docs/react/getting-started/quick-start).
+
+### Starting a sync in the native extension
+
+Overview provides **Review and sync changes** and **Enable automatic sync**. Project component groups start expanded and include **Sync component to Figma**, with the same individual-review action available beside the component row. Description readiness means the sidecar validates; it is not a pending-change count.
+
+A native review picker lists the planned creates/updates and specific blocking issues, then offers **Apply sync** or **Apply and enable automatic sync**. Dismissing it leaves the review in Changes without writing. A clean empty plan reports **Already in sync**; automatic sync can still be enabled for subsequent edits. Figma conflicts still require explicit replacement confirmation. Missing-token issues display their actual validation reason rather than a generic “no supported changes” message.
