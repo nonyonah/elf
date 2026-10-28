@@ -12,3 +12,5 @@ batch/elf.manifest.json
 extension/runtime/
 *.vsix
 .DS_Store
+/extension/media/elf-mascot.png
+/settings-next/public/brand/elf-mascot.png

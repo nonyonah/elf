@@ -9,7 +9,8 @@ const inter = Inter({
 });
 
 export const metadata = {
-  title: "elf settings",
+  title: "Elf Settings",
+  icons: {icon:"/brand/elf-mascot.png"},
   description: "Configure Slack notifications and drift preferences",
 };
 

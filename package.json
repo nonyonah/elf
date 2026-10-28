@@ -47,7 +47,8 @@
     "bridge-plugin/ui.html",
     "bridge-plugin/manifest.json",
     "bridge-plugin/manifest.public.json",
-    "docs"
+    "docs",
+    "assets/brand"
   ],
   "engines": {
     "node": ">=20"
@@ -59,8 +60,8 @@
     "test": "node --import tsx --test test/component-import.test.ts test/token-import.test.ts test/activity.test.ts test/connections.test.ts test/discovery.test.ts test/diff.test.ts test/report.test.ts test/webhook.test.ts test/source.test.ts test/components.test.ts test/deprecations.test.ts test/status.test.ts test/modes.test.ts test/notify.test.ts test/core-purity.test.ts test/core-hash.test.ts test/push.test.ts test/remote-config.test.ts test/slack.test.ts test/settings.test.ts test/settings-api.test.ts test/start.test.ts test/project.test.ts",
     "test:worker": "node worker/test.mjs",
     "notify:drill": "node test/notify-drill.mjs",
-    "build:plugin": "tsc -p plugin/tsconfig.json",
-    "build:bridge-plugin": "node scripts/build-bridge-auth.mjs && tsc -p bridge-plugin/tsconfig.json && node scripts/build-public-bridge.mjs",
+    "build:plugin": "npm run build:brand && tsc -p plugin/tsconfig.json",
+    "build:bridge-plugin": "npm run build:brand && node scripts/build-bridge-auth.mjs && tsc -p bridge-plugin/tsconfig.json && node scripts/build-public-bridge.mjs",
     "typecheck": "tsc --noEmit",
     "prepublishOnly": "npm run typecheck && npm run mcp:typecheck && npm --prefix settings-next run typecheck && npm --prefix settings-next run build && npm run build:bridge-plugin",
     "mcp:test": "npm --prefix mcp test",
@@ -70,7 +71,8 @@
     "batch:typecheck": "npm --prefix batch run typecheck",
     "watch:test": "npm --prefix watch test",
     "watch:typecheck": "npm --prefix watch run typecheck",
-    "test:all": "npm test && npm run typecheck && npm run test:worker && npm run notify:drill && npm run batch:test && npm run batch:typecheck && npm run watch:test && npm run watch:typecheck && npm --prefix mcp test && npm --prefix mcp run typecheck && npm --prefix mcp run verify:plugin && npm --prefix console test && npm --prefix console run typecheck && npm run build:plugin && npm run build:bridge-plugin && npm --prefix settings-next run typecheck && npm --prefix settings-next run build"
+    "test:all": "npm test && npm run typecheck && npm run test:worker && npm run notify:drill && npm run batch:test && npm run batch:typecheck && npm run watch:test && npm run watch:typecheck && npm --prefix mcp test && npm --prefix mcp run typecheck && npm --prefix mcp run verify:plugin && npm --prefix console test && npm --prefix console run typecheck && npm run build:plugin && npm run build:bridge-plugin && npm --prefix settings-next run typecheck && npm --prefix settings-next run build",
+    "build:brand": "node scripts/build-brand.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.13.0",

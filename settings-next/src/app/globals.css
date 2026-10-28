@@ -6,26 +6,26 @@
 :root {
   color-scheme: light;
 
-  /* Rift surfaces */
+  /* Elf surfaces */
   --surface-app: #f5f7f8;
   --surface-card: #ffffff;
   --surface-input: #ffffff;
   --surface-subtle: #eef0f2;
 
-  /* Rift text */
+  /* Elf text */
   --fg-default: #121619;
   --fg-muted: #494e51;
   --fg-faint: #65696d;
 
-  /* Rift lines + primary */
+  /* Elf lines + primary */
   --line-default: #e1e3e5;
   --line-input: #868a8c;
-  --primary: #121619;
-  --primary-hover: #282c2f;
+  --primary: #6f3cfa;
+  --primary-hover: #592bd5;
   --on-primary: #ffffff;
-  --ring: #121619;
+  --ring: #6f3cfa;
 
-  /* Rift status */
+  /* Elf status */
   --success-fg: #0d7a3e;
   --warning-fg: #8c6104;
   --danger-fg: #bf3b35;
@@ -78,10 +78,10 @@
 
   --line-default: #34393c;
   --line-input: #868a8c;
-  --primary: #f5f7f8;
-  --primary-hover: #e1e3e5;
-  --on-primary: #121619;
-  --ring: #f5f7f8;
+  --primary: #794afc;
+  --primary-hover: #6f3cfa;
+  --on-primary: #ffffff;
+  --ring: #b49cff;
 
   --success-fg: #4aa969;
   --warning-fg: #bd8d3a;

@@ -8,7 +8,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "prebuild": "node ../scripts/build-brand.mjs",
+    "predev": "node ../scripts/build-brand.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",

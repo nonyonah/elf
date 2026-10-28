@@ -237,6 +237,7 @@ class NativeElf {
     item.iconPath = element.color
       ? new this.vscode.ThemeIcon(element.icon || 'circle-outline', new this.vscode.ThemeColor(element.color))
       : new this.vscode.ThemeIcon(element.icon || 'circle-outline');
+    if(element.mascot)item.iconPath=this.vscode.Uri.file(join(__dirname,'..','media','elf-mascot.png'));
     return item;
   }
   provider(view) {
@@ -268,7 +269,7 @@ class NativeElf {
     const mode = !project?.configured ? 'Setup needed' : !project?.running ? 'Monitoring paused' : project.mode === 'automatic' ? 'Automatic sync' : 'Monitoring';
     const file = project?.bridge?.connected ? project.bridge.file?.name || 'Connected' : 'Plugin disconnected';
     return [
-      row(basename(project?.root || this.getRuntime().root), null, mode, 'folder', undefined, { tooltip: project?.root }),
+      row(basename(project?.root || this.getRuntime().root), null, mode, 'folder', undefined, { tooltip: project?.root, mascot:true }),
       row('Figma file', null, file, 'link'),
       ...(project?.bridge?.pendingApproval ? [row('Approve open Figma document', 'elf.approveDocument', project.bridge.pendingApproval.name, 'shield')] : []),
       ...(project?.bridge?.file?.authorization === 'plugin' ? [row('Document approved for this connection', null, 'URL not independently verified', 'shield')] : []),

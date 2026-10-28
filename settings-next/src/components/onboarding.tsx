@@ -153,6 +153,7 @@ export function Onboarding({ initial, onFinished }: { initial: OnboardingStatus;
     <main className="mx-auto w-full max-w-[420px] px-5 pb-6 pt-8">
       <p className="mb-1 text-[15px] font-medium leading-[1.55]">Set up elf</p>
       <p className="mb-5 truncate text-[11.5px] leading-[1.55] text-faint" title={status.root}>{status.root}</p>
+      <div className="mb-5 flex items-center gap-3"><img src="/brand/elf-mascot.png" width={64} height={64} alt="" /><div><p className="text-[15px] font-semibold">Elf</p><p className="text-[12px] text-muted-foreground">Your design system companion</p></div></div>
       <ol aria-label="Setup progress" className="mb-6 flex items-center gap-3 text-[11px] leading-[1.55] text-faint">
         {["Project", "Figma", "Notifications"].map((label, i) => (
           <li key={label} aria-current={i === step ? "step" : undefined} className={`flex items-center gap-1.5 ${i === step ? "font-medium text-foreground" : ""}`}>

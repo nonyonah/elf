@@ -315,7 +315,7 @@ export default function SettingsPage() {
 
   return (
     <main className="mx-auto w-full max-w-[420px] px-5 pb-6 pt-8">
-      <div className="mb-1 flex items-center justify-between gap-3"><h1 className="text-[15px] font-medium leading-[1.55]">Settings</h1><Notifications activity={onboarding?.activity} projectKey={project?.configPath ?? onboarding?.root ?? ""} /></div>
+      <div className="mb-1 flex items-center justify-between gap-3"><div className="flex items-center gap-3"><img src="/brand/elf-mascot.png" width={48} height={48} alt="" /><div><p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Elf</p><h1 className="text-[15px] font-medium leading-[1.55]">Settings</h1></div></div><Notifications activity={onboarding?.activity} projectKey={project?.configPath ?? onboarding?.root ?? ""} /></div>
       {project?.configPath ? (
         <p
           className="mb-5 truncate text-[11.5px] leading-[1.55] text-faint"
