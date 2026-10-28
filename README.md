@@ -61,6 +61,24 @@ Design tokens are supposed to be the single source of truth for how a product lo
 
 ## Quick start
 
+### Choose your interface
+
+**npm remains fully supported.** Use it for local monitoring, Settings, scripts,
+and CI. The native VS Code extension and MCP adapter use the same engine and
+project files; the extension is an additional interface with a feature-parity
+goal, not a replacement for the package.
+
+From the package, discover the editor experience with:
+
+```bash
+npx elf-tokens extension
+```
+
+The extension is currently a local preview. See [editor setup](extension/README.md)
+for installing a prepared VSIX into your current workspace. It is not yet
+published on the Marketplace. See [production readiness](docs/production-readiness.md)
+for remaining parity gaps and release checks.
+
 ### Option A — use it in any project (npm package)
 
 ```bash
@@ -68,7 +86,7 @@ npm install --save-dev elf-tokens
 npx elf-tokens --config elf.config.json
 ```
 
-`elf-tokens` has no runtime dependencies of its own to worry about — it runs wherever Node ≥ 20 does.
+The package requires Node ≥ 20 and installs its runtime dependencies through npm.
 
 ### Set up a project
 

@@ -63,6 +63,7 @@ Usage:
 The npm package installs both \`elf\` and \`elf-tokens\` — same CLI, either name.
 
 Commands:
+  extension            Discover the native VS Code extension and preview setup.
   start                Open setup and monitor this project (default with no arguments).
   mcp                  Run the MCP adapter for coding assistants (stdio by default).
   bridge               Start the local Figma bridge and print a pairing code.

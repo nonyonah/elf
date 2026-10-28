@@ -35,6 +35,7 @@ export async function main(argv: string[]): Promise<number> {
     else throw new Error(`Unknown startup option: ${argv[i]}`);
   }
   const root = dirname(configPath);
+  if (!existsSync(configPath)) console.log("Prefer working in VS Code? Run elf extension for the native editor preview. npm remains supported.");
   if (!existsSync(fileURLToPath(new URL("../dist/settings/index.html", import.meta.url)))) {
     throw new Error("Settings assets are missing. Build settings-next before packaging Elf.");
   }

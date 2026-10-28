@@ -9,6 +9,7 @@ const require = createRequire(import.meta.url);
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const commands = {
+  extension: ["src/editor.ts", true],
   start: ["src/start.ts", true],
   mcp: ["mcp/src/index.ts", false],
   bridge: ["watch/src/bridge-host.ts", true],
