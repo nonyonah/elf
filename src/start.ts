@@ -154,7 +154,7 @@ export async function main(argv: string[]): Promise<number> {
       if (action === "pairing-code") {
         const pairing = await runtime.refreshPairingCode();
         console.log(`New pairing code: ${pairing.code}\nPaste it into the Figma plugin within five minutes.`);
-        return { ok: true };
+        return { ok: true, pairing };
       }
       if (action === "disconnect-figma") {
         await runtime.revoke(loadConfig(configPath).figma.fileKey); project.setMonitoring(); return { ok: true };

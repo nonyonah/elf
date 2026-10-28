@@ -158,7 +158,7 @@
       text-transform: uppercase;
     }
 
-    input[type="text"] {
+    :is(input[type="text"], input[type="url"], select) {
       width: 100%;
       height: 34px;
       border: 0.5px solid var(--line-strong);
@@ -170,9 +170,9 @@
       letter-spacing: 0.02em;
       outline: none;
     }
-    input[type="text"]::placeholder { color: var(--fg-faint); opacity: 0.7; }
-    input[type="text"]:focus { border-color: var(--focus); box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus) 12%, transparent); }
-    input[type="text"]:disabled { opacity: 0.6; }
+    :is(input[type="text"], input[type="url"], select)::placeholder { color: var(--fg-faint); opacity: 0.7; }
+    :is(input[type="text"], input[type="url"], select):focus { border-color: var(--focus); box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus) 12%, transparent); }
+    :is(input[type="text"], input[type="url"], select):disabled { opacity: 0.6; }
 
     .error {
       display: none;
@@ -380,11 +380,11 @@
           <h2 id="context-heading">Reading this file…</h2>
           <p class="sub" id="context-detail">Bridge state is kept in Figma, not in the document.</p>
           <button class="secondary" id="retry-context" hidden>Try again</button>
-          <div id="file-link-form" hidden>
+          <div id="file-link-form" hidden style="text-align:left;width:100%;margin-top:16px">
             <p class="sub">Paste this open file’s link to select your project. Choose plugin approval without REST, or strict URL verification using your connected Figma account.</p>
-            <label for="figma-file-link">Figma file link</label>
+            <label class="field-label" for="figma-file-link">Figma file link</label>
             <input id="figma-file-link" type="url" placeholder="https://www.figma.com/design/…" />
-            <label for="file-authorization">Document authorization</label>
+            <label class="field-label" for="file-authorization">Document authorization</label>
             <select id="file-authorization"><option value="strict">Strict URL verification (REST)</option><option value="plugin">Approve open document in Elf (no REST)</option></select>
             <p class="sub">Plugin approval requires fresh confirmation in Elf every connection. The URL selects your project; it is not independently verified in this mode.</p>
             <button class="primary" id="use-file-link">Use this file link</button>
@@ -395,7 +395,7 @@
       <section data-panel="disconnected" aria-labelledby="pair-heading">
         <div class="card">
           <h2 id="pair-heading">Pair this file</h2>
-          <p class="sub">Start the elf MCP server, then paste the pairing code it printed.</p>
+          <p class="sub">In Elf, choose Manage → Figma plugin pairing, then paste the fresh code.</p>
 
           <label class="field-label" for="code">Pairing code</label>
           <input
@@ -429,7 +429,7 @@
         <div class="card pairing-box">
           <div class="spinner" aria-hidden="true"></div>
           <h2 id="pairing-heading">Pairing this file…</h2>
-          <p class="sub">Waiting for the local bridge to accept the code.</p>
+          <p class="sub" id="pairing-detail">Waiting for the local bridge to accept the code.</p>
           <button class="secondary" id="cancel-pair">Cancel</button>
         </div>
       </section>
@@ -680,6 +680,8 @@ function pairingHmac(key, text) {
         return;
       }
 
+      $("pairing-heading").textContent = "Pairing this file…";
+      $("pairing-detail").textContent = "Waiting for the local bridge to accept the code.";
       state.authMode = mode;
       state.manualClose = false;
       state.ready = false;
@@ -784,7 +786,9 @@ function pairingHmac(key, text) {
         }
         if (message.type === 'document-approval-required') {
           state.identityVerified = false;
-          setPhase('pairing'); setStatus('pairing', 'Approve this open document in Elf → Manage.'); return;
+          $("pairing-heading").textContent = "Approve this document in Elf";
+          $("pairing-detail").textContent = "Pairing succeeded. In the Elf sidebar, choose Manage → Approve open Figma document, then confirm this file.";
+          setPhase('pairing'); setStatus('pairing', 'approval needed'); return;
         }
         if (message.type === "request" && state.ready && state.identityVerified) {
           state.requestCount += 1;
@@ -798,6 +802,7 @@ function pairingHmac(key, text) {
       };
 
       socket.onclose = (event) => {
+        if (state.socket !== socket) return;
         const modeUsed = state.authMode;
         state.socket = null;
         state.authMode = null;
@@ -812,7 +817,7 @@ function pairingHmac(key, text) {
             postPluginMessage({ type: "forget-session" });
             showPairing("The saved session is no longer valid. Pair this file again.");
           } else {
-            showPairing("That pairing code is invalid, expired, or already used.");
+            showPairing("That code is expired or already used. In Elf, choose Manage → Figma plugin pairing for a fresh code.");
           }
           return;
         }
@@ -938,12 +943,19 @@ function pairingHmac(key, text) {
       contextTimer = setTimeout(() => contextError("Figma did not respond. Try again, or close and reopen the plugin."), 10000);
       postPluginMessage({ type: "context" });
     }
+    function closeCurrentSocket() {
+      clearReadyTimer(); clearReconnectTimer();
+      const socket = state.socket;
+      state.socket = null; state.ready = false; state.identityVerified = false;
+      if (socket) { socket.onmessage = null; socket.onclose = null; socket.close(1000, "file connection changed"); }
+    }
     function showFileLink() {
+      closeCurrentSocket();
       $('file-authorization').value = state.file && state.file.verification ? state.file.verification.method || 'strict' : 'plugin';
       clearTimeout(contextTimer); setPhase("loading");
       $("context-spinner").hidden = true; $("retry-context").hidden = true;
       $("context-heading").textContent = "Link this Figma file";
-      $("context-detail").textContent = "The link is checked against a fresh proof in this document.";
+      $("context-detail").textContent = "Choose how Elf authorizes the file you have open.";
       $("file-link-form").hidden = false;
     }
     $("use-file-link").addEventListener("click", () => postPluginMessage({type: "set-file-link", url: $("figma-file-link").value.trim(), authorization: $('file-authorization').value}));
@@ -956,6 +968,7 @@ function pairingHmac(key, text) {
       if (message.type === "context-error") { contextError(message.message || "Could not load saved bridge settings. Try again."); return; }
 
       if (message.type === "context") {
+        closeCurrentSocket();
         clearTimeout(contextTimer);
         state.file = message.file || null;
         $('file-authorization').value = state.file && state.file.verification && state.file.verification.method === 'plugin' ? 'plugin' : 'strict';

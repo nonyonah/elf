@@ -424,14 +424,9 @@ class NativeElf {
   async pairing() {
     const runtime = await this.ensureRuntime();
     if (!runtime) return;
-    let pairing = runtime.pairing;
-    if (!pairing || Date.now() >= pairing.expires) {
-      await this.api('/api/project/pairing-code', 'POST', {});
-      const deadline = Date.now() + 3000;
-      while (Date.now() < deadline && (!runtime.pairing || Date.now() >= runtime.pairing.expires)) await delay(100);
-      pairing = runtime.pairing;
-    }
-    if (!pairing) { void this.vscode.window.showInformationMessage('A fresh pairing code was requested. Check the Elf terminal output.'); return; }
+    const result = await this.api('/api/project/pairing-code', 'POST', {});
+    const pairing = result?.pairing;
+    if (!pairing?.code) throw new Error('Could not obtain a fresh pairing code. Restart the updated Elf runtime and try again.');
     const choice = await this.vscode.window.showInformationMessage(`Pairing code: ${pairing.code}. It expires in five minutes.`, 'Copy code');
     if (choice === 'Copy code' && this.vscode.env.clipboard) await this.vscode.env.clipboard.writeText(pairing.code);
   }

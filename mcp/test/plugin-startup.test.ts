@@ -180,3 +180,25 @@ test("public UI refuses old bridges and never forwards writes before verificatio
     assert.equal(app.messages.at(-1).type, "request");
   }
 });
+
+
+test("changing a file link retires the old socket before reconnecting with new authorization", () => {
+  const app = ui(); const channel = app.messages[0].channel;
+  const context = {type: "context", channel, file: {name: "Public", key: "file12345", verification: {nonce: "a".repeat(64), method: "strict"}}, bridge: {host: "localhost:8765", session: ""}};
+  app.window.onmessage({data: {pluginMessage: context}});
+  app.document.getElementById("code").value = "abcd-efgh-jkmn";
+  app.elements.get("pair").listeners.click();
+  const old = app.sockets[0];
+  app.elements.get("change-file-link").listeners.click();
+  assert.equal(old.closed.code, 1000);
+  assert.equal(old.onmessage, null);
+  assert.equal(old.onclose, null);
+  app.window.onmessage({data: {pluginMessage: {...context, file: {...context.file, verification: {...context.file.verification, method: "plugin"}}}}});
+  app.elements.get("pair").listeners.click();
+  assert.equal(app.sockets.length, 2);
+  const socket = app.sockets[1];
+  socket.onmessage({data: JSON.stringify({type: "ready", fileVerification: 1, documentApproval: 1})});
+  socket.onmessage({data: JSON.stringify({type: "document-approval-required"})});
+  assert.match(app.elements.get("pairing-detail").textContent, /Pairing succeeded/);
+  assert.equal(app.document.body.dataset.phase, "pairing");
+});

@@ -46,7 +46,7 @@ function harness(options = {}) {
       else if (path === '/api/project/apply') data = options.applyResult || { synced: 1, issues: [] };
       else if (path === '/api/project/resources') data = { resources: options.resources || [{ name: 'color.brand', verified: true, recorded: true, figmaUrl: 'https://www.figma.com/design/file' }] };
       else if (path === '/api/project/check' || path === '/api/project/monitor' || path === '/api/slack/test' || path === '/api/figma/disconnect' || path === '/api/slack/disconnect' || path === '/api/project/disconnect-figma' || path === '/api/project/save-description') data = { ok: true };
-      else if (path === '/api/project/pairing-code') { data = { ok: true }; if (options.newPairing) runtime.pairing = { code: 'NEW-CODE', expires: Date.now() + 60_000 }; }
+      else if (path === '/api/project/pairing-code') { data = { ok: true, pairing: {code: 'NEW-CODE'} }; if (options.newPairing) runtime.pairing = { code: 'NEW-CODE', expires: Date.now() + 60_000 }; }
       else if (path === '/api/figma/connect') data = { url: options.connectUrl || 'https://www.figma.com/oauth?state=private', authorizationOrigin: options.connectOrigin || 'https://www.figma.com' };
       else if (path === '/api/slack/connect') data = { url: options.connectUrl || 'https://slack.com/oauth?state=private', authorizationOrigin: options.connectOrigin || 'https://slack.com' };
       else if (path === '/api/report') data = { markdown: '# Drift' };
@@ -194,7 +194,7 @@ test('pairing, report, resources, and assistants use native affordances', async 
   await h.native.refresh();
   h.infoResponses.push('Copy code');
   await h.commands.get('elf.pairing')();
-  assert.deepEqual(h.clipboard, ['ABCD-1234']);
+  assert.deepEqual(h.clipboard, ['NEW-CODE']);
   h.files.set('/project/drift-report.md', Buffer.from('# Drift'));
   await h.commands.get('elf.report')();
   assert.equal(h.executed.some(item => item.name === 'markdown.showPreview'), false);
