@@ -493,7 +493,18 @@ class NativeElf {
     const catalog=await this.api('/api/project/component-imports','POST',{},owner);
     const component=await this.vscode.window.showQuickPick(catalog.components.map(item=>({label:item.name,description:item.id,nodeId:item.id})),{title:'Import a Figma component'});if(!component)return;
     const framework=await this.vscode.window.showQuickPick([{label:'React (TSX)',value:'react',description:`First supported adapter · detected: ${catalog.frameworks.join(', ')||'none'}`}],{title:'Confirm component framework'});if(!framework)return;
-    const library=await this.vscode.window.showQuickPick([{label:'Native HTML elements',value:'native'},...catalog.libraries.map(name=>({label:name,value:name,description:'Declared in this project'}))],{title:'Choose a component library'});if(!library)return;
+    const choices=catalog.libraryChoices||[{id:'native',label:'Native HTML elements',installed:true},...catalog.libraries.map(id=>({id,label:id,installed:true}))];
+    const library=await this.vscode.window.showQuickPick(choices.map(item=>({label:item.label,value:item.id,description:item.id===catalog.preferredLibrary?'Your saved choice':item.installed?'Declared in this project':'Setup required',detail:item.description})),{title:'Choose a component library'});if(!library)return;
+    const setup=await this.api('/api/project/component-library-setup','POST',{library:library.value},owner);
+    if(!setup.installed){
+      await this.text(JSON.stringify(setup,null,2),'json',`${library.label} setup review`);
+      if(setup.requiresReact) {void this.vscode.window.showInformationMessage('Set up React and React DOM first using your framework guide, then retry this import.');return;}
+      const action=await this.vscode.window.showWarningMessage(`Review setup for ${library.label}. Installation changes package.json and the lockfile. Provider/framework steps must also be completed. The command disables dependency install scripts.`,{modal:true},'Prepare install command');
+      if(action!=='Prepare install command'||owner!==this.getRuntime())return;
+      const terminal=this.vscode.window.createTerminal({name:'Elf library setup',cwd:owner.root});terminal.show();terminal.sendText(setup.command,false);
+      if(await this.vscode.window.showInformationMessage('Review the terminal command and press Enter to install. Complete the displayed setup steps, then continue.','Installation and setup complete')!=='Installation and setup complete')return;
+    }
+    await this.api('/api/project/remember-component-library','POST',{library:library.value},owner);
     const reuse=await this.vscode.window.showQuickPick(catalog.reusable.map(item=>({label:item.name,description:item.file,key:item.codeKey})),{title:'Choose existing components to reuse (optional)',canPickMany:true});if(reuse===undefined)return;
     const safe=String(component.label).replace(/[^A-Za-z0-9]/g,'');
     const path=await this.vscode.window.showInputBox({title:'New component destination',prompt:'Existing files are never overwritten. Choose an existing project folder and PascalCase .tsx filename.',value:`Imported${safe||'Component'}.tsx`});if(!path)return;

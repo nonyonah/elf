@@ -131,3 +131,13 @@ apply operations to the same local project engine used by npm and the extension.
 Stale plans, dependency checks, write verification, and notifications stay in
 that engine. A pairing alone, without a running local Elf project, does not
 provide access to project code. No REST variable reads are needed in plugin mode.
+
+### Library selection and setup
+
+Component imports offer native elements, Material UI, Mantine, and supported libraries already declared in the project. Existing local components can be selected for reuse; shadcn components are local source components rather than a package to install through this preview.
+
+Select **Review library setup** in npm Settings, or choose the library in the native extension. Elf displays a fixed installation recipe, official guide, and required provider/framework steps. It detects npm, pnpm, and Yarn lockfiles. The extension can place the reviewed command in a project terminal; you press Enter yourself. Commands disable installation scripts. No dependency is installed by merely choosing a library, and application entry points, providers, PostCSS, and SSR settings are never rewritten automatically. Review peer versions before installing. Complete setup, then continue; Elf verifies the library declaration and remembers the selection. This check does not prove the provider or application build is correct. Run the project's own build and visual checks.
+
+Recipes follow [Material UI installation](https://mui.com/material-ui/getting-started/installation/) and [Mantine setup](https://mantine.dev/getting-started/). React TSX remains the supported import adapter.
+
+Description references accept an exact token key first, then a unique separator-equivalent key (`spacing.2` → `spacing-2`). Ambiguous aliases are rejected. Type checks still apply, and missing references show available keys. Editing a private AI draft does not update a component sidecar until **Save reviewed description** succeeds.

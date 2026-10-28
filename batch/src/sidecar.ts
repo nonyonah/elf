@@ -3,6 +3,21 @@ import { extname, resolve } from "node:path";
 import { normalizeRef, type TokenIndex } from "./tokens.js";
 import type { ParsedComponent, SidecarSpec, SidecarVariant, Variant } from "./types.js";
 
+/** Exact references win. Separator aliases must identify exactly one token. */
+export function resolveDescriptionToken(value: string, index: TokenIndex) {
+  const ref = normalizeRef(value);
+  const exact = index.get(ref);
+  if (exact) return exact;
+  const canonical = (name: string) => name.replace(/[./]/g, '-');
+  const matches = [...index.entries()].filter(([key, token]) => canonical(key) === canonical(ref) || canonical(token.name) === canonical(ref));
+  if (matches.length === 1) return matches[0][1];
+  if (matches.length > 1) throw new Error(`Ambiguous token reference "${ref}". Use an exact token key: ${matches.map(([key]) => key).join(', ')}.`);
+  return undefined;
+}
+function unknownToken(label: string, field: string, ref: string, index: TokenIndex): Error {
+  return new Error(`${label}: "${field}" references "${ref}", which is not a known token. Available keys: ${[...index.keys()].slice(0, 30).join(', ')}. Save the corrected Elf description draft before reviewing sync.`);
+}
+
 /**
  * `<Name>.figma.json` next to the component. Values reference tokens by their
  * dotted name — `"color.surface.base"` or `"{color.surface.base}"` — never raw
@@ -172,8 +187,8 @@ function numberOrRef(
     return value;
   }
   if (typeof value === "string") {
-    const target = index.get(normalizeRef(value));
-    if (!target) throw new Error(`${label}: "${field}" references "${normalizeRef(value)}", which is not a known token.`);
+    const target = resolveDescriptionToken(value, index);
+    if (!target) throw unknownToken(label, field, normalizeRef(value), index);
     if (target.type !== "FLOAT") {
       throw new Error(`${label}: "${field}" needs a dimension token, but "${normalizeRef(value)}" is ${target.type}.`);
     }
@@ -204,8 +219,8 @@ function translateFill(
 }
 
 function colorRef(value: string, field: string, index: TokenIndex, label: string): string {
-  const target = index.get(normalizeRef(value));
-  if (!target) throw new Error(`${label}: "${field}" references "${normalizeRef(value)}", which is not a known token.`);
+  const target = resolveDescriptionToken(value, index);
+  if (!target) throw unknownToken(label, field, normalizeRef(value), index);
   if (target.type !== "COLOR") {
     throw new Error(`${label}: "${field}" needs a color token, but "${normalizeRef(value)}" is ${target.type}.`);
   }
@@ -296,8 +311,8 @@ function literalFromToken(
     throw new Error(`${label}: "${field}" must be a literal or a {token} reference.`);
   }
   const ref = normalizeRef(value);
-  const target = index.get(ref);
-  if (!target) throw new Error(`${label}: "${field}" references "${ref}", which is not a known token.`);
+  const target = resolveDescriptionToken(value, index);
+  if (!target) throw unknownToken(label, field, ref, index);
   if (target.type !== expected) {
     throw new Error(`${label}: "${field}" needs a ${expected} token, but "${ref}" is ${target.type}.`);
   }

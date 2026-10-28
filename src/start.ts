@@ -170,6 +170,8 @@ export async function main(argv: string[]): Promise<number> {
         if (body.selection !== undefined && (!body.selection || typeof body.selection !== 'object' || !['token','component','style'].includes((body.selection as any).kind) || typeof (body.selection as any).key !== 'string')) throw new Error('Invalid resource selection.');
         return project.plan(body.selection as any);
       }
+      if (action === 'component-library-setup' && typeof body.library === 'string') return project.componentLibrarySetup(body.library);
+      if (action === 'remember-component-library' && typeof body.library === 'string') return project.rememberComponentLibrary(body.library);
       if (action === 'component-imports') return project.listComponentImports();
       if (action === 'prepare-component-import') return project.prepareComponentImport(body as any);
       if (action === 'validate-component-import') {if(typeof body.id!=='string')throw new Error('Prepare a component import.');return project.validateComponentImport(body.id,body.code);}

@@ -16,3 +16,16 @@ test('component imports permit only the chosen library and explicitly reused loc
  assert.equal(validateImportedComponent(library,{...options,library:'@mui/material'},'/project',[]),library);
  assert.throws(()=>validateImportedComponent(library,options,'/project',[]),/confirmed/);
 });
+
+import {resolveDescriptionToken} from '../batch/src/sidecar.js';
+import type {TokenIndex} from '../batch/src/tokens.js';
+test('description token aliases preserve exact names, reject ambiguity and never guess absent tokens',()=>{
+ const token={name:'spacing-2',codeKey:'spacing-2',type:'FLOAT' as const,literal:8};
+ const index:TokenIndex=new Map([['spacing-2',token]]);
+ assert.equal(resolveDescriptionToken('spacing.2',index),token);
+ assert.equal(resolveDescriptionToken('{spacing/2}',index),token);
+ assert.equal(resolveDescriptionToken('spacing.99',index),undefined);
+ const other={...token,name:'spacing/2',codeKey:'spacing/2'};index.set('spacing/2',other);
+ assert.throws(()=>resolveDescriptionToken('spacing.2',index),/Ambiguous/);
+ assert.equal(resolveDescriptionToken('spacing/2',index),other);
+});

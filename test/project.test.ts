@@ -477,3 +477,31 @@ test('reviewed replacement restores an edited Figma token even when the code val
   assert.equal(p.variables[0].valuesByMode.Value.value,'#112233');
  }finally{p.cleanup();}
 });
+
+test('library setup uses fixed recipes, respects the package manager and remembers only declared selections',async()=>{
+ const p=project();try{
+  const setup=await p.service.componentLibrarySetup('@mui/material');
+  assert.equal(setup.command,'npm install --ignore-scripts @mui/material @emotion/react @emotion/styled');
+  assert.equal(setup.requiresReact,true);
+  await assert.rejects(p.service.componentLibrarySetup('x; touch /tmp/unsafe'),/supported/);
+  await assert.rejects(p.service.rememberComponentLibrary('@mui/material'),/Install/);
+  writeFileSync(join(p.root,'pnpm-lock.yaml'),'lockfileVersion: 9');
+  assert.match(String((await p.service.componentLibrarySetup('@mantine/core')).command),/^pnpm add --ignore-scripts/);
+  writeFileSync(join(p.root,'package.json'),JSON.stringify({dependencies:{react:'^19', 'react-dom':'^19','@mui/material':'^7'}}));
+  assert.equal((await p.service.componentLibrarySetup('@mui/material')).command,null);
+  await p.service.rememberComponentLibrary('@mui/material');
+  assert.equal(JSON.parse(readFileSync(p.path,'utf8')).runtime.componentLibrary,'@mui/material');
+  assert.equal((await p.service.listComponentImports()).preferredLibrary,'@mui/material');
+ }finally{p.cleanup();}
+});
+
+test('CSS separator aliases validate and save reviewed component descriptions',async()=>{
+ const p=project(true);try{
+  writeFileSync(join(p.root,'tokens.css'),':root { --spacing-2: 8px; --color-primary: #112233; }');
+  const draft=await p.service.prepareComponent('Button');
+  const description={layoutMode:'HORIZONTAL',gap:'spacing.2',fill:'color.primary',size:{width:120,height:40}};
+  await p.service.validateDescription('Button',description,String(draft.reviewHash));
+  await p.service.saveDescription('Button',description,String(draft.reviewHash));
+  assert.equal((await p.service.prepareComponent('Button')).warning,null);
+ }finally{p.cleanup();}
+});

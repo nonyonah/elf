@@ -41,6 +41,8 @@ function harness(options = {}) {
       else if (path === '/api/project/components') data = {components:options.components || [{name:'Button',file:'Button.tsx',codeKey:'button.tsx#Button'}]};
       else if (path === '/api/project/plan-token-import') data = {id:'import-1',path:'figma.tokens.json',content:'{"tokens":{}}',names:['color-new'],issues:[],limitations:['New JSON file only.']};
       else if (path === '/api/project/apply-token-import') data = {imported:1,path:'figma.tokens.json'};
+      else if (path === '/api/project/component-library-setup') data=options.librarySetup||{installed:true,requiresReact:false};
+      else if (path === '/api/project/remember-component-library') data={saved:true};
       else if (path === '/api/project/component-imports') data={components:[{id:'remote',name:'Alert'}],frameworks:['react'],libraries:[],reusable:[]};
       else if (path === '/api/project/prepare-component-import') data={id:'component-import',exportName:'ImportedAlert',options:JSON.parse(body),limitations:['Review accessibility.']};
       else if (path === '/api/project/validate-component-import') data={valid:true};
@@ -459,4 +461,28 @@ test('component import confirms framework/library/reuse choices and creates only
  await h.commands.get('elf.saveComponentImport')(uri.toString());assert.equal(h.requests.some(item=>item.path==='/api/project/apply-component-import'),false);
  h.warningResponses.push('Create component file');await h.commands.get('elf.saveComponentImport')(uri.toString());
  assert.equal(h.errors.length,0);assert.match(JSON.parse(h.requests.find(item=>item.path==='/api/project/apply-component-import').body).code,/export function ImportedAlert/);
+});
+
+test('library setup stops before drafting when React is absent or installation approval is cancelled',async t=>{
+ for(const requiresReact of [true,false]){
+  const h=harness({librarySetup:{installed:false,requiresReact,command:'npm install --ignore-scripts @mui/material',steps:[]}});t.after(()=>h.native.dispose());await h.native.refresh();
+  h.quickPicks.push({label:'Alert',nodeId:'remote'},{value:'react'},{label:'Material UI',value:'@mui/material'});
+  await h.commands.get('elf.importComponent')();
+  assert.equal(h.errors.length,0);
+  assert.equal(h.requests.some(item=>item.path==='/api/project/prepare-component-import'),false);
+  assert.equal(h.requests.some(item=>item.path==='/api/project/remember-component-library'),false);
+ }
+});
+
+test('approved library setup stages a fixed command without executing it and then resumes import',async t=>{
+ const h=harness({librarySetup:{installed:false,requiresReact:false,command:'npm install --ignore-scripts @mui/material @emotion/react @emotion/styled',steps:[]}});t.after(()=>h.native.dispose());await h.native.refresh();
+ const terminals=[];
+ h.vscode.window.createTerminal=options=>({show(){},sendText(text,execute){terminals.push({options,text,execute});}});
+ h.quickPicks.push({label:'Alert',nodeId:'remote'},{value:'react'},{label:'Material UI',value:'@mui/material'},[],{value:'manual'});
+ h.warningResponses.push('Prepare install command');h.infoResponses.push('Installation and setup complete');h.inputResponses.push('ImportedAlert.tsx');
+ await h.commands.get('elf.importComponent')();
+ assert.equal(h.errors.length,0);assert.equal(terminals.length,1);
+ assert.equal(terminals[0].options.cwd,'/project');assert.equal(terminals[0].execute,false);
+ assert.equal(terminals[0].text,'npm install --ignore-scripts @mui/material @emotion/react @emotion/styled');
+ assert.equal(JSON.parse(h.requests.find(item=>item.path==='/api/project/prepare-component-import').body).library,'@mui/material');
 });

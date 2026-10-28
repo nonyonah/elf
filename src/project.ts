@@ -1,3 +1,4 @@
+import {componentLibraryChoices} from './component-library.js';
 import {validateImportedComponent,type ComponentImportOptions} from './component-import.js';
 import {importedTokenDocument, type ImportSnapshot} from './token-import.js';
 import {discoverProject, readSource} from './discovery.js';
@@ -218,11 +219,32 @@ export class ProjectService {
     const components=hasComponents?parseComponents(config.componentsDir,config.componentFiles).filter(item=>item.deprecated===undefined).map(item=>({name:item.name,codeKey:item.codeKey,file:relative(root,resolve(config.componentsDir,item.file))})):[];
     return {frameworks:[...(dependencies.includes('react')||components.some(item=>/\.[jt]sx$/.test(item.file))?['react']:[]),...(dependencies.includes('vue')||components.some(item=>item.file.endsWith('.vue'))?['vue']:[]),...(dependencies.includes('svelte')||components.some(item=>item.file.endsWith('.svelte'))?['svelte']:[])],libraries:dependencies.filter(name=>/^(?:@mui\/material|@chakra-ui\/react|@radix-ui\/react-[a-z-]+|@heroui\/react|antd|@mantine\/core)$/.test(name)),dependencies,components,fingerprint:hashSpec({manifest,components:components.map(item=>({...item,source:readSource(resolve(root,item.file))})),sources:this.importSources().hash})};
   }
+  async componentLibrarySetup(library: string): Promise<Record<string,unknown>> {
+    const environment = this.importEnvironment();
+    const choice = componentLibraryChoices(environment.libraries).find(item => item.id === library);
+    if (!choice) throw new Error('Choose a supported component library.');
+    const root = dirname(this.configPath);
+    const manager = existsSync(join(root,'pnpm-lock.yaml')) ? 'pnpm' : existsSync(join(root,'yarn.lock')) ? 'yarn' : 'npm';
+    const manifestPath=join(root,'package.json');
+    const manifest=existsSync(manifestPath)?JSON.parse(readSource(manifestPath)):{};
+    const skipScripts=manager==='yarn' && (/^yarn@[2-9]/.test(manifest.packageManager||'')||existsSync(join(root,'.yarnrc.yml'))) ? '--mode=skip-build' : '--ignore-scripts';
+    const command = choice.installed ? null : `${manager} ${manager === 'npm' ? 'install' : 'add'} ${skipScripts} ${choice.packages.join(' ')}`;
+    return {...choice, command, requiresReact: !environment.dependencies.includes('react') || !environment.dependencies.includes('react-dom'), message:'Review package versions, installation scripts, provider and framework setup. Elf does not execute commands or rewrite application configuration.'};
+  }
+  async rememberComponentLibrary(library: string): Promise<Record<string,unknown>> {
+    return this.serial(async () => {
+      const choice = await this.componentLibrarySetup(library);
+      if (!choice.installed) throw new Error('Install the selected library, then retry.');
+      const raw = this.raw();
+      writeProjectConfig(this.configPath, {...raw, runtime:{...raw.runtime,componentLibrary:library}});
+      return {saved:true,library};
+    });
+  }
   async listComponentImports():Promise<Record<string,unknown>> {
     return this.serial(()=>this.transaction(async client=>{
       const {components}=await client.call<{components:any[]}>('list_components',{deep:true});
       const environment=this.importEnvironment();
-      return {components:components.map(item=>({id:item.id,name:item.name})),frameworks:environment.frameworks,libraries:environment.libraries,reusable:environment.components.filter(item=>/\.(?:jsx|tsx|js)$/.test(item.file)),supportedFrameworks:['react'],limitations:['React TSX is the first supported output. No dependencies are installed.','Figma does not capture complete behavior, accessibility, or responsive intent.']};
+      return {components:components.map(item=>({id:item.id,name:item.name})),frameworks:environment.frameworks,libraries:environment.libraries,libraryChoices:componentLibraryChoices(environment.libraries),preferredLibrary:this.raw().runtime?.componentLibrary||'native',reusable:environment.components.filter(item=>/\.(?:jsx|tsx|js)$/.test(item.file)),supportedFrameworks:['react'],limitations:['React TSX is the first supported output. No dependencies are installed.','Figma does not capture complete behavior, accessibility, or responsive intent.']};
     }));
   }
   async prepareComponentImport(options:ComponentImportOptions):Promise<Record<string,unknown>> {
