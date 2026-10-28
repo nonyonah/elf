@@ -65,3 +65,22 @@ test('each Settings open requests a fresh private link and rejects a changed ori
   await assert.rejects(h.runtime.openSettings(), /Could not open/);
   await h.runtime.stop();
 });
+
+test('bridge restart stops the owned runtime and uses only the bundled bridge command', async () => {
+  const h = harness(); h.runtime.start();
+  const original = h.runtime.launch; const launches = [];
+  h.runtime.launch = (...args) => {
+    launches.push(args);
+    if (args[1].some(value => value.includes('main(["--stop"])'))) {
+      const child = new EventEmitter(); child.stdout = new EventEmitter(); child.stderr = new EventEmitter(); child.kill = () => {};
+      queueMicrotask(()=>child.emit('exit',0)); return child;
+    }
+    return original(...args);
+  };
+  await h.runtime.restartBridge();
+  assert.equal(launches.length,2);
+  assert(launches[0][1].at(-1).includes('watch/src/bridge-host.ts'));
+  assert.equal(launches[0][2].shell,undefined);
+  assert.equal(h.runtime.state,'starting');
+  await h.runtime.stop();
+});

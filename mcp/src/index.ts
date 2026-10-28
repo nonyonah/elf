@@ -60,7 +60,7 @@ async function main(): Promise<void> {
   }
   stderrLogger.log(`token fingerprint ${tokenFingerprint(config.token)} (${TOKEN_ENV})`);
 
-  const client = new PluginClient(runtime.connection, (fileKey, work) => runtime.transaction(projectPath ? loadConfig(projectPath).figma.fileKey : fileKey, work));
+  const client = new PluginClient(runtime.connection, (fileKey, work) => runtime.transaction(projectPath ? loadConfig(projectPath).figma.fileKey : fileKey, work, {authorization: projectPath ? loadConfig(projectPath).figma.authorization : "strict"}));
   client.onStatus((status) => {
     stderrLogger.log(
       status.connected

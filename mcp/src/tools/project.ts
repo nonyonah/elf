@@ -12,6 +12,9 @@ export function registerProjectTools(server: McpServer, project: ProjectService)
     });
   };
   add("project_status", "Read this local project's sync mode and recent activity.", {}, async () => ({ automatic: project.automatic(), activity: project.activity }));
+  add('pending_document_approval', 'Inspect the open document awaiting plugin-only approval. Its link is a project routing claim, not verified URL identity. Present file name/key to the user.', {}, () => project.pendingDocument());
+  add('approve_plugin_document', 'Only after explicit human consent: switch this project to plugin-only authorization and approve the currently pending document/connection. Pauses automatic sync, does not mutate Figma. Never approve automatically or reuse a prior launch ticket.', {fileKey:z.string().min(8),ticket:z.string().regex(/^[a-f0-9]{64}$/),optIn:z.literal(true)}, args => project.approveDocument(args.fileKey,args.ticket,args.optIn));
+  add('require_strict_file_verification', 'After user request, require independently verified URL identity again. Pauses auto-sync and closes this project’s plugin-only connection. REST quotas apply.', {}, () => project.useStrictAuthorization());
   add("check_drift", "Check the configured code sources against the connected Figma file and write a drift report. Does not write to Figma.", {}, () => project.check());
   add("plan_sync", "Preview exact supported writes, conflicts, removed resources and missing descriptions. Present the result to the user before applying.", {}, () => project.plan());
   add("apply_sync", "Apply a previously reviewed, unexpired plan. Rejects stale plans. Enable automatic sync or replace Figma edits only when the user explicitly requested that choice.", {

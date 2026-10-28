@@ -66,6 +66,7 @@ export interface DashboardConfig {
 
 export interface DriftConfig {
   figma: {
+    authorization?: "strict" | "plugin";
     fileKey: string;
     apiTokenEnv: string;
     source: FigmaSource;

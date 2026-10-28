@@ -48,14 +48,14 @@ export interface BridgeFetchOptions {
  * with an actionable message instead of a stack trace when the server or the
  * plugin is not there.
  */
-export async function connectBridge(fileKey?: string): Promise<BridgeCaller> {
+export async function connectBridge(fileKey?: string, authorization: "strict" | "plugin" = "strict"): Promise<BridgeCaller> {
   const here = dirname(fileURLToPath(import.meta.url));
   loadDotEnvFile(resolve(here, "../../mcp/.env"));
 
   try {
     const client = await createBridgeClient();
     try {
-      if (fileKey) await client.call("__elf_lock", { fileKey }, { timeoutMs: 30_000 });
+      if (fileKey) await client.call("__elf_lock", { fileKey, authorization }, { timeoutMs: 30_000 });
       return client;
     } catch (error) { client.close(); throw error; }
   } catch (error) {

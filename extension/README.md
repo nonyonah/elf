@@ -10,6 +10,13 @@ AI-generated descriptions are available as a development preview through editor
 language models. Slack/Figma authorization opens
 your browser; return to VS Code and the native view refreshes connection status.
 
+For plugin-only use without REST verification, select **Approve open document in
+Elf (no REST)** in the plugin, then **Manage → Approve open Figma document** in
+Elf. Each connection requires fresh confirmation; saved pairing is retained.
+Strict mode remains optional and existing strict projects are not downgraded.
+See [document authorization](https://github.com/nonyonah/elf/blob/main/docs/document-authorization.md) for the security
+model, upgrade steps, and draft recovery after an editor reload.
+
 To use a prepared local `.vsix` in your current workspace, open the Extensions
 view, choose **… → Install from VSIX…**, and select the Elf package. Then open
 the Elf icon in the activity bar. No development window is needed. This local

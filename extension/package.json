@@ -2,7 +2,7 @@
   "name": "elf-design-system",
   "displayName": "Elf",
   "description": "Connect your project and Figma, monitor design drift, and review sync changes.",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "publisher": "elf-local",
   "license": "MIT",
   "repository": {
@@ -195,6 +195,22 @@
       {
         "command": "elf.descriptionContext",
         "title": "Elf: Description Source and Token Context"
+      },
+      {
+        "command": "elf.approveDocument",
+        "title": "Elf: Approve Open Figma Document"
+      },
+      {
+        "command": "elf.authorizationMode",
+        "title": "Elf: Figma Authorization Mode"
+      },
+      {
+        "command": "elf.restartBridge",
+        "title": "Elf: Restart Shared Bridge"
+      },
+      {
+        "command": "elf.recoverDescription",
+        "title": "Elf: Recover Open Description Draft"
       }
     ],
     "menus": {

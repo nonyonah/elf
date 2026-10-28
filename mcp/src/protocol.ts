@@ -31,7 +31,9 @@ export const NOT_CONNECTED_HINT =
 export const CONTROL_PATH = "/control";
 
 export interface BridgeFileInfo {
-  verification?: {nonce: string};
+  verification?: {nonce: string; method?: 'strict' | 'plugin'};
+  authorization?: 'strict' | 'plugin';
+  authorizationId?: string;
   name: string;
   key: string;
 }
@@ -72,6 +74,7 @@ export interface BridgeStatusMessage {
 export interface BridgeReadyMessage {
   type: "ready";
   fileVerification?: number;
+  documentApproval?: number;
   /** Present only when the handshake used a one-time pairing code. */
   session?: string;
   sessionExpiresAt?: string;

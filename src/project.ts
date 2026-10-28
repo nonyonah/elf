@@ -33,6 +33,31 @@ export class ProjectService {
   private tail: Promise<unknown> = Promise.resolve();
   constructor(readonly configPath: string, private readonly runtime: BridgeRuntime) { this.migrate(); }
 
+  private transaction<T>(work: (client: import('../mcp/src/client.js').BridgeClient) => Promise<T>): Promise<T> {
+    const config = loadConfig(this.configPath);
+    return this.runtime.transaction(config.figma.fileKey, work, {authorization: config.figma.authorization ?? 'strict'});
+  }
+  async pendingDocument(): Promise<unknown> {
+    return this.runtime.control('__elf_document_pending');
+  }
+  async approveDocument(fileKey: string, ticket: string, optIn: boolean): Promise<unknown> {
+    if (!optIn || !/^[a-f0-9]{64}$/.test(ticket) || !/^[A-Za-z0-9_-]{8,128}$/.test(fileKey)) throw new Error('Explicit document approval is required.');
+    const pending = await this.pendingDocument() as {file?: {key: string}; ticket?: string} | null;
+    if (!pending || pending.file?.key !== fileKey || pending.ticket !== ticket) throw new Error('The open document changed. Review its approval again.');
+    const raw = existsSync(this.configPath) ? this.raw() : {figma: {fileKey, source:'bridge'}, codebase:{path:'auto',source:'auto'},runtime:{projectConfigured:false,setupComplete:false}};
+    if (raw.figma?.fileKey !== fileKey) throw new Error('The plugin file link does not match this project. Check it before approving.');
+    raw.figma.authorization = 'plugin'; raw.figma.source = 'bridge'; raw.runtime = {...raw.runtime, autoSync:false}; this.reviewed.clear();
+    writeProjectConfig(this.configPath, raw);
+    const result = await this.runtime.control('__elf_document_approve', {fileKey, ticket});
+    this.record('description', 'Open Figma document approved for this plugin connection. URL identity was not verified.');
+    return result;
+  }
+  async useStrictAuthorization(): Promise<unknown> {
+    const raw = this.raw(); raw.figma.authorization = 'strict'; raw.runtime = {...raw.runtime, autoSync:false}; this.reviewed.clear();
+    writeProjectConfig(this.configPath, raw);
+    await this.runtime.control('__elf_require_strict', {fileKey:raw.figma.fileKey});
+    return {ok:true};
+  }
   record(type: Activity["type"], message: string, changes?: SyncedChange[]): void {
     recordActivity(this.configPath, type, message, changes);
   }
@@ -69,7 +94,7 @@ export class ProjectService {
     });
   }
   async plan(): Promise<SyncPlan> {
-    return this.serial(() => this.runtime.transaction(loadConfig(this.configPath).figma.fileKey, async client => {
+    return this.serial(() => this.transaction( async client => {
       const plan = await this.build(client);
       for (const [id, previous] of this.reviewed) if (Date.parse(previous.view.expiresAt) < Date.now()) this.reviewed.delete(id);
       if (this.reviewed.size >= 20) this.reviewed.delete(this.reviewed.keys().next().value!);
@@ -78,7 +103,7 @@ export class ProjectService {
     }));
   }
   async apply(id: string, options: { enableAuto?: boolean; overwriteConflicts?: boolean } = {}): Promise<Record<string, unknown>> {
-    const result = await this.serial(() => this.runtime.transaction(loadConfig(this.configPath).figma.fileKey, async client => {
+    const result = await this.serial(() => this.transaction( async client => {
       const reviewed = this.reviewed.get(id);
       if (!reviewed || Date.parse(reviewed.view.expiresAt) < Date.now()) throw new Error("This sync plan expired. Review a fresh plan.");
       const fresh = await this.build(client);
@@ -97,7 +122,7 @@ export class ProjectService {
     return result;
   }
   async autoSync(): Promise<Record<string, unknown>> {
-    return this.serial(() => this.runtime.transaction(loadConfig(this.configPath).figma.fileKey, async client => {
+    return this.serial(() => this.transaction( async client => {
       if (!this.automatic()) return { synced: 0, paused: false, issues: [] };
       if (loadConfig(this.configPath).intentionalDifferences?.length) return {synced: 0, paused: true, conflicts: ["Intentional differences require reviewed sync."]};
       const plan = await this.build(client);
@@ -110,7 +135,7 @@ export class ProjectService {
     }));
   }
   async resources(): Promise<Record<string, unknown>> {
-    return this.serial(() => this.runtime.transaction(loadConfig(this.configPath).figma.fileKey, async client => {
+    return this.serial(() => this.transaction( async client => {
       const { config } = this.batchConfig(); const manifest = loadManifest(config.manifestFile);
       const { variables } = await client.call<{ variables: any[] }>("list_variables");
       const styles = Object.keys(manifest.styles ?? {}).length ? (await client.call<{styles: any[]}>("list_styles")).styles : [];
@@ -278,7 +303,7 @@ export class ProjectService {
     }
     for (const issue of issues) if (issue.kind === "conflict") issue.blocksApply = !byKey.has(issue.key) || relevant.has(issue.key);
     const view: SyncPlan = { id: randomUUID(), fileKey: loadConfig(this.configPath).figma.fileKey, entries, issues, expiresAt: new Date(Date.now() + 10 * 60_000).toISOString() };
-    const fingerprint = createHash("sha256").update(stableStringify({ config: this.raw(), tokens: tokens.plan, source: [...new Set([config.tokensFile, ...(loadConfig(this.configPath).codebase.paths ?? [])])].map(path => readFileSync(path, "utf8")), components: components.map(component => ({ ...component, source: readFileSync(resolve(config.componentsDir, component.parsed.file), "utf8"), raw: existsSync(sidecarPathFor(config.componentsDir, component.parsed)) ? readFileSync(sidecarPathFor(config.componentsDir, component.parsed), "utf8") : null })), manifest, snapshot })).digest("hex");
+    const fingerprint = createHash("sha256").update(stableStringify({ connectionIdentity: {connectedAt: this.runtime.connection.status.connectedAt, authorizationId: this.runtime.connection.status.file?.authorizationId}, config: this.raw(), tokens: tokens.plan, source: [...new Set([config.tokensFile, ...(loadConfig(this.configPath).codebase.paths ?? [])])].map(path => readFileSync(path, "utf8")), components: components.map(component => ({ ...component, source: readFileSync(resolve(config.componentsDir, component.parsed.file), "utf8"), raw: existsSync(sidecarPathFor(config.componentsDir, component.parsed)) ? readFileSync(sidecarPathFor(config.componentsDir, component.parsed), "utf8") : null })), manifest, snapshot })).digest("hex");
     return { view, fingerprint, config, manifest, tokens: tokens.plan, components, snapshot };
   }
   private async execute(plan: InternalPlan, client: BridgeCaller): Promise<Record<string, unknown>> {
@@ -396,7 +421,7 @@ export class ProjectService {
     return { name: component.name, reviewHash, existing, warning, source: source.slice(0, 20_000), sourceTruncated: source.length > 20_000, dependencies: component.dependencies, tokens: [...tokens.index.entries()].slice(0, 200).map(([key, value]) => ({ key, name: value.name, type: value.type })), tokenCount: tokens.index.size, codeKey: component.codeKey, file: component.file, path: relative(config.root, sidecarPathFor(config.componentsDir, component)), variantProps: component.variantProps, sidecar, reviewRequired: true, message: "Review layout, token bindings and variants against the implementation. This is an editable description, not a rendered reconstruction." };
   }
   async saveDescription(name: string, description: unknown, reviewHash?: string): Promise<Record<string, unknown>> {
-    return this.serial(() => this.runtime.transaction(loadConfig(this.configPath).figma.fileKey, async () => {
+    return this.serial(() => this.transaction( async () => {
       const { config, hasComponents, structured } = this.batchConfig();
       if (!hasComponents) throw new Error("No component source files were discovered in this project. Add a component and try again.");
       const component = parseComponents(config.componentsDir, config.componentFiles).find(item => item.name === name || item.codeKey === name);

@@ -11,8 +11,9 @@ export interface BridgeRuntime {
   connection: PluginConnection;
   pairingCode: BridgePairing | null;
   owned: boolean;
+  control<T = unknown>(method: string, params?: Record<string, unknown>): Promise<T>;
   revoke(fileKey: string): Promise<void>;
-  transaction<T>(fileKey: string, work: (client: BridgeClient) => Promise<T>): Promise<T>;
+  transaction<T>(fileKey: string, work: (client: BridgeClient) => Promise<T>, options?: {authorization?: "strict" | "plugin"}): Promise<T>;
   refreshPairingCode(): Promise<BridgePairing>;
   close(): Promise<void>;
 }
@@ -21,7 +22,7 @@ export interface BridgeRuntime {
 async function requireFileVerification(connection: BridgeClient): Promise<void> {
   try {
     const capabilities = await connection.call<{fileVerification?: number}>("__elf_capabilities", {}, {timeoutMs: 1500});
-    if (capabilities?.fileVerification !== 1 || (capabilities as { accountRenewal?: number }).accountRenewal !== 1) throw new Error("Unsupported bridge");
+    if (capabilities?.fileVerification !== 1 || (capabilities as { accountRenewal?: number; documentApproval?: number }).accountRenewal !== 1 || (capabilities as {documentApproval?: number}).documentApproval !== 1) throw new Error("Unsupported bridge");
   } catch {
     await connection.close();
     throw new Error("An older Elf shared bridge is still running. Stop Elf watcher and MCP sessions, run elf bridge --stop (or node bin/elf-tokens.js bridge --stop in this repo), then run elf start again. Saved pairings are preserved.");
@@ -32,15 +33,16 @@ async function requireFileVerification(connection: BridgeClient): Promise<void> 
 export async function acquireBridge(config: BridgeConfig, logger: Logger = silentLogger): Promise<BridgeRuntime> {
   if (config.persistent) return acquireSharedHost(config, logger);
   const bridge = new Bridge({ ...config, logger });
-  const transaction = async <T>(fileKey: string, work: (client: BridgeClient) => Promise<T>): Promise<T> => {
+  const transaction = async <T>(fileKey: string, work: (client: BridgeClient) => Promise<T>, options?: {authorization?: "strict" | "plugin"}): Promise<T> => {
     const client = await BridgeClient.connect({ ...config, port: boundPort });
-    try { return await client.transaction(fileKey, work); } finally { client.close(); }
+    try { return await client.transaction(fileKey, work, options); } finally { client.close(); }
   };
   let boundPort = config.port;
   try {
     boundPort = await bridge.start();
     return {
       revoke: async fileKey => { const client = await BridgeClient.connect({ ...config, port: boundPort }); try { await client.call("__elf_revoke", { fileKey }); } finally { client.close(); } },
+      control: async <T>(method: string, params: Record<string, unknown> = {}) => { const client = await BridgeClient.connect({...config, port: boundPort}); try {return await client.call<T>(method, params);} finally {await client.close();} },
       transaction, connection: bridge, pairingCode: bridge.pairingCode, owned: true,
       refreshPairingCode: async () => bridge.refreshPairingCode(),
       close: () => bridge.stop(),
@@ -52,6 +54,7 @@ export async function acquireBridge(config: BridgeConfig, logger: Logger = silen
     logger.log("using the existing authenticated Elf bridge");
     return {
       revoke: async fileKey => { await connection.call("__elf_revoke", { fileKey }); },
+      control: <T>(method: string, params?: Record<string, unknown>) => connection.call<T>(method, params),
       transaction, connection, pairingCode: null, owned: false,
       refreshPairingCode: () => connection.call<BridgePairing>("__elf_pairing_refresh"),
       close: async () => connection.close(),
@@ -85,9 +88,10 @@ async function acquireSharedHost(config: BridgeConfig, logger: Logger): Promise<
   const pairingCode = await connection.call<BridgePairing | null>("__elf_pairing_current");
   return {
     connection, pairingCode, owned: false,
-    transaction: async (fileKey, work) => {
+    control: <T>(method: string, params?: Record<string, unknown>) => connection.call<T>(method, params),
+    transaction: async (fileKey, work, options) => {
       const client = await BridgeClient.connect(config);
-      try { return await client.transaction(fileKey, work); } finally { client.close(); }
+      try { return await client.transaction(fileKey, work, options); } finally { client.close(); }
     },
     refreshPairingCode: () => connection.call<BridgePairing>("__elf_pairing_refresh"),
     revoke: async fileKey => { await connection.call("__elf_revoke", { fileKey }); },

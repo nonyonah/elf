@@ -173,8 +173,8 @@ export class BridgeClient {
   }
 
   /** Hold the shared bridge lane across a complete read/plan/write transaction. */
-  async transaction<T>(fileKey: string, work: (client: BridgeClient) => Promise<T>): Promise<T> {
-    await this.call("__elf_lock", { fileKey }, { timeoutMs: 30_000 });
+  async transaction<T>(fileKey: string, work: (client: BridgeClient) => Promise<T>, options?: {authorization?: "strict" | "plugin"}): Promise<T> {
+    await this.call("__elf_lock", { fileKey, ...(options?.authorization ? {authorization: options.authorization} : {}) }, { timeoutMs: 30_000 });
     try { return await work(this); }
     finally { await this.call("__elf_unlock").catch(() => {}); }
   }

@@ -117,5 +117,20 @@ class Runtime {
       child.kill('SIGTERM');
     });
   }
+  async restartBridge() {
+    await this.stop();
+    const loader = createRequire(join(this.packageRoot, 'package.json')).resolve('tsx');
+    const entry = require('node:url').pathToFileURL(join(this.packageRoot, 'watch/src/bridge-host.ts')).href;
+    await new Promise((resolve, reject) => {
+      let output = '';
+      const child = this.launch(process.execPath, ['--import',loader,'--input-type=module','--eval','const {main}=await import(process.argv[1]); process.exitCode=await main(["--stop"]);',entry], {cwd:this.root,env:{...process.env,ELECTRON_RUN_AS_NODE:'1',NODE_OPTIONS:'',NODE_PATH:''},stdio:['ignore','pipe','pipe']});
+      const collect = chunk => {output=(output+chunk.toString()).slice(-8192);};
+      child.stdout.on('data',collect); child.stderr.on('data',collect);
+      const timer=setTimeout(()=>{child.kill('SIGTERM');reject(new Error('Bridge restart timed out. Stop other Elf clients and retry.'));},10000);
+      child.once('error',()=>{clearTimeout(timer);reject(new Error('Could not restart the shared bridge.'));});
+      child.once('exit',code=>{clearTimeout(timer);if(code===0 || output.includes('Cannot reach the Elf bridge')) resolve();else reject(new Error('Another Elf client may still be using the bridge. Stop Elf MCP/watch sessions and retry.'));});
+    });
+    this.start();
+  }
 }
 module.exports = { Runtime, settingsLink };

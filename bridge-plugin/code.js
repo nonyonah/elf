@@ -1139,7 +1139,8 @@ function currentFile() {
     const key = native || (typeof figma.root.getPluginData === "function" ? figma.root.getPluginData(FILE_LINK_KEY) : "");
     if (typeof key !== "string" || !key.trim() || key === "draft")
         throw new Error("Copy this file’s Figma link and paste it into Elf Bridge to verify its identity.");
-    return { name: figma.root.name, key, ...(!native && uiChannel ? { verification: { nonce: uiChannel } } : {}) };
+    const method = figma.root.getPluginData('elf-authorization') === 'plugin' ? 'plugin' : 'strict';
+    return { name: figma.root.name, key, ...(!native && uiChannel ? { verification: { nonce: uiChannel, method } } : {}) };
 }
 // ---------------------------------------------------------------------------
 // Dispatch
@@ -1205,7 +1206,7 @@ async function announceContext(channel) {
             return;
         }
         const file = currentFile();
-        if (file.verification)
+        if (file.verification && file.verification.method !== 'plugin')
             figma.root.setSharedPluginData(NAMESPACE, "fileProof", file.verification.nonce);
         const bridge = await Promise.race([
             loadBridgeState(),
@@ -1247,7 +1248,11 @@ figma.ui.onmessage = async (message) => {
             const match = /^https:\/\/(?:www\.)?figma\.com\/(?:design|file|board)\/([A-Za-z0-9_-]{8,128})(?:[/?#]|$)/.exec(link);
             if (!match)
                 throw new Error("Paste the Figma link for this open file.");
+            const authorization = message.authorization ?? 'strict';
+            if (authorization !== 'strict' && authorization !== 'plugin')
+                throw new Error('Choose strict verification or explicit plugin approval.');
             figma.root.setPluginData(FILE_LINK_KEY, match[1]);
+            figma.root.setPluginData('elf-authorization', authorization);
             await announceContext(uiChannel);
             return;
         }

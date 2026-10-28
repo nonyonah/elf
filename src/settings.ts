@@ -10,6 +10,7 @@
  */
 import { startConnection, startSlackConnection, finishSlackConnection, finishConnection } from "./connection-service.js";
 import { readFigmaAccount, writeFigmaAccount, removeFigmaAccount, validateAccount } from "./figma/account.js";
+import { readVerificationLimit } from './figma/verification-limit.js';
 import { SETTINGS_API_VERSION } from "./settings-protocol.js";
 import { readDriftReport } from "./reports.js";
 import { createServer, IncomingMessage, Server, ServerResponse } from "node:http";
@@ -352,7 +353,9 @@ export async function createSettingsServer(
 
     if (path === "/api/figma/account" && req.method === "GET") {
       const account = readFigmaAccount();
-      res.writeHead(200, {"Content-Type": "application/json"}); res.end(JSON.stringify({connected: Boolean(account), expiresAt: account?.expiresAt ?? null})); return;
+      const fileKey = existsSync(configPath) ? loadConfig(configPath).figma.fileKey : null;
+      const verificationLimit = fileKey ? readVerificationLimit(fileKey) : null;
+      res.writeHead(200, {"Content-Type": "application/json"}); res.end(JSON.stringify({connected: Boolean(account), expiresAt: account?.expiresAt ?? null, verificationLimit})); return;
     }
     if (path === "/api/figma/connect" && req.method === "POST") {
       figmaGeneration++;

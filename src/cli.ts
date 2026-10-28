@@ -230,7 +230,7 @@ async function main(): Promise<number> {
 
   let bridge: BridgeCaller | null = null;
   const getBridge = async (): Promise<BridgeCaller> => {
-    bridge ??= await connectBridge(config.figma.fileKey);
+    bridge ??= await connectBridge(config.figma.fileKey, config.figma.authorization);
     return bridge;
   };
 

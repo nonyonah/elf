@@ -78,6 +78,10 @@ export async function main(argv: string[]): Promise<number> {
         rerun = false;
         const config = loadConfig(configPath);
         const file = runtime.connection.status.file;
+        if (runtime.connection.status.pendingApproval) {
+          lastError = 'Approve the open Figma document in Elf before checking or syncing.';
+          return;
+        }
         if (!runtime.connection.isConnected || !file?.key) {
           lastError = "Open the Elf bridge plugin in Figma. Your next check will run when it reconnects.";
           console.log(lastError);
@@ -128,6 +132,7 @@ export async function main(argv: string[]): Promise<number> {
       bridge: runtime.connection.status,
       running,
       mode: project.automatic() ? "automatic" : "monitor",
+      authorization: (() => {try {return loadConfig(configPath).figma.authorization ?? 'strict';} catch {return 'strict';}})(),
       activity: project.activity,
       checking: Boolean(checking),
       attention: (() => { const latest = project.activity.find(item => item.type !== "check" && item.type !== "description"); return latest && (latest.type === "conflict" || latest.type === "error") ? latest.message : null; })(),
@@ -161,6 +166,9 @@ export async function main(argv: string[]): Promise<number> {
       }
       if (action === "plan") return project.plan();
       if (action === "components") return project.listComponents();
+      if (action === 'pending-document') return project.pendingDocument();
+      if (action === 'approve-document' && typeof body.fileKey === 'string' && typeof body.ticket === 'string') return project.approveDocument(body.fileKey, body.ticket, body.optIn === true);
+      if (action === 'strict-authorization') return project.useStrictAuthorization();
       if (action === "validate-description" && typeof body.component === "string" && typeof body.reviewHash === "string") return project.validateDescription(body.component, body.description, body.reviewHash);
       if (action === "apply") {
         if (typeof body.planId !== "string" || (body.enableAuto !== undefined && typeof body.enableAuto !== "boolean") || (body.overwriteConflicts !== undefined && typeof body.overwriteConflicts !== "boolean")) throw new Error("Invalid sync request.");

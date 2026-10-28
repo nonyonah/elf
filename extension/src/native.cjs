@@ -71,6 +71,13 @@ class NativeElf {
     }));
     register('elf.manage', () => this.manage());
     register('elf.refresh', () => this.refresh({ resources: true }));
+    register('elf.restartBridge', async () => {
+      let runtime = this.getRuntime();
+      if (!runtime) { try {await this.ensureRuntime();} catch {} runtime = this.getRuntime(); }
+      if (!runtime) throw new Error('Start Elf once before restarting its bridge.');
+      if (await this.vscode.window.showWarningMessage('Restart the shared bridge? Monitoring stops briefly and plugin-only approval must be renewed. Saved pairing is retained. Active MCP clients must close first.',{modal:true},'Restart bridge') !== 'Restart bridge') return;
+      await runtime.restartBridge(); await this.show();
+    });
     register('elf.setup', () => this.setup());
     register('elf.check', () => this.check());
     register('elf.monitor', () => this.monitor());
@@ -80,6 +87,8 @@ class NativeElf {
     register('elf.cancelPlan', () => this.cancelPlan());
     register('elf.toggleReplace', () => this.toggleReplace());
     register('elf.toggleEnableAuto', () => this.toggleEnableAuto());
+    register('elf.approveDocument', () => this.approveDocument());
+    register('elf.authorizationMode', () => this.authorizationMode());
     register('elf.figma', () => this.account('figma'));
     register('elf.pairing', () => this.pairing());
     register('elf.disconnectFigma', () => this.disconnectFigma());
@@ -91,6 +100,7 @@ class NativeElf {
     register('elf.preferences', () => this.preferences());
     register('elf.prepareDescription', component => this.prepareDescription(component));
     register('elf.generateDescription', component => this.prepareDescription(component, true));
+    register('elf.recoverDescription', () => this.recoverDescription());
     register('elf.descriptionContext', () => this.descriptionContext());
     register('elf.saveDescription', () => this.saveDescription());
     register('elf.resource', resource => this.openResource(resource));
@@ -240,6 +250,9 @@ class NativeElf {
     return [
       row(basename(project?.root || this.getRuntime().root), null, mode, 'folder', undefined, { tooltip: project?.root }),
       row('Figma file', null, file, 'link'),
+      ...(project?.bridge?.pendingApproval ? [row('Approve open Figma document', 'elf.approveDocument', project.bridge.pendingApproval.name, 'shield')] : []),
+      ...(project?.bridge?.file?.authorization === 'plugin' ? [row('Document approved for this connection', null, 'URL not independently verified', 'shield')] : []),
+      ...(project?.authorization !== 'plugin' && this.snapshot.figma?.verificationLimit ? [row('Figma verification paused', null, `Retry after ${new Date(this.snapshot.figma.verificationLimit.retryAt).toLocaleString()}`, 'clock', undefined, { tooltip: 'Figma imposed a REST API rate limit. Reconnecting the account does not bypass it. Saved pairing remains unchanged.' })] : []),
       row(summary, 'elf.report', last?.checkedAt ? new Date(last.checkedAt).toLocaleTimeString() : undefined, last?.status === 'failed' ? 'error' : last?.status === 'drift' ? 'warning' : 'pulse'),
       ...(!project?.running ? [row(project?.configured ? 'Resume monitoring' : 'Set up project', 'elf.setup', null, 'play')] : []),
       ...(this.error || project?.error || project?.attention ? [row('Needs attention', 'elf.report', this.error || project.error || project.attention, 'warning')] : []),
@@ -252,6 +265,8 @@ class NativeElf {
     await this.refresh();
     const { config, figma, project } = this.snapshot || {};
     const options = [
+      { label: 'Approve open Figma document', description: project?.bridge?.pendingApproval?.name || 'Plugin-only mode; fresh approval each connection', command: 'elf.approveDocument' },
+      { label: 'Figma authorization mode', description: 'Plugin approval or strict URL verification', command: 'elf.authorizationMode' },
       { label: 'Figma account', description: figma?.connected ? 'Connected · disconnect' : 'Connect', command: 'elf.figma' },
       { label: 'Figma plugin pairing', description: project?.bridge?.connected ? 'Connected · show pairing code' : 'Pair file', command: 'elf.pairing' },
       ...(project?.bridge?.connected ? [{ label: 'Disconnect file pairing', command: 'elf.disconnectFigma' }] : []),
@@ -263,8 +278,10 @@ class NativeElf {
       { label: 'Generate component description with AI', command: 'elf.generateDescription' },
       { label: 'Prepare component description manually', command: 'elf.prepareDescription' },
       { label: 'Description source and token context', command: 'elf.descriptionContext' },
+      { label: 'Recover open description draft', command: 'elf.recoverDescription' },
       { label: 'Save reviewed description', command: 'elf.saveDescription' },
       { label: 'Stop Elf', command: 'elf.stop' },
+      { label: 'Restart shared bridge', description: 'Preserves saved pairings; close MCP sessions first', command: 'elf.restartBridge' },
     ];
     const choice = await this.vscode.window.showQuickPick(options, { title: 'Manage Elf', placeHolder: 'Connections, preferences, and project tools' });
     if (choice?.command) await this.vscode.commands.executeCommand(choice.command);
@@ -370,6 +387,23 @@ class NativeElf {
       return;
     }
     await this.reviewSync(true);
+  }
+  async approveDocument() {
+    const owner = await this.ensureRuntime();
+    const pending = await this.api('/api/project/pending-document', 'POST', {});
+    if (!pending) throw new Error('In the Figma plugin, choose Plugin approval, enter this project’s file link, and connect first.');
+    if (pending.expiresAt <= Date.now()) throw new Error('Document approval timed out. Reconnect the Figma plugin for a fresh approval request.');
+    const approve = await this.vscode.window.showWarningMessage(`Authorize the currently open Figma document “${pending.file.name}” for ${owner.root}? Project link key: ${pending.file.key}. This switches this project to plugin-only authorization: the URL is not independently verified. Approval lasts only for this connection; automatic sync is paused.`, {modal:true}, 'Approve this document');
+    if (approve !== 'Approve this document') return;
+    await this.api('/api/project/approve-document', 'POST', {fileKey:pending.file.key,ticket:pending.ticket,optIn:true}, owner);
+    await this.refresh({resources:true});
+  }
+  async authorizationMode() {
+    const choice = await this.vscode.window.showQuickPick(['Plugin approval — no REST requests', 'Strict URL verification — REST required'], {title:'Figma document authorization'});
+    if (!choice) return;
+    if (choice.startsWith('Plugin')) return this.approveDocument();
+    if (await this.vscode.window.showWarningMessage('Require strict URL verification for this project? An existing plugin-only connection will be closed, and Figma REST limits apply.', {modal:true}, 'Use strict verification') !== 'Use strict verification') return;
+    await this.api('/api/project/strict-authorization','POST',{}); await this.refresh();
   }
   async account(provider) {
     const data = await this.api(provider === 'figma' ? '/api/figma/account' : '/api/config');
@@ -510,7 +544,7 @@ class NativeElf {
     const base = this.context.storageUri || this.context.globalStorageUri;
     return base ? this.vscode.Uri.joinPath(base, 'description-drafts') : this.vscode.Uri.file(join(tmpdir(), 'elf-extension-drafts'));
   }
-  async prepareDescription(component, useAI = false) {
+  async prepareDescription(component, useAI = false, recoveredContent) {
     if (typeof component !== 'string') {
       const { components } = await this.api('/api/project/components', 'POST', {});
       if (!components?.length) throw new Error('No components discovered. Add a component source file first.');
@@ -522,6 +556,11 @@ class NativeElf {
     const prepared = await this.api('/api/project/prepare-component', 'POST', { component });
     if (owner !== this.getRuntime()) throw new Error('The project changed. Prepare the description again.');
     const original = JSON.stringify(prepared.sidecar, null, 2);
+    if (typeof recoveredContent === 'string') {
+      let description; try {description=JSON.parse(recoveredContent);} catch {throw new Error('The recovered draft is not valid JSON.');}
+      await this.api('/api/project/validate-description','POST',{component:prepared.codeKey,reviewHash:prepared.reviewHash,description},owner);
+      prepared.sidecar=description;
+    }
     let generated;
     if (useAI) {
       await this.text(JSON.stringify({ component: prepared.name, file: prepared.file, source: prepared.source, sourceTruncated: prepared.sourceTruncated, tokens: prepared.tokens, variants: prepared.variantProps, dependencies: prepared.dependencies, description: prepared.sidecar }, null, 2), 'json', `${prepared.name} context to share`);
@@ -551,6 +590,15 @@ class NativeElf {
     const draft = active && this.drafts.get(active.uri.toString()) || (this.drafts.size === 1 ? [...this.drafts.values()][0] : null);
     if (!draft) throw new Error('Select a component description draft first.');
     await this.text(JSON.stringify({ file: draft.prepared.file, source: draft.prepared.source, sourceTruncated: draft.prepared.sourceTruncated, tokens: draft.prepared.tokens, variants: draft.prepared.variantProps, dependencies: draft.prepared.dependencies, reviewNotes: draft.generated ? { assumptions: draft.generated.assumptions, unsupported: draft.generated.unsupported } : undefined }, null, 2), 'json', `${draft.prepared.name} source and tokens`);
+  }
+  async recoverDescription() {
+    const document=this.vscode.window.activeTextEditor?.document;
+    const directory=this.draftDirectory().fsPath;
+    if (!document || document.uri.scheme !== 'file' || require('node:path').dirname(document.uri.fsPath) !== directory || !document.uri.fsPath.endsWith('.draft.json')) throw new Error('Select the right-hand Elf description draft to recover.');
+    const content=document.getText();
+    if (Buffer.byteLength(content)>128000) throw new Error('Draft is too large.');
+    await this.prepareDescription(undefined,false,content);
+    void this.vscode.window.showInformationMessage('Draft recovered against the current source revision. Review it again before saving; previous approval and AI notes were not restored.');
   }
   async saveDescription() {
     const visible = this.vscode.window.visibleTextEditors || [];

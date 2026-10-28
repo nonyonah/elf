@@ -70,6 +70,25 @@ test('component discovery and generated-draft validation never save or call Figm
   } finally { p.cleanup(); }
 });
 
+test('document approval requires explicit opt-in and matching pending file before changing strict configuration', async () => {
+  const p = project(); const ticket = 'b'.repeat(64); const controlCalls: string[] = [];
+  try {
+    (p.service as any).runtime.control = async (method: string) => {controlCalls.push(method); return method === '__elf_document_pending' ? {file:{key:'project-file',name:'Open document'},ticket} : {ok:true};};
+    const original = readFileSync(p.path,'utf8');
+    await assert.rejects(p.service.approveDocument('project-file',ticket,false),/Explicit/);
+    await assert.rejects(p.service.approveDocument('another-file',ticket,true),/changed/);
+    assert.equal(readFileSync(p.path,'utf8'),original);
+    await p.service.approveDocument('project-file',ticket,true);
+    const updated = JSON.parse(readFileSync(p.path,'utf8'));
+    assert.equal(updated.figma.authorization,'plugin'); assert.equal(updated.figma.source,'bridge');
+    assert.equal(updated.runtime.autoSync,false);
+    assert(controlCalls.includes('__elf_document_approve'));
+    await p.service.useStrictAuthorization();
+    assert.equal(JSON.parse(readFileSync(p.path,'utf8')).figma.authorization,'strict');
+    assert(controlCalls.includes('__elf_require_strict'));
+  } finally {p.cleanup();}
+});
+
 test("managed plans reject changed code and only enable auto after a fresh reviewed apply", async () => {
   const p = project();
   try {

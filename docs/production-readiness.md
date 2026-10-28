@@ -29,6 +29,11 @@ do not advertise an unpublished extension as available there.
 1. **Reliable connections:** confirm the live Figma reconnect after its 429 limit
    clears. Verify renewal, retry delays, wrong-file rejection, revoked access,
    persistent pairing, and disconnect without bypassing verification.
+   Plugin-only document approval is now implemented as a distinct trust model:
+   explicit fresh per-connection approval, no independently verified URL claim,
+   and no REST calls. Existing strict projects remain strict until opt-in.
+   Mock integration tests cover replay, expiry, strict-policy rejection, and
+   managed sync planning. A live user-approved connection still needs acceptance.
 2. **Interactive parity:** finish the gaps above and run the same acceptance
    scenarios through npm Settings and native controls. Avoid adding behavior to
    only one adapter when it belongs in the shared engine.

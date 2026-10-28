@@ -52,6 +52,7 @@ export interface BridgePairing {
 }
 
 export interface BridgeStatus {
+  pendingApproval?: {key: string; name: string} | null;
   connected: boolean;
   /** Bound port, or null before start(). */
   port: number | null;
@@ -98,6 +99,7 @@ export class Bridge {
   private file: BridgeFileInfo | null = null;
   private identityGeneration = 0;
   private publicIdentity = false;
+  private documentApproval: {file: BridgeFileInfo; plugin: BridgePluginInfo | null; ticket: string; expiresAt: number} | null = null;
   private plugin: BridgePluginInfo | null = null;
   private alive = false;
   private jobs: { queuedAt: number; owner: WebSocket | null; method: string; params: Record<string, unknown>; options: RequestOptions; resolve: (value: any) => void; reject: (error: Error) => void }[] = [];
@@ -129,6 +131,7 @@ export class Bridge {
       file: this.file,
       plugin: this.plugin,
       connectedAt: this.connectedAt,
+      pendingApproval: this.documentApproval ? {key:this.documentApproval.file.key,name:this.documentApproval.file.name} : null,
     };
   }
 
@@ -243,6 +246,7 @@ export class Bridge {
       throw new BridgeError("not-connected", `No Figma plugin connected — ${NOT_CONNECTED_HINT}.`);
     }
 
+    if (this.documentApproval) throw new BridgeError('not-connected', 'The open Figma document needs explicit approval in Elf. Plugin-only mode does not require an account connection.');
     if ((this.options.sessionStore || this.publicIdentity) && !this.file) throw new BridgeError("not-connected", "The Figma file has not been verified. Connect your account in Settings and check the plugin file link.");
     const id = randomUUID();
     const timeoutMs = options.timeoutMs ?? this.timeoutMs;
@@ -299,8 +303,10 @@ export class Bridge {
           if (job.owner && job.owner.readyState !== WebSocket.OPEN) throw new BridgeError("disconnected", "The operation's controller disconnected.");
           if (job.method === "__elf_lock") {
             if (!job.owner || this.lockOwner) throw new Error("A transaction is already active on this connection.");
+            if (this.documentApproval) throw new Error('Approve the open Figma document in Elf before checking or syncing.');
             const fileKey = job.params.fileKey;
             if (typeof fileKey !== "string" || !fileKey || this.file?.key !== fileKey || !this.socket) throw new Error("The connected Figma file does not match the operation's target.");
+            if (this.file.authorization === 'plugin' && job.params.authorization !== 'plugin') throw new Error('This project requires strict file verification. Plugin approval is not sufficient.');
             this.lockOwner = job.owner;
             this.lockFile = fileKey;
             this.lockTimer = setTimeout(() => {
@@ -437,7 +443,7 @@ export class Bridge {
     this.alive = true;
     this.connectedAt = new Date().toISOString();
     this.file = null;
-    this.publicIdentity = false; this.identityGeneration++;
+    this.publicIdentity = false; this.identityGeneration++; this.documentApproval = null;
     this.plugin = null;
     if (auth === "code") this.logger.log("plugin paired with a one-time code");
     else if (auth === "session") this.logger.log("plugin reconnected with its saved session");
@@ -448,6 +454,7 @@ export class Bridge {
       this.encodePlugin(socket, {
         type: "ready",
         fileVerification: 1,
+        documentApproval: 1,
         ...(issued
           ? { session: issued.session, ...(issued.expiresAt ? { sessionExpiresAt: new Date(issued.expiresAt).toISOString() } : {}) }
           : {}),
@@ -520,7 +527,20 @@ export class Bridge {
 
     try {
       let result: unknown;
-      if (message.method === "__elf_capabilities") result = {fileVerification: 1, accountRenewal: 1};
+      if (message.method === "__elf_capabilities") result = {fileVerification: 1, accountRenewal: 1, documentApproval: 1};
+      else if (message.method === '__elf_document_pending') result = this.documentApproval ? {file: {key: this.documentApproval.file.key, name: this.documentApproval.file.name}, ticket: this.documentApproval.ticket, expiresAt: this.documentApproval.expiresAt} : null;
+      else if (message.method === '__elf_document_approve') {
+        const pending = this.documentApproval;
+        if (!pending || !this.socket || pending.expiresAt < Date.now() || message.params?.ticket !== pending.ticket || message.params?.fileKey !== pending.file.key) throw new Error('Document approval expired or changed. Reconnect the plugin and review again.');
+        if (this.options.sessionStore && this.activeSession && !this.options.sessionStore.bindKey(this.activeSession, pending.file.key)) throw new Error('Pairing belongs to a different project file.');
+        this.file = {...pending.file, authorization: 'plugin', authorizationId: randomUUID()}; this.plugin = pending.plugin;
+        this.documentApproval = null; this.emitStatus();
+        this.socket.send(this.encodePlugin(this.socket, {type:'file-verified', authorization:'plugin'})); result = {ok:true};
+      }
+      else if (message.method === '__elf_require_strict') {
+        if ((this.file && this.file.key === message.params?.fileKey && this.file.authorization === 'plugin') || (this.documentApproval && this.documentApproval.file.key === message.params?.fileKey)) { this.documentApproval = null; this.file = null; this.releaseLock(); this.emitStatus(); this.socket?.close(4003, 'Switch the plugin to strict URL verification and reconnect.'); }
+        result = {ok:true};
+      }
       else if (message.method === "__elf_pairing_refresh") result = this.refreshPairingCode();
       else if (message.method === "__elf_pairing_current") result = this.pairingCode;
       else if (message.method === "__elf_revoke") {
@@ -552,7 +572,7 @@ export class Bridge {
     this.socket = null;
     this.connectedAt = null;
     this.file = null;
-    this.publicIdentity = false; this.identityGeneration++;
+    this.publicIdentity = false; this.identityGeneration++; this.documentApproval = null;
     this.plugin = null;
     this.logger.log(`plugin disconnected (code ${code})`);
     this.rejectAll("the plugin disconnected while the request was in flight");
@@ -570,13 +590,21 @@ export class Bridge {
 
     if (message.type === "status" && message.file?.verification) {
       const socket = this.socket; const file = message.file; const generation = ++this.identityGeneration;
+      if (typeof file.key !== 'string' || !/^[A-Za-z0-9_-]{8,128}$/.test(file.key) || typeof file.name !== 'string' || !/^[a-f0-9]{64}$/.test(file.verification?.nonce || '')) { socket?.close(4003, 'Invalid document context. Reopen the plugin.'); return; }
       this.publicIdentity = true;
       this.file = null; this.emitStatus();
       if (this.lockOwner) this.releaseLock();
+      this.documentApproval = null;
+      if (file.verification?.method === 'plugin') {
+        this.documentApproval = {file, plugin: message.plugin ?? null, ticket: randomBytes(32).toString('hex'), expiresAt: Date.now() + 5 * 60_000};
+        this.emitStatus();
+        socket?.send(this.encodePlugin(socket, {type:'document-approval-required'}));
+        return;
+      }
       void (this.options.verifyPublicFile ?? verifyPublicFile)(file.key, file.verification!).then(() => {
         if (this.socket !== socket || !socket || generation !== this.identityGeneration) return;
         if (this.options.sessionStore && this.activeSession && !this.options.sessionStore.bindKey(this.activeSession, file.key)) throw new Error("Pairing belongs to a different file");
-        this.file = file; this.plugin = message.plugin ?? null; this.emitStatus();
+        this.file = {...file, authorization: 'strict'}; this.plugin = message.plugin ?? null; this.emitStatus();
         socket.send(this.encodePlugin(socket, {type: "file-verified"}));
       }).catch(error => {
         if (this.socket === socket && generation === this.identityGeneration) socket?.close(4003, error instanceof FileVerificationError ? error.message : "File not verified. Check Settings and the file link, then retry after saving.");

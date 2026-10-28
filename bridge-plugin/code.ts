@@ -1425,11 +1425,12 @@ function nativeFileKey(): string | undefined {
   if (PUBLIC_FILE_LINK_REQUIRED) return undefined;
   try {return figma.fileKey;} catch {return undefined;}
 }
-function currentFile(): { name: string; key: string; verification?: {nonce: string} } {
+function currentFile(): { name: string; key: string; verification?: {nonce: string; method: 'strict' | 'plugin'} } {
   const native = nativeFileKey();
   const key = native || (typeof figma.root.getPluginData === "function" ? figma.root.getPluginData(FILE_LINK_KEY) : "");
   if (typeof key !== "string" || !key.trim() || key === "draft") throw new Error("Copy this file’s Figma link and paste it into Elf Bridge to verify its identity.");
-  return {name: figma.root.name, key, ...(!native && uiChannel ? {verification: {nonce: uiChannel}} : {})};
+  const method = figma.root.getPluginData('elf-authorization') === 'plugin' ? 'plugin' : 'strict';
+  return {name: figma.root.name, key, ...(!native && uiChannel ? {verification: {nonce: uiChannel, method}} : {})};
 }
 
 // ---------------------------------------------------------------------------
@@ -1498,7 +1499,7 @@ async function announceContext(channel: string): Promise<void> {
       postUi({type: "file-link-required"}); return;
     }
     const file = currentFile();
-    if (file.verification) figma.root.setSharedPluginData(NAMESPACE, "fileProof", file.verification.nonce);
+    if (file.verification && file.verification.method !== 'plugin') figma.root.setSharedPluginData(NAMESPACE, "fileProof", file.verification.nonce);
     const bridge = await Promise.race([
       loadBridgeState(),
       new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error("Figma’s saved settings did not respond. Try again or reopen the plugin.")), 8000); }),
@@ -1525,7 +1526,10 @@ figma.ui.onmessage = async (message: UiMessage) => {
       const link = typeof message.url === "string" ? message.url : "";
       const match = /^https:\/\/(?:www\.)?figma\.com\/(?:design|file|board)\/([A-Za-z0-9_-]{8,128})(?:[/?#]|$)/.exec(link);
       if (!match) throw new Error("Paste the Figma link for this open file.");
+      const authorization = message.authorization ?? 'strict';
+      if (authorization !== 'strict' && authorization !== 'plugin') throw new Error('Choose strict verification or explicit plugin approval.');
       figma.root.setPluginData(FILE_LINK_KEY, match[1]);
+      figma.root.setPluginData('elf-authorization', authorization);
       await announceContext(uiChannel!); return;
     }
     if (message.type === "hide-ui") {

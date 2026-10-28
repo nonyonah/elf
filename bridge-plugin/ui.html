@@ -381,9 +381,12 @@
           <p class="sub" id="context-detail">Bridge state is kept in Figma, not in the document.</p>
           <button class="secondary" id="retry-context" hidden>Try again</button>
           <div id="file-link-form" hidden>
-            <p class="sub">Connect your Figma account in Elf Settings, then paste the link to this open file. Elf adds a verification marker and checks the file before allowing changes.</p>
+            <p class="sub">Paste this open file’s link to select your project. Choose plugin approval without REST, or strict URL verification using your connected Figma account.</p>
             <label for="figma-file-link">Figma file link</label>
             <input id="figma-file-link" type="url" placeholder="https://www.figma.com/design/…" />
+            <label for="file-authorization">Document authorization</label>
+            <select id="file-authorization"><option value="strict">Strict URL verification (REST)</option><option value="plugin">Approve open document in Elf (no REST)</option></select>
+            <p class="sub">Plugin approval requires fresh confirmation in Elf every connection. The URL selects your project; it is not independently verified in this mode.</p>
             <button class="primary" id="use-file-link">Use this file link</button>
           </div>
         </div>
@@ -749,6 +752,7 @@ function pairingHmac(key, text) {
           try { message = JSON.parse(message.payload); } catch { socket.close(1000, "invalid bridge message"); return; }
         }
         if (message.type === "ready") {
+          if (state.file && state.file.verification && state.file.verification.method === 'plugin' && message.documentApproval !== 1) {socket.close(4003, 'Restart the updated Elf bridge to enable document approval.'); return;}
           if (state.file && state.file.verification && message.fileVerification !== 1) {socket.close(4003, "Restart the Elf bridge to enable secure file verification."); return;}
           state.ready = true;
           state.identityVerified = !state.file || !state.file.verification;
@@ -777,6 +781,10 @@ function pairingHmac(key, text) {
         if (message.type === "file-verified") {
           state.identityVerified = true;
           setPhase("connected"); setStatus("online", "connected"); renderConnected(); return;
+        }
+        if (message.type === 'document-approval-required') {
+          state.identityVerified = false;
+          setPhase('pairing'); setStatus('pairing', 'Approve this open document in Elf → Manage.'); return;
         }
         if (message.type === "request" && state.ready && state.identityVerified) {
           state.requestCount += 1;
@@ -931,13 +939,14 @@ function pairingHmac(key, text) {
       postPluginMessage({ type: "context" });
     }
     function showFileLink() {
+      $('file-authorization').value = state.file && state.file.verification ? state.file.verification.method || 'strict' : 'plugin';
       clearTimeout(contextTimer); setPhase("loading");
       $("context-spinner").hidden = true; $("retry-context").hidden = true;
       $("context-heading").textContent = "Link this Figma file";
       $("context-detail").textContent = "The link is checked against a fresh proof in this document.";
       $("file-link-form").hidden = false;
     }
-    $("use-file-link").addEventListener("click", () => postPluginMessage({type: "set-file-link", url: $("figma-file-link").value.trim()}));
+    $("use-file-link").addEventListener("click", () => postPluginMessage({type: "set-file-link", url: $("figma-file-link").value.trim(), authorization: $('file-authorization').value}));
     $("change-file-link").addEventListener("click", showFileLink);
     $("retry-context").addEventListener("click", requestContext);
     window.onmessage = (event) => {
@@ -949,6 +958,7 @@ function pairingHmac(key, text) {
       if (message.type === "context") {
         clearTimeout(contextTimer);
         state.file = message.file || null;
+        $('file-authorization').value = state.file && state.file.verification && state.file.verification.method === 'plugin' ? 'plugin' : 'strict';
         state.plugin = message.plugin || null;
         state.host = (message.bridge && message.bridge.host) || "localhost:8765";
         state.session = (message.bridge && message.bridge.session) || "";

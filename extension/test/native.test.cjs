@@ -40,6 +40,8 @@ function harness(options = {}) {
       else if (path === '/api/onboarding/validate' || path === '/api/onboarding/start') data = { ok: true };
       else if (path === '/api/project/components') data = {components:[{name:'Button',file:'Button.tsx',codeKey:'button.tsx#Button'}]};
       else if (path === '/api/project/validate-description') data = {valid:true};
+      else if (path === '/api/project/pending-document') data = {file:{key:'file',name:'Open design'},ticket:'d'.repeat(64),expiresAt:Date.now()+300000};
+      else if (path === '/api/project/approve-document' || path === '/api/project/strict-authorization') data = {ok:true};
       else if (path === '/api/project/plan') data = options.plan || { id: 'plan-1', entries: [{ kind: 'token', key: 'color.brand', name: 'color.brand', action: 'update' }], issues: [], expiresAt: '2026-10-27T00:10:00.000Z' };
       else if (path === '/api/project/apply') data = options.applyResult || { synced: 1, issues: [] };
       else if (path === '/api/project/resources') data = { resources: options.resources || [{ name: 'color.brand', verified: true, recorded: true, figmaUrl: 'https://www.figma.com/design/file' }] };
@@ -382,4 +384,27 @@ test('AI description generation validates a draft without saving or applying it'
   assert.equal(h.native.drafts.size, 1);
   assert(h.executed.some(item => item.name === 'vscode.diff'));
   assert(h.documents.some(document => document.getText().includes('Interaction behavior')));
+});
+
+test('document authorization never downgrades a project before explicit confirmation', async t => {
+  const h = harness(); t.after(()=>h.native.dispose());
+  await h.native.approveDocument();
+  assert.equal(h.requests.some(request=>request.path==='/api/project/approve-document'),false);
+  h.warningResponses.push('Approve this document');
+  await h.native.approveDocument();
+  const approved = h.requests.find(request=>request.path==='/api/project/approve-document');
+  assert.equal(JSON.parse(approved.body).optIn,true);
+  assert.equal(JSON.parse(approved.body).ticket,'d'.repeat(64));
+});
+
+test('an open draft can be recovered after reload only as a freshly validated review', async t => {
+  const h = harness();t.after(()=>h.native.dispose());
+  h.vscode.window.activeTextEditor={document:{uri:uri('/storage/description-drafts/old.draft.json'),getText:()=>'{"layoutMode":"VERTICAL"}'}};
+  h.quickPicks.push({component:'button.tsx#Button'});
+  await h.native.recoverDescription();
+  assert(h.requests.some(request=>request.path==='/api/project/validate-description'));
+  assert.equal(h.requests.some(request=>request.path==='/api/project/save-description'),false);
+  const draft=[...h.native.drafts.values()][0];
+  assert.equal(draft.prepared.sidecar.layoutMode,'VERTICAL');
+  assert.notEqual(draft.uri.fsPath,'/storage/description-drafts/old.draft.json');
 });

@@ -6,6 +6,20 @@ import { test } from "node:test";
 import { startConnection, finishSlackConnection } from "../src/connection-service.js";
 import { readFigmaAccount, writeFigmaAccount, figmaAccessToken, removeFigmaAccount } from "../src/figma/account.js";
 import { verifyPublicFile } from "../src/figma/file-identity.js";
+import { storeVerificationLimit, readVerificationLimit, verificationLimitMessage } from '../src/figma/verification-limit.js';
+
+test('verification deadlines persist beyond 24 hours and contain no credentials', () => {
+  const root = mkdtempSync(join(tmpdir(), 'elf-limit-deadline-')); const oldPath = process.env.ELF_FIGMA_ACCOUNT_PATH;
+  process.env.ELF_FIGMA_ACCOUNT_PATH = join(root, 'account.json');
+  try {
+    const value = storeVerificationLimit('deadlineFile', new Headers({'Retry-After':'2592000','X-Figma-Plan-Tier':'pro','X-Figma-Rate-Limit-Type':'low'}));
+    assert.ok(value.retryAt > Date.now() + 29 * 86400000);
+    assert.deepEqual(readVerificationLimit('deadlineFile'), value);
+    assert.match(verificationLimitMessage(value), /Retry after .* UTC/);
+    assert.ok(Buffer.byteLength(verificationLimitMessage(value)) <= 123);
+    assert.equal(readVerificationLimit('anotherFile'), null);
+  } finally { if (oldPath === undefined) delete process.env.ELF_FIGMA_ACCOUNT_PATH; else process.env.ELF_FIGMA_ACCOUNT_PATH = oldPath; rmSync(root,{recursive:true,force:true}); }
+});
 
 test("rate-limited file verification observes a cooldown instead of retrying every reconnect", async () => {
   const root = mkdtempSync(join(tmpdir(), "elf-figma-rate-")); const oldPath = process.env.ELF_FIGMA_ACCOUNT_PATH;

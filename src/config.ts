@@ -49,8 +49,9 @@ export function loadConfig(configPath: string): DriftConfig {
   return {
     figma: {
       fileKey: config.figma.fileKey,
+      authorization: config.figma.authorization === "plugin" ? "plugin" : "strict",
       apiTokenEnv: config.figma.apiTokenEnv ?? "FIGMA_API_TOKEN",
-      source: config.figma.source ?? "auto",
+      source: config.figma.authorization === 'plugin' ? 'bridge' : config.figma.source ?? "auto",
       teamId: config.figma.teamId ?? "",
     },
     codebase: {

@@ -63,6 +63,11 @@ Design tokens are supposed to be the single source of truth for how a product lo
 
 ### Choose your interface
 
+For free-account use without REST file-read quotas, see
+[plugin-only document approval](docs/document-authorization.md). It requires fresh
+confirmation of the open document each connection. Existing strict connections
+stay strict until explicitly changed.
+
 **npm remains fully supported.** Use it for local monitoring, Settings, scripts,
 and CI. The native VS Code extension and MCP adapter use the same engine and
 project files; the extension is an additional interface with a feature-parity
