@@ -153,7 +153,7 @@ export function Onboarding({ initial, onFinished }: { initial: OnboardingStatus;
     <main className="mx-auto w-full max-w-[420px] px-5 pb-6 pt-8">
       <p className="mb-1 text-[15px] font-medium leading-[1.55]">Set up elf</p>
       <p className="mb-5 truncate text-[11.5px] leading-[1.55] text-faint" title={status.root}>{status.root}</p>
-      <div className="mb-5 flex items-center gap-3"><img src="/brand/elf-mascot.png" width={64} height={64} alt="" /><div><p className="text-[15px] font-semibold">Elf</p><p className="text-[12px] text-muted-foreground">Your design system companion</p></div></div>
+      <div className="mb-5 flex items-center gap-3"><img src="/brand/elf-mascot.png" width={40} height={40} alt="" /><div><p className="text-[15px] font-semibold">Elf</p><p className="text-[12px] text-muted-foreground">Your design system companion</p></div></div>
       <ol aria-label="Setup progress" className="mb-6 flex items-center gap-3 text-[11px] leading-[1.55] text-faint">
         {["Project", "Figma", "Notifications"].map((label, i) => (
           <li key={label} aria-current={i === step ? "step" : undefined} className={`flex items-center gap-1.5 ${i === step ? "font-medium text-foreground" : ""}`}>
@@ -211,7 +211,7 @@ export function Onboarding({ initial, onFinished }: { initial: OnboardingStatus;
           <div className="flex items-center gap-2.5 px-3.5 py-3">
             <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-white ring-1 ring-black/5 dark:ring-white/10"><img src="https://a.slack-edge.com/80588/marketing/img/icons/icon_slack_hash_colored.png" alt="" width={24} height={24} className="size-6" /></span>
             <div className="min-w-0 flex-1"><p className="text-[13px] font-medium leading-[1.55]">{slack.connected ? "Connected" : "Not connected"}</p><p className="text-[12px] leading-[1.55] text-muted-foreground">{slack.connected ? [slack.teamName, slack.channel].filter(Boolean).join(" · ") : "Send drift notifications to your team"}</p></div>
-            <Button variant="default" size="sm" className={smallButton} loading={busy} disabled={busy || offline} onClick={() => { void (slack.connected ? disconnectSlack() : connectSlack()); }}>{slack.connected ? "Disconnect" : "Connect Slack"}</Button>
+            <Button variant={slack.connected ? "destructive" : "default"} size="sm" className={smallButton} loading={busy} disabled={busy || offline} onClick={() => { void (slack.connected ? disconnectSlack() : connectSlack()); }}>{slack.connected ? "Disconnect" : "Connect Slack"}</Button>
           </div>
           {slack.connected && <div className="flex items-center justify-between gap-2 border-t-[0.5px] border-border px-3.5 py-3"><p role="status" className="text-[12px] text-muted-foreground">{slackTested ? "Test message sent" : "Check that messages reach your channel"}</p><Button variant="default" size="sm" className={`${smallButton} border-[0.5px]`} disabled={busy} onClick={() => { void testSlack(); }}>Send test</Button></div>}
           {slack.connected && <div className="flex items-center gap-2.5 border-t-[0.5px] border-border px-3.5 py-3"><div className="min-w-0 flex-1"><p className="text-[13px] font-medium leading-[1.55]">Notify on drift</p><p className="text-[12px] leading-[1.55] text-muted-foreground">Only when the drift state changes</p></div><Switch checked={notify} onCheckedChange={setNotify} disabled={busy} aria-label="Notify on drift" className="h-5 w-9 shrink-0 p-[2px] [--thumb-size:--spacing(4)]" thumbClassName="data-checked:translate-x-4" /></div>}

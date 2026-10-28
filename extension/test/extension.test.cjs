@@ -67,3 +67,16 @@ test('empty and virtual workspaces cannot launch local code', async () => {
   assert.equal(h.runtimes.length, 0);
   assert.match(h.errors[0], /local project folder/);
 });
+
+test('native status bar uses the registered mascot glyph in stopped and running states',async()=>{
+ const h=harness();
+ assert.match(h.statuses[0].text,/^\$\(elf-mascot\)/);
+ const pkg=JSON.parse(readFileSync(join(__dirname,'../package.json'),'utf8'));
+ const icon=pkg.contributes.icons['elf-mascot'];
+ assert.equal(icon.default.fontCharacter,'\\E001');
+ const font=readFileSync(join(__dirname,'..',icon.default.fontPath));
+ assert.equal(font.subarray(0,4).toString(),'wOFF');
+ await h.commands.get('elf.start')();
+ assert.equal(h.statuses[0].text,'$(elf-mascot) Elf');
+ await h.deactivate();
+});

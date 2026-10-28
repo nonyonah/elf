@@ -12,7 +12,7 @@ function activate(context) {
   };
   const update = () => {
     const state = runtime?.state ?? 'stopped';
-    status.text = state === 'running' ? '$(symbol-color) Elf' : state === 'starting' ? '$(loading~spin) Elf: Starting' : state === 'failed' ? '$(warning) Elf: Stopped' : '$(symbol-color) Elf: Stopped';
+    status.text = `$(elf-mascot) ${state === 'running' ? 'Elf' : state === 'starting' ? 'Elf: Starting' : state === 'failed' ? 'Elf: Error' : 'Elf: Stopped'}`;
     status.tooltip = state === 'running' ? 'Open Elf' : state === 'starting' ? 'Elf is starting' : 'Open Elf to start monitoring';
     status.show();
     setContext('elf.running', state === 'running');

@@ -29,6 +29,7 @@
   --success-fg: #0d7a3e;
   --warning-fg: #8c6104;
   --danger-fg: #bf3b35;
+  --danger-solid: #c03a32;
 
   /* Semantic aliases used by the coss components */
   --background: var(--surface-app);
@@ -106,6 +107,7 @@
   --color-muted-foreground: var(--muted-foreground);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
+  --color-danger-solid: var(--danger-solid);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);
