@@ -2,7 +2,7 @@
   "name": "elf-design-system",
   "displayName": "Elf",
   "description": "Connect your project and Figma, monitor design drift, and review sync changes.",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "publisher": "elf-local",
   "license": "MIT",
   "repository": {
@@ -211,6 +211,30 @@
       {
         "command": "elf.recoverDescription",
         "title": "Elf: Recover Open Description Draft"
+      },
+      {
+        "command": "elf.reviewResource",
+        "title": "Elf: Review Individual Resource Sync",
+        "icon": "$(git-compare)"
+      },
+      {
+        "command": "elf.saveAndReviewDescription",
+        "title": "Elf: Save and Review Component Sync",
+        "icon": "$(check)"
+      },
+      {
+        "command": "elf.importTokens",
+        "title": "Elf: Import Figma Tokens",
+        "icon": "$(cloud-download)"
+      },
+      {
+        "command": "elf.applyTokenImport",
+        "title": "Elf: Apply Reviewed Token Import",
+        "icon": "$(check)"
+      },
+      {
+        "command": "elf.cancelTokenImport",
+        "title": "Elf: Cancel Token Import"
       }
     ],
     "menus": {
@@ -276,6 +300,28 @@
           "command": "elf.activity",
           "when": "view == elf.activityView && viewItem == elf.activity",
           "group": "inline@1"
+        },
+        {
+          "command": "elf.reviewResource",
+          "when": "view == elf.changes && viewItem == elf.sync-resource",
+          "group": "inline@1"
+        },
+        {
+          "command": "elf.generateDescription",
+          "when": "view == elf.changes && viewItem == elf.issue",
+          "group": "inline@2"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "elf.saveAndReviewDescription",
+          "when": "resourceFilename =~ /\\.draft\\.json$/ && elf.running",
+          "group": "navigation@1"
+        },
+        {
+          "command": "elf.saveDescription",
+          "when": "resourceFilename =~ /\\.draft\\.json$/ && elf.running",
+          "group": "navigation@2"
         }
       ]
     }

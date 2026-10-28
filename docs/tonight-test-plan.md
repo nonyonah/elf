@@ -188,7 +188,7 @@ sync review, per-resource activity changes, and Stop for an explicitly started,
 bundled runtime. Overview, Changes, and Activity separate daily work from connections and
 preferences in the Manage menu. Component descriptions open in a native diff editor. Only account authorization opens the browser.
 Session credentials stay in the host and all API calls use an allowlisted native
-bridge. AI generation and imports are not implemented. Startup requires a trusted
+bridge. AI descriptions and a reviewed JSON token-import preview are implemented; component code imports remain. Startup requires a trusted
 local workspace; reloading the editor stops the owned monitor.
 
 - [ ] Design extension onboarding using the current Settings visual style:
@@ -205,7 +205,7 @@ local workspace; reloading the editor stops the owned monitor.
   including stale-review protection and explicit write approval.
 - [ ] Add native token suggestions/context alongside description drafts; the
   former Settings form suggestions are not yet available in the diff editor.
-- [ ] Finish live acceptance of AI-generated component-description drafts in the extension, using the
+- [x] Finish live acceptance of AI-generated component-description drafts in the extension, using the
   selected component source, discovered tokens, existing descriptions, and
   framework/library context. Show inferred values and unsupported behavior for
   review; generation must not save files or apply Figma changes automatically.
@@ -215,7 +215,7 @@ local workspace; reloading the editor stops the owned monitor.
   Local preview 0.3.1 implements editor model selection, context preview,
   per-request consent, bounded generation, assumptions/unsupported notes, shared
   validation, and a reviewed diff. Mock-based tests pass; no live model has been
-  called during implementation. Component discovery and validation are also
+  called during automated testing. The user confirmed live generation on October 28, 2026. Component discovery and validation are also
   available to MCP; native JSON token completion and context inspection exist.
 - [ ] At file connection, offer **Code → Figma**, **Figma → Code**, or
   **Compare only**. A missing-in-code finding should offer an import action.

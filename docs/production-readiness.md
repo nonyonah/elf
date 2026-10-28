@@ -33,7 +33,7 @@ do not advertise an unpublished extension as available there.
    explicit fresh per-connection approval, no independently verified URL claim,
    and no REST calls. Existing strict projects remain strict until opt-in.
    Mock integration tests cover replay, expiry, strict-policy rejection, and
-   managed sync planning. A live user-approved connection still needs acceptance.
+   managed sync planning. The user confirmed live plugin-only pairing and AI description generation on October 28, 2026. New individual-sync and token-import flows still need live acceptance.
 2. **Interactive parity:** finish the gaps above and run the same acceptance
    scenarios through npm Settings and native controls. Avoid adding behavior to
    only one adapter when it belongs in the shared engine.
@@ -67,13 +67,19 @@ acceptance test before release; automated tests use mocks and send no source.
 Discovery and draft validation are also exposed through MCP. Editor token
 completion and a source/token context document are available for manual drafts.
 
-Imports still need implementation: select direction at connection, inspect Figma
-resources, detect project formats, preserve modes/aliases, preview naming and
-file conflicts, and apply only a reviewed plan. Component imports must ask for
+A first token-import preview now creates a reviewed new Elf JSON file through
+the bridge, preserves modes and alias source data, skips existing code names,
+and rejects stale plans and overwrites. It is shared by npm Settings, MCP and
+the native extension. Imported files support checks and component token references.
+CSS/Tailwind conversion, reverse-write adoption, and direction choices at
+connection remain. Component imports must ask for
 framework/library choices and identify unsupported behavior/accessibility.
-Neither import generation nor model output may overwrite project files or write
+Neither component import generation nor model output may overwrite project files or write
 to Figma without explicit reviewed approval. Do not advertise imports as shipping.
 
 Automated tests are evidence for the covered cases, not proof of every live
 provider flow or operating system. Keep observed live results separate from
 mock tests and unverified release assumptions.
+
+See [component sync and imports](component-sync-and-imports.md) for the new native
+actions, individual sync dependency rules, and token-import limitations.

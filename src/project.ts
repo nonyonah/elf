@@ -1,3 +1,5 @@
+import {importedTokenDocument, type ImportSnapshot} from './token-import.js';
+import {discoverProject, readSource} from './discovery.js';
 import { deliverSyncNotifications } from "./sync-notifications.js";
 import { verifyComponentPatch, verifyStylePatch } from "./verify-write.js";
 import { cssColorToHex } from "./core/normalize.js";
@@ -21,15 +23,16 @@ import type { BridgeRuntime } from "../mcp/src/runtime.js";
 
 export interface PlanEntry { kind: "token" | "component" | "style"; key: string; name: string; action: "create" | "update"; }
 export interface PlanIssue { kind: "conflict" | "unsupported" | "removed"; key: string; message: string; component?: string; action?: "prepare-component"; blocksApply?: boolean; }
-export interface SyncPlan { id: string; fileKey: string; entries: PlanEntry[]; issues: PlanIssue[]; expiresAt: string; }
+export interface SyncPlan { selection?: {kind: PlanEntry["kind"];key:string}; id: string; fileKey: string; entries: PlanEntry[]; issues: PlanIssue[]; expiresAt: string; }
 interface Snapshot { collections: any[]; variables: any[]; components: any[]; nodes: Record<string, unknown>; styles: any[]; }
-interface InternalPlan { view: SyncPlan; fingerprint: string; config: BatchConfig; manifest: Manifest; tokens: TokensPlan; components: PlannedComponent[]; snapshot: Snapshot; }
+interface InternalPlan { selection?: {kind: PlanEntry["kind"]; key: string}; view: SyncPlan; fingerprint: string; config: BatchConfig; manifest: Manifest; tokens: TokensPlan; components: PlannedComponent[]; snapshot: Snapshot; }
 const writes = (plan: SyncPlan, kind: PlanEntry["kind"]): Set<string> => new Set(plan.entries.filter(entry => entry.kind === kind).map(entry => entry.key));
 
 /** The same managed workflow is used by Settings, automatic watch, CLI and MCP. */
 export class ProjectService {
   get activity(): Activity[] { return readActivity(this.configPath); }
   private reviewed = new Map<string, InternalPlan>();
+  private importReviews = new Map<string,{id:string;path:string;content:string;names:string[];issues:string[];fingerprint:string;expiresAt:string;ids?:string[]}>();
   private tail: Promise<unknown> = Promise.resolve();
   constructor(readonly configPath: string, private readonly runtime: BridgeRuntime) { this.migrate(); }
 
@@ -93,9 +96,10 @@ export class ProjectService {
       return { ...result, report: join(dirname(this.configPath), "drift-report.md") };
     });
   }
-  async plan(): Promise<SyncPlan> {
+  async plan(selection?: {kind: PlanEntry["kind"]; key: string}): Promise<SyncPlan> {
     return this.serial(() => this.transaction( async client => {
       const plan = await this.build(client);
+      if (selection) this.selectPlan(plan, selection);
       for (const [id, previous] of this.reviewed) if (Date.parse(previous.view.expiresAt) < Date.now()) this.reviewed.delete(id);
       if (this.reviewed.size >= 20) this.reviewed.delete(this.reviewed.keys().next().value!);
       this.reviewed.set(plan.view.id, plan);
@@ -107,8 +111,10 @@ export class ProjectService {
       const reviewed = this.reviewed.get(id);
       if (!reviewed || Date.parse(reviewed.view.expiresAt) < Date.now()) throw new Error("This sync plan expired. Review a fresh plan.");
       const fresh = await this.build(client);
+      if (reviewed.selection) this.selectPlan(fresh, reviewed.selection);
       if (fresh.fingerprint !== reviewed.fingerprint) throw new Error("Code, configuration, or Figma changed after review. Review a fresh plan before applying.");
       if (fresh.view.issues.some(issue => issue.kind === "conflict" && issue.blocksApply !== false) && !options.overwriteConflicts) throw new Error("Figma has edits. Keep them, or explicitly choose to replace the conflicts in this reviewed plan.");
+      if (options.enableAuto && reviewed.selection) throw new Error('Individual sync cannot enable automatic sync. Review the full project first.');
       if (options.enableAuto && loadConfig(this.configPath).intentionalDifferences?.length) throw new Error("Intentional differences are configured. Keep monitoring enabled and review writes individually.");
       if (options.enableAuto && fresh.view.issues.some(issue => issue.kind !== "unsupported")) throw new Error("Resolve conflicts and removed resources before enabling automatic sync.");
       this.reviewed.delete(id);
@@ -156,6 +162,51 @@ export class ProjectService {
       ] };
     }));
   }
+  private async importSnapshot(client:BridgeCaller):Promise<ImportSnapshot> {
+    const collections = await client.call<{collections:any[]}>('list_collections');
+    const variables = await client.call<{variables:any[]}>('list_variables');
+    return {collections:collections.collections,variables:variables.variables};
+  }
+  private importSources(): {paths:string[];hash:string} {
+    const root = realpathSync(dirname(this.configPath));
+    const drift = loadConfig(this.configPath);
+    const paths = [...new Set([...discoverProject(root).tokens,...(drift.codebase.paths ?? [drift.codebase.path]).map(path => resolve(root,path))])].filter(path => resolve(path)!==resolve(this.configPath)).sort();
+    return {paths,hash:hashSpec({config:readSource(this.configPath),sources:paths.map(path => [path,readSource(path)]),connection:{at:this.runtime.connection.status.connectedAt,id:this.runtime.connection.status.file?.authorizationId}})};
+  }
+  async planTokenImport(path='figma.tokens.json', ids?:string[]):Promise<Record<string,unknown>> {
+    return this.serial(() => this.transaction(async client => {
+      if (!/^[A-Za-z0-9][A-Za-z0-9._-]*\.tokens\.json$/.test(path) || path.includes('..')) throw new Error('Use a new filename in the project root, such as figma.tokens.json.');
+      const target=this.outputPath(path);
+      if (existsSync(target)) throw new Error('The import output already exists. Choose a new filename; imports never overwrite existing files.');
+      const sources=this.importSources();
+      const existing = new Set<string>();
+      for (const source of sources.paths) for (const token of await parseCodebaseTokens('auto',source)) existing.add(token.name);
+      const snapshot=await this.importSnapshot(client);
+      const draft=importedTokenDocument(snapshot,loadConfig(this.configPath).figma.fileKey,existing,ids,loadConfig(this.configPath).nameMapping);
+      const view={id:randomUUID(),path,content:draft.content,names:draft.names,issues:draft.issues,expiresAt:new Date(Date.now()+10*60_000).toISOString()};
+      for (const [id,old] of this.importReviews) if (Date.parse(old.expiresAt)<Date.now()) this.importReviews.delete(id);
+      if (this.importReviews.size>=20) this.importReviews.delete(this.importReviews.keys().next().value!);
+      this.importReviews.set(view.id,{...view,ids,fingerprint:hashSpec({sources:sources.hash,snapshot})});
+      return {...view,detectedFormats:[...new Set(sources.paths.map(source => source.endsWith('.css')?'CSS':source.endsWith('.json')?'JSON':'Tailwind'))],format:'Elf JSON',limitations:['Creates a new JSON file; does not rewrite CSS, Tailwind, or existing tokens.','Imported variables are reference baselines. Reverse writes require a separate reviewed migration.','Boolean and unclassified numeric values are retained, but are not compared by the drift engine.']};
+    }));
+  }
+  async applyTokenImport(id:string):Promise<Record<string,unknown>> {
+    return this.serial(() => this.transaction(async client => {
+      const plan=this.importReviews.get(id);
+      if (!plan || Date.parse(plan.expiresAt)<Date.now()) throw new Error('This token import review expired. Prepare it again.');
+      if (!plan.names.length) throw new Error('There are no new tokens to import.');
+      const target=this.outputPath(plan.path);
+      if (existsSync(target)) throw new Error('The import file now exists. Review a new output path.');
+      const snapshot=await this.importSnapshot(client);
+      if (hashSpec({sources:this.importSources().hash,snapshot})!==plan.fingerprint) throw new Error('Code, configuration, connection, or Figma changed. Review the import again.');
+      this.importReviews.delete(id);
+      if (this.automatic()) this.setMonitoring();
+      writeFileSync(target,plan.content,{flag:'wx',mode:0o600});
+      this.reviewed.clear();
+      this.record('description',`${plan.names.length} Figma tokens imported into ${plan.path}.`);
+      return {imported:plan.names.length,path:plan.path};
+    }));
+  }
   generatedPaths(): string[] { const { config } = this.batchConfig(); return [config.manifestFile, realpathSync(this.configPath), join(config.root, "drift-report.md"), join(config.root, "drift-status.json")]; }
   watchPaths(): string[] {
     const { config, hasComponents } = this.batchConfig();
@@ -195,15 +246,31 @@ export class ProjectService {
     return target;
   }
   private async tokens(config: BatchConfig, structured: boolean): Promise<{ plan: TokensPlan; index: TokenIndex; unsupported: PlanIssue[] }> {
-    if (structured) return { ...planTokens(config.tokensFile, config), unsupported: [] };
+    const importedIndex:TokenIndex=new Map();const importedIssues:PlanIssue[]=[];
+    for (const path of loadConfig(this.configPath).codebase.paths ?? []) if (path.endsWith('.json')) {
+      const data=JSON.parse(readSource(path));
+      if (data.$elfFigmaImport===1) importedIssues.push({kind:'unsupported',key:`import:${basename(path)}`,message:`${basename(path)}: imported Figma references are read for checks and component bindings; reverse token writes require a reviewed migration.`});
+      if (data.$elfFigmaImport===1) for (const [name,item] of Object.entries(data.tokens) as [string,any][]) {
+        const variable=data.source?.variables?.find((value:any)=>value.id===item.figmaId);
+        if (!variable || typeof variable.name!=='string') throw new Error('Imported token metadata is invalid.');
+        importedIndex.set(name,{codeKey:name,name:variable.name,type:item.type,literal:item.value});
+
+      }
+    }
+    if (structured) {
+      const planned=planTokens(config.tokensFile,config);
+      return {...planned,index:new Map([...importedIndex,...planned.index]),unsupported:importedIssues};
+    }
     // Preserve rich token aliases/modes when the source already uses the batch format.
     if (config.tokensFile.endsWith(".json") && !loadConfig(this.configPath).codebase.paths?.slice(1).length) {
       try { const planned = planTokens(config.tokensFile, config); if (planned.index.size) return { ...planned, unsupported: [] }; } catch {}
     }
     const drift = loadConfig(this.configPath);
     const source = drift.codebase.paths ? await parseProjectTokens(drift.codebase) : await parseCodebaseTokens(drift.codebase.source, config.tokensFile);
-    const variables: TokensPlan["primitives"]["variables"] = []; const index: TokenIndex = new Map(); const unsupported: PlanIssue[] = [];
+    const variables: TokensPlan["primitives"]["variables"] = []; const index: TokenIndex = new Map(importedIndex); const unsupported: PlanIssue[] = [...importedIssues];
+    const importedNames = new Set(importedIndex.keys());
     for (const token of source) {
+      if (token.mode !== undefined || importedNames.has(token.name)) continue;
       const number = Number(token.value.replace(/px$/, ""));
       const type = token.category === "color" ? "COLOR" : ["spacing", "radius"].includes(token.category) && Number.isFinite(number) ? "FLOAT" : null;
       if (!type) { unsupported.push({ kind: "unsupported", key: token.name, message: `${token.name}: this token type needs an explicit sync description. It will not be written automatically.` }); continue; }
@@ -306,6 +373,55 @@ export class ProjectService {
     const fingerprint = createHash("sha256").update(stableStringify({ connectionIdentity: {connectedAt: this.runtime.connection.status.connectedAt, authorizationId: this.runtime.connection.status.file?.authorizationId}, config: this.raw(), tokens: tokens.plan, source: [...new Set([config.tokensFile, ...(loadConfig(this.configPath).codebase.paths ?? [])])].map(path => readFileSync(path, "utf8")), components: components.map(component => ({ ...component, source: readFileSync(resolve(config.componentsDir, component.parsed.file), "utf8"), raw: existsSync(sidecarPathFor(config.componentsDir, component.parsed)) ? readFileSync(sidecarPathFor(config.componentsDir, component.parsed), "utf8") : null })), manifest, snapshot })).digest("hex");
     return { view, fingerprint, config, manifest, tokens: tokens.plan, components, snapshot };
   }
+  private selectPlan(plan: InternalPlan, selection: {kind: PlanEntry["kind"]; key: string}): void {
+    if (!['token','component','style'].includes(selection.kind) || typeof selection.key !== 'string' || !selection.key) throw new Error('Select one supported resource.');
+    const selected = new Set<string>();
+    const include = (kind: PlanEntry['kind'], key: string): void => {
+      const id = `${kind}:${key}`; if (selected.has(id)) return; selected.add(id);
+      if (kind === 'component') {
+        const component = plan.components.find(item => item.parsed.codeKey === key);
+        if (!component) throw new Error('This component is no longer in the project.');
+        const visit = (value: unknown): void => {
+          if (typeof value === 'string') {
+            const ref = value.replace(/^\{(.*)\}$/, '$1');
+            const variable = [plan.tokens.primitives, ...(plan.tokens.semanticCollections ?? [plan.tokens.semantic])].flatMap(section => section.variables).find(item => item.codeKey === ref || item.name === ref);
+            if (variable) include('token', variable.codeKey);
+          } else if (value && typeof value === 'object') for (const [field, child] of Object.entries(value)) {
+            if (field === 'component' && typeof child === 'string') {
+              const target = plan.components.find(item => item.parsed.codeKey === child || item.parsed.name === child);
+              if (target) include('component', target.parsed.codeKey);
+            } else if (!['characters','name','codeKey','layoutMode'].includes(field)) visit(child);
+          }
+        };
+        visit(component.sidecar);
+        for (const dep of component.parsed.dependencies) include('component', dep);
+        if (key !== selection.key && component.sidecarError) throw new Error(`${component.parsed.name}: prepare and review this required dependency's description before syncing ${selection.key}.`);
+      }
+      if (kind === 'style') {
+        const style = [...plan.tokens.textStyles.map(item => ({...item,kind:'text'})), ...plan.tokens.effectStyles.map(item => ({...item,kind:'effect'}))].find(item => `${item.kind}:${item.key}` === key);
+        const visit = (value: unknown): void => {
+          if (typeof value === 'string') {
+            const ref = value.replace(/^\{(.*)\}$/, '$1');
+            const variable = [plan.tokens.primitives,...(plan.tokens.semanticCollections ?? [plan.tokens.semantic])].flatMap(section => section.variables).find(item => item.name === ref || item.codeKey === ref);
+            if (variable) include('token',variable.codeKey);
+          } else if (value && typeof value === 'object') Object.values(value).forEach(visit);
+        }; visit(style?.params);
+      }
+      if (kind === 'token') {
+        const variables = [plan.tokens.primitives, ...(plan.tokens.semanticCollections ?? [plan.tokens.semantic])].flatMap(section => section.variables);
+        const variable = variables.find(item => item.codeKey === key);
+        for (const value of Object.values(variable?.values ?? {})) if (value && typeof value === 'object' && 'variable' in value) {
+          const target = variables.find(item => item.name === (value as any).variable || item.codeKey === (value as any).variable);
+          if (target) include('token', target.codeKey);
+        }
+      }
+    };
+    include(selection.kind, selection.key);
+    plan.selection = {...selection}; plan.view.selection={...selection};
+    plan.view.entries = plan.view.entries.filter(entry => selected.has(`${entry.kind}:${entry.key}`));
+    plan.view.issues = plan.view.issues.filter(issue => [...selected].some(id => id.slice(id.indexOf(':') + 1) === issue.key));
+    for (const issue of plan.view.issues) if (issue.kind === 'conflict') issue.blocksApply = true;
+  }
   private async execute(plan: InternalPlan, client: BridgeCaller): Promise<Record<string, unknown>> {
     const variableKeys = writes(plan.view, "token"); const componentKeys = writes(plan.view, "component"); const styleKeys = writes(plan.view, "style");
     if (!plan.view.entries.length) {
@@ -391,8 +507,13 @@ export class ProjectService {
     return createHash("sha256").update(JSON.stringify({source: componentSourceHash(config.componentsDir, component), description: stat ? readFileSync(path, "utf8") : null})).digest("hex");
   }
   async listComponents(): Promise<Record<string, unknown>> {
-    const { config, hasComponents } = this.batchConfig();
-    return { components: hasComponents ? parseComponents(config.componentsDir, config.componentFiles).map(item => ({name: item.name, codeKey: item.codeKey, file: item.file})) : [] };
+    const { config, hasComponents, structured } = this.batchConfig();
+    const tokens = await this.tokens(config, structured);
+    const deprecations = loadConfig(this.configPath).deprecations;
+    return { components: hasComponents ? parseComponents(config.componentsDir, config.componentFiles).map(item => {
+      const planned = planComponent(config, tokens.index, item);
+      return {name:item.name, codeKey:item.codeKey, file:item.file, deprecated:item.deprecated !== undefined || deprecations.some(entry => entry.type === 'component' && (entry.name === item.name || entry.name === item.codeKey)), descriptionStatus:planned.sidecarError ? 'needs-review' : 'ready', suggestion:planned.sidecarError ? 'Generate or prepare a Figma description before syncing.' : undefined};
+    }) : [] };
   }
   async validateDescription(name: string, description: unknown, reviewHash: string): Promise<Record<string, unknown>> {
     const { config, structured, hasComponents } = this.batchConfig();

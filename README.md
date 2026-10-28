@@ -679,3 +679,6 @@ Every project I've worked on has had the same arc: the design system starts as a
 [MIT](LICENSE)
 
 For component monitoring, item-level Slack alerts, and intentional differences, see [Testing drift locally](docs/testing-drift.md).
+
+For description save-to-sync actions, individual resource reviews, and the first
+reviewed Figma token-import workflow, see [component sync and imports](docs/component-sync-and-imports.md).

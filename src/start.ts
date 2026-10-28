@@ -164,7 +164,18 @@ export async function main(argv: string[]): Promise<number> {
         const key = loadConfig(configPath).figma.fileKey;
         return runtime.transaction(key, client => client.call("show_ui"));
       }
-      if (action === "plan") return project.plan();
+      if (action === "plan") {
+        if (body.selection !== undefined && (!body.selection || typeof body.selection !== 'object' || !['token','component','style'].includes((body.selection as any).kind) || typeof (body.selection as any).key !== 'string')) throw new Error('Invalid resource selection.');
+        return project.plan(body.selection as any);
+      }
+      if (action === 'plan-token-import') {
+        if (body.path !== undefined && typeof body.path !== 'string' || body.ids !== undefined && (!Array.isArray(body.ids) || body.ids.some(id => typeof id !== 'string'))) throw new Error('Invalid import selection.');
+        return project.planTokenImport(body.path as string | undefined,body.ids as string[] | undefined);
+      }
+      if (action === 'apply-token-import') {
+        if (typeof body.planId !== 'string') throw new Error('Review a token import first.');
+        return project.applyTokenImport(body.planId);
+      }
       if (action === "components") return project.listComponents();
       if (action === 'pending-document') return project.pendingDocument();
       if (action === 'approve-document' && typeof body.fileKey === 'string' && typeof body.ticket === 'string') return project.approveDocument(body.fileKey, body.ticket, body.optIn === true);

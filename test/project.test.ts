@@ -15,11 +15,11 @@ function project(components = false) {
     writeFileSync(join(root, "components", "Button.figma.json"), JSON.stringify({ size: { width: 120, height: 40 }, text: { characters: "Save", fontSize: 14 } }));
   }
   writeFileSync(path, JSON.stringify({ figma: { fileKey: "project-file", source: "bridge" }, codebase: { path: "tokens.css", source: "css" }, ...(components ? { components: { path: "components", manifest: "elf.manifest.json" } } : {}) }));
-  const variables: any[] = []; const refs: any[] = []; const nodes: Record<string, any> = {}; const calls: string[] = [];
+  const collections: any[] = []; const variables: any[] = []; const refs: any[] = []; const nodes: Record<string, any> = {}; const calls: string[] = [];
   const race = { enabled: false };
   const client = { async call(method: string, params: any = {}): Promise<any> {
     calls.push(method);
-    if (method === "list_collections") return { collections: [] };
+    if (method === "list_collections") return { collections };
     if (method === "list_variables") return { variables: variables.map(item => ({ ...item })) };
     if (method === "list_components") return { components: refs };
     if (method === "get_node") return { node: nodes[params.nodeId] };
@@ -50,7 +50,7 @@ function project(components = false) {
     throw new Error(`Unexpected ${method}`);
   } };
   const runtime = { transaction: async (file: string, work: (client: any) => any) => { assert.equal(file, "project-file"); return work(client); }, connection: { status: { file: { key: "project-file" } } } } as unknown as BridgeRuntime;
-  return { root, path, variables, refs, nodes, calls, race, service: new ProjectService(path, runtime), cleanup: () => rmSync(root, { recursive: true }) };
+  return { root, path, collections, variables, refs, nodes, calls, race, service: new ProjectService(path, runtime), cleanup: () => rmSync(root, { recursive: true }) };
 }
 
 test('component discovery and generated-draft validation never save or call Figma', async () => {
@@ -344,4 +344,95 @@ test("conflicts on a planned component dependency still require explicit replace
     await assert.rejects(p.service.apply(plan.id), /Figma has edits/);
     assert.equal(p.calls.some(call => /^(upsert|create|delete)/.test(call)), false);
   } finally {p.cleanup();}
+});
+
+
+test('individual component sync includes only referenced tokens and rejects stale review and auto enable', async () => {
+  const p = project(true);
+  try {
+    writeFileSync(join(p.root,'tokens.css'), ':root { --color-primary: #112233; --color-unrelated: #abcdef; }');
+    writeFileSync(join(p.root,'components/Button.figma.json'), JSON.stringify({fill:'color-primary',size:{width:120,height:40},text:{characters:'Save',fontSize:14}}));
+    writeFileSync(join(p.root,'components/Other.tsx'), 'export function Other(){return <div/>}');
+    const listed = await p.service.listComponents();
+    assert.equal((listed.components as any[]).find(item => item.name === 'Other').descriptionStatus,'needs-review');
+    const selected = {kind:'component' as const,key:'components/Button.tsx#Button'};
+    const key = (listed.components as any[]).find(item => item.name === 'Button').codeKey;
+    selected.key = key;
+    const plan = await p.service.plan(selected);
+    assert.deepEqual(plan.entries.map(item => item.name).sort(),['Button','color-primary']);
+    assert.equal(plan.issues.some(item => item.key.includes('Other')),false);
+    await assert.rejects(p.service.apply(plan.id,{enableAuto:true}),/Individual sync/);
+    writeFileSync(join(p.root,'tokens.css'), ':root { --color-primary: #223344; --color-unrelated: #abcdef; }');
+    await assert.rejects(p.service.apply(plan.id),/changed after review/);
+    assert.equal(p.calls.some(method => method === 'upsert_variables'),false);
+  } finally {p.cleanup();}
+});
+
+test('individual token apply does not write unselected tokens or components', async () => {
+  const p = project(true);
+  try {
+    writeFileSync(join(p.root,'tokens.css'), ':root { --color-primary: #112233; --color-unrelated: #abcdef; }');
+    const plan = await p.service.plan({kind:'token',key:'color-primary'});
+    assert.equal(plan.entries.length,1);
+    await p.service.apply(plan.id);
+    assert.deepEqual(p.variables.map(item => item.codeKey),['color-primary']);
+    assert.equal(p.calls.includes('upsert_component'),false);
+  } finally {p.cleanup();}
+});
+
+
+test('token import creates only an explicitly reviewed new file and rejects changed Figma and existing outputs', async () => {
+  const p=project();
+  try {
+    p.collections.push({id:'c',name:'Colors',defaultModeId:'light',modes:[{modeId:'light',name:'Light'},{modeId:'dark',name:'Dark'}]});
+    p.variables.push({id:'new',name:'color/new',collectionId:'c',resolvedType:'COLOR',valuesByMode:{Light:{type:'COLOR',value:'#ffffff'},Dark:{type:'COLOR',value:'#111111'}}});
+    const plan=await p.service.planTokenImport();
+    assert.equal(plan.format,'Elf JSON');
+    assert.deepEqual(plan.names,['color-new']);
+    assert.throws(() => readFileSync(join(p.root,'figma.tokens.json')));
+    assert.equal(p.calls.some(method => /create|upsert/.test(method)),false);
+    p.variables[0].valuesByMode.Dark.value='#222222';
+    await assert.rejects(p.service.applyTokenImport(plan.id as string),/changed/);
+    const fresh=await p.service.planTokenImport();
+    writeFileSync(join(p.root,'figma.tokens.json'),'user content');
+    await assert.rejects(p.service.applyTokenImport(fresh.id as string),/changed|exists/);
+    assert.equal(readFileSync(join(p.root,'figma.tokens.json'),'utf8'),'user content');
+    await assert.rejects(p.service.planTokenImport('reviewed.tokens.json'),/JSON|Unexpected/);
+  } finally {p.cleanup();}
+});
+
+test('token import applies once without writing Figma and preserves complete modes', async () => {
+  const p=project();
+  try {
+    p.collections.push({id:'c',name:'Colors',defaultModeId:'light',modes:[{modeId:'light',name:'Light'},{modeId:'dark',name:'Dark'}]});
+    p.variables.push({id:'new',name:'color/new',collectionId:'c',resolvedType:'COLOR',valuesByMode:{Light:{type:'COLOR',value:'#ffffff'},Dark:{type:'COLOR',value:'#111111'}}});
+    const plan=await p.service.planTokenImport();
+    const result=await p.service.applyTokenImport(plan.id as string);
+    assert.equal(result.imported,1);
+    const data=JSON.parse(readFileSync(join(p.root,'figma.tokens.json'),'utf8'));
+    assert.equal(data.tokens['color-new'].modes.Dark,'#111111');
+    assert.equal(data.source.variables[0].id,'new');
+    const {loadConfig}=await import('../src/config.js');
+    const {parseProjectTokens}=await import('../src/codebase/index.js');
+    const discovered=loadConfig(p.path);
+    assert(discovered.codebase.paths?.includes(join(p.root,'figma.tokens.json')));
+    const code=await parseProjectTokens(discovered.codebase);
+    assert(code.some(item=>item.name==='color-new' && item.mode==='Dark' && item.value==='#111111'));
+    await assert.rejects(p.service.applyTokenImport(plan.id as string),/expired/);
+    assert.equal(p.calls.some(method => /create|upsert/.test(method)),false);
+    await assert.rejects(p.service.planTokenImport('../outside.tokens.json'),/filename/);
+    await assert.rejects(p.service.planTokenImport(),/already exists/);
+  } finally {p.cleanup();}
+});
+
+
+test('individual sync cannot override an invalid required component dependency',async()=>{
+ const p=project(true);
+ try {
+  writeFileSync(join(p.root,'components/Child.tsx'),'export function Child(){return <div/>}');
+  writeFileSync(join(p.root,'components/Button.tsx'),"import {Child} from './Child'; export function Button(){return <Child/>}");
+  const listed=await p.service.listComponents();const key=(listed.components as any[]).find(item=>item.name==='Button').codeKey;
+  await assert.rejects(p.service.plan({kind:'component',key}),/required dependency/);
+  assert.equal(p.calls.some(method=>/upsert|create/.test(method)),false);
+ } finally {p.cleanup();}
 });

@@ -38,7 +38,9 @@ function harness(options = {}) {
       else if (path === '/api/figma/account') data = { connected: options.figmaConnected !== false };
       else if (path === '/api/onboarding') data = project;
       else if (path === '/api/onboarding/validate' || path === '/api/onboarding/start') data = { ok: true };
-      else if (path === '/api/project/components') data = {components:[{name:'Button',file:'Button.tsx',codeKey:'button.tsx#Button'}]};
+      else if (path === '/api/project/components') data = {components:options.components || [{name:'Button',file:'Button.tsx',codeKey:'button.tsx#Button'}]};
+      else if (path === '/api/project/plan-token-import') data = {id:'import-1',path:'figma.tokens.json',content:'{"tokens":{}}',names:['color-new'],issues:[],limitations:['New JSON file only.']};
+      else if (path === '/api/project/apply-token-import') data = {imported:1,path:'figma.tokens.json'};
       else if (path === '/api/project/validate-description') data = {valid:true};
       else if (path === '/api/project/pending-document') data = {file:{key:'file',name:'Open design'},ticket:'d'.repeat(64),expiresAt:Date.now()+300000};
       else if (path === '/api/project/approve-document' || path === '/api/project/strict-authorization') data = {ok:true};
@@ -55,6 +57,7 @@ function harness(options = {}) {
         reviewHash: 'a'.repeat(64), sidecar: { layoutMode: 'HORIZONTAL' }, warning: null,
       };
       else return { status: 404, body: JSON.stringify({ error: 'Not found' }) };
+      if (path === '/api/project/plan' && body) data = {...data,selection:JSON.parse(body).selection};
       return { status: 200, body: JSON.stringify(data) };
     },
   };
@@ -99,7 +102,7 @@ function harness(options = {}) {
         delete: async target => { files.delete(target.fsPath); },
       },
       registerTextDocumentContentProvider: (scheme, provider) => { providers.set(scheme, provider); return { dispose() {} }; },
-      openTextDocument: async input => { const readonly = input.scheme === 'elf-readonly'; const language = readonly ? input.toString().includes('.md?') ? 'markdown' : 'json' : input.language; const content = readonly ? providers.get(input.scheme).provideTextDocumentContent(input) : input.content; const document = { languageId: language, isUntitled: !readonly, getText: () => content, uri: readonly ? input : uri(`/untitled/${documents.length}.${language}`) }; documents.push(document); return document; },
+      openTextDocument: async input => { const readonly = input.scheme === 'elf-readonly'; const language = readonly ? input.toString().includes('.md?') ? 'markdown' : 'json' : input.language; const content = readonly ? providers.get(input.scheme).provideTextDocumentContent(input) : input.fsPath && files.has(input.fsPath) ? files.get(input.fsPath).toString() : input.content; const document = { languageId: language, isUntitled: !readonly, getText: () => content, uri: readonly || input.fsPath ? input : uri(`/untitled/${documents.length}.${language}`) }; documents.push(document); return document; },
       onDidCloseTextDocument: () => ({ dispose() {} }),
     },
     commands: {
@@ -407,4 +410,37 @@ test('an open draft can be recovered after reload only as a freshly validated re
   const draft=[...h.native.drafts.values()][0];
   assert.equal(draft.prepared.sidecar.layoutMode,'VERTICAL');
   assert.notEqual(draft.uri.fsPath,'/storage/description-drafts/old.draft.json');
+});
+
+
+test('individual sync sends selection and never offers automatic sync',async t => {
+ const h=harness();t.after(()=>h.native.dispose());await h.native.refresh();
+ await h.commands.get('elf.reviewResource')({kind:'component',key:'button.tsx#Button'});
+ assert.deepEqual(JSON.parse(h.requests.find(item=>item.path==='/api/project/plan').body),{selection:{kind:'component',key:'button.tsx#Button'}});
+ assert.equal(h.native.syncChildren().some(item=>item.command?.command==='elf.toggleEnableAuto'),false);
+ assert.equal(h.requests.some(item=>item.path==='/api/project/apply'),false);
+});
+test('missing descriptions suggest generation while deprecated components stay quiet',async t => {
+ const h=harness({components:[{name:'Button',codeKey:'button',descriptionStatus:'needs-review',suggestion:'Description needed'},{name:'Old',codeKey:'old',descriptionStatus:'needs-review',deprecated:true}]});t.after(()=>h.native.dispose());
+ const rows=await h.native.componentChildren();
+ assert(rows[0].children.some(item=>item.command?.command==='elf.generateDescription'));
+ assert.equal(rows[1].children.length,0);
+});
+test('save and review description prepares only that component without applying Figma changes',async t=>{
+ const h=harness();t.after(()=>h.native.dispose());
+ await h.commands.get('elf.prepareDescription')('Button');
+ const uri=h.executed.find(item=>item.name==='vscode.diff').args[1];
+ h.warningResponses.push('Save reviewed description');
+ await h.commands.get('elf.saveAndReviewDescription')(uri.toString());
+ assert.deepEqual(JSON.parse(h.requests.find(item=>item.path==='/api/project/plan').body).selection,{kind:'component',key:'button.tsx#Button'});
+ assert.equal(h.requests.some(item=>item.path==='/api/project/apply'),false);
+});
+test('token import previews read-only content and requires explicit confirmation before writing',async t=>{
+ const h=harness();t.after(()=>h.native.dispose());await h.native.refresh();
+ h.inputResponses.push('figma.tokens.json');await h.commands.get('elf.importTokens')();
+ assert.equal(h.requests.some(item=>item.path==='/api/project/apply-token-import'),false);
+ await h.commands.get('elf.applyTokenImport')();
+ assert.equal(h.requests.some(item=>item.path==='/api/project/apply-token-import'),false);
+ h.warningResponses.push('Create token file');await h.commands.get('elf.applyTokenImport')();
+ assert.deepEqual(JSON.parse(h.requests.find(item=>item.path==='/api/project/apply-token-import').body),{planId:'import-1'});
 });

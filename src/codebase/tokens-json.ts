@@ -1,3 +1,4 @@
+import {parseImportedTokens} from '../token-import.js';
 import { readFileSync } from "node:fs";
 import { categoryFromName, cssColorToHex, normalizeShadow, slugify, toPx } from "../core/normalize.js";
 import type { Category, Token } from "../core/types.js";
@@ -22,6 +23,7 @@ const TYPE_TO_CATEGORY: Record<string, Category> = {
 
 export function parseTokensJson(jsonPath: string, contents?: string): Token[] {
   const data = JSON.parse(contents ?? readFileSync(jsonPath, "utf8")) as Record<string, unknown>;
+  if (Object.hasOwn(data, "$elfFigmaImport")) return parseImportedTokens(data);
   const tokens: Token[] = [];
 
   const walk = (node: Record<string, unknown>, path: string[]): void => {

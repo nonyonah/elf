@@ -1,5 +1,5 @@
-import { discoverProject } from "./discovery.js";
-import { existsSync, readFileSync } from "node:fs";
+import { discoverProject, readSource } from "./discovery.js";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, join, resolve, relative } from "node:path";
 import type { ComponentsConfig, DashboardConfig, Deprecation, DriftConfig, ModeStrategy, NotifyConfig } from "./core/types.js";
 
@@ -41,6 +41,12 @@ export function loadConfig(configPath: string): DriftConfig {
   }
   const autoTokens = !config.codebase?.path || config.codebase.path === "auto";
   const discovered = autoTokens || !components ? discoverProject(configDir) : undefined;
+  // Elf-created root imports supplement explicit legacy token paths as well.
+  const importedPaths = readdirSync(configDir,{withFileTypes:true}).filter(item => item.isFile() && /^[A-Za-z0-9][A-Za-z0-9._-]*\.tokens\.json$/.test(item.name)).map(item => join(configDir,item.name)).filter(path => {
+    const content=readSource(path);
+    if (!content.includes('"$elfFigmaImport"')) return false;
+    return JSON.parse(content).$elfFigmaImport===1;
+  });
   const componentConfig = components ?? (discovered?.componentRoot ? {
     path: discovered.componentRoot, manifest: config.sync?.manifest ?? "elf.manifest.json",
     files: discovered.components.map(path => relative(discovered.componentRoot!, path)),
@@ -57,7 +63,7 @@ export function loadConfig(configPath: string): DriftConfig {
     codebase: {
       path: autoTokens ? discovered!.tokens[0] ?? resolve(configPath) : config.codebase!.path,
       source: autoTokens ? "auto" : config.codebase!.source ?? "auto",
-      ...(autoTokens ? {paths: discovered!.tokens} : {}),
+      ...(autoTokens ? {paths: [...new Set([...discovered!.tokens,...importedPaths])]} : importedPaths.length ? {paths:[...new Set([resolve(configDir,config.codebase!.path),...importedPaths])]} : {}),
     },
     modeName: config.modeName ?? null,
     modeStrategy: parseModeStrategy(config.modeStrategy),

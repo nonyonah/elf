@@ -62,9 +62,11 @@ export function diffTokens(
     figmaByName.set(name, list);
   }
 
+  const codeModes = new Map<string, Token>();
   const codeByName = new Map<string, Token>();
   for (const token of codeTokens) {
-    codeByName.set(token.name, token);
+    if (token.mode !== undefined) codeModes.set(`${token.name}\0${token.mode}`,token);
+    if (token.mode === undefined || !codeByName.has(token.name)) codeByName.set(token.name, token);
   }
 
   const valueMismatches: ValueMismatch[] = [];
@@ -80,12 +82,13 @@ export function diffTokens(
       continue;
     }
     for (const figmaToken of figmaList) {
-      if (codeToken.value === figmaToken.value) continue;
+      const comparedCode = figmaToken.mode === undefined ? codeToken : codeModes.get(`${name}\0${figmaToken.mode}`) ?? codeToken;
+      if (comparedCode.value === figmaToken.value) continue;
       valueMismatches.push({
         name,
         category: figmaToken.category,
         figmaValue: figmaToken.value,
-        codeValue: codeToken.value,
+        codeValue: comparedCode.value,
         ...(figmaToken.mode === undefined ? {} : { mode: figmaToken.mode }),
       });
     }

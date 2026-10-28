@@ -39,9 +39,10 @@ export async function parseProjectTokens(codebase: DriftConfig["codebase"]): Pro
     const source = detectCodebaseSource(path);
     const entries = source === "tailwind" ? parseStaticTailwind(path) : source === "css" ? parseCss(path, readSource(path)) : parseTokensJson(path, readSource(path));
     for (const token of entries) {
-      const previous = tokens.get(token.name);
-      if (previous && (previous.value !== token.value || previous.category !== token.category)) throw new Error(`Conflicting token "${token.name}" in ${origins.get(token.name)} and ${path}. Use one value for this token or separate its names.`);
-      tokens.set(token.name, token); origins.set(token.name, path);
+      const identity = `${token.name}\0${token.mode ?? ""}`;
+      const previous = tokens.get(identity);
+      if (previous && (previous.value !== token.value || previous.category !== token.category)) throw new Error(`Conflicting token "${token.name}" in ${origins.get(identity)} and ${path}. Use one value for this token or separate its names.`);
+      tokens.set(identity, token); origins.set(identity, path);
     }
   }
   return [...tokens.values()];

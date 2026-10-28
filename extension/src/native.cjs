@@ -70,6 +70,9 @@ class NativeElf {
       }
     }));
     register('elf.manage', () => this.manage());
+    register('elf.importTokens', () => this.importTokens());
+    register('elf.applyTokenImport', () => this.applyTokenImport());
+    register('elf.cancelTokenImport', () => {this.tokenImport=null;this.events.fire();});
     register('elf.refresh', () => this.refresh({ resources: true }));
     register('elf.restartBridge', async () => {
       let runtime = this.getRuntime();
@@ -84,6 +87,15 @@ class NativeElf {
     register('elf.toggleAutomatic', () => this.toggleAutomatic());
     register('elf.reviewSync', automatic => this.reviewSync(automatic === true));
     register('elf.applySync', () => this.applySync());
+    register('elf.reviewResource', async entry => {
+      if (!entry) {
+        const plan = await this.api('/api/project/plan','POST',{});
+        entry = await this.vscode.window.showQuickPick((plan.entries || []).map(item => ({label:item.name,description:item.kind,kind:item.kind,key:item.key})),{title:'Review one resource sync'});
+        if (!entry) return;
+      }
+      await this.reviewSync(false, entry);
+    });
+    register('elf.saveAndReviewDescription', uri => this.saveDescription(uri, true));
     register('elf.cancelPlan', () => this.cancelPlan());
     register('elf.toggleReplace', () => this.toggleReplace());
     register('elf.toggleEnableAuto', () => this.toggleEnableAuto());
@@ -231,7 +243,7 @@ class NativeElf {
         return [row(state === 'starting' ? 'Starting Elf…' : 'Start Elf', 'elf.start', state, state === 'failed' ? 'warning' : 'play')];
       }
       if (!this.snapshot) return [row(this.error || 'Load project status', 'elf.refresh', this.error ? 'Retry' : 'Loading…', this.error ? 'warning' : 'refresh')];
-      if (view === 'changes') return [...this.syncChildren(), group('Synced resources', () => this.resourceChildren(), { expanded: false, icon: 'symbol-color' })];
+      if (view === 'changes') return [...this.syncChildren(), group('Project components', () => this.componentChildren(), { expanded: true, icon: 'symbol-class' }), group('Synced resources', () => this.resourceChildren(), { expanded: false, icon: 'symbol-color' })];
       if (view === 'activity') return this.activityChildren();
       return this.overviewChildren();
     }
@@ -273,6 +285,7 @@ class NativeElf {
       { label: 'Slack', description: config?.slack?.connected ? `${config.slack.channel || 'Connected'} · disconnect` : 'Connect', command: 'elf.slack' },
       ...(config?.slack?.connected ? [{ label: 'Send Slack test message', command: 'elf.slackTest' }] : []),
       { label: 'Notification preferences', command: 'elf.preferences' },
+      { label: 'Import Figma tokens', description:'Preview a new JSON file; existing files stay unchanged', command:'elf.importTokens' },
       { label: 'Coding assistants', description: 'Cursor, Claude Code, Codex', command: 'elf.assistants' },
       { label: 'Automatic sync', description: project?.mode === 'automatic' ? 'On · pause' : 'Off · review before enabling', command: 'elf.toggleAutomatic' },
       { label: 'Generate component description with AI', command: 'elf.generateDescription' },
@@ -290,11 +303,18 @@ class NativeElf {
     const project = this.snapshot?.project;
     const automatic = project?.mode === 'automatic';
     const children = [row('Review code changes', 'elf.reviewSync', 'Preview before syncing', 'git-compare')];
+    for (const [uri, draft] of this.drafts) if (draft.owner === this.getRuntime()) children.push(row(`Save and review ${draft.prepared.name} sync`, 'elf.saveAndReviewDescription', 'Description draft ready', 'check', uri));
+    if (this.tokenImport && this.tokenImportOwner===this.getRuntime()) children.push(group('Figma → code token import',[
+      row(this.tokenImport.path,null,`${this.tokenImport.names.length} new tokens`,'file-code'),
+      ...this.tokenImport.issues.map(issue => row(issue,null,null,'info')),
+      row('Apply reviewed token import','elf.applyTokenImport','Creates the reviewed JSON file','check'),
+      row('Cancel token import','elf.cancelTokenImport',null,'close'),
+    ]));
     if (!this.plan) return children;
     const conflicts = this.plan.issues?.some(issue => issue.kind === 'conflict' && issue.blocksApply !== false);
     const unresolved = this.plan.issues?.some(issue => issue.kind !== 'unsupported');
     if (this.plan.entries?.length) {
-      children.push(group(`${this.plan.entries.length} planned ${this.plan.entries.length === 1 ? 'change' : 'changes'}`, this.plan.entries.map(entry => row(entry.name, null, `${entry.kind} · ${entry.action === 'create' ? 'Create' : 'Update'}`, entry.kind === 'component' ? 'symbol-class' : entry.kind === 'style' ? 'symbol-enum' : 'symbol-color'))));
+      children.push(group(`${this.plan.entries.length} planned ${this.plan.entries.length === 1 ? 'change' : 'changes'}`, this.plan.entries.map(entry => row(entry.name, 'elf.reviewResource', `${entry.kind} · ${entry.action === 'create' ? 'Create' : 'Update'}`, entry.kind === 'component' ? 'symbol-class' : entry.kind === 'style' ? 'symbol-enum' : 'symbol-color', {kind:entry.kind,key:entry.key}, {contextValue:'elf.sync-resource',tooltip:'Review just this resource and its required dependencies'}))));
     } else {
       children.push(row('No supported changes to apply', null, 'Review the issues below', 'info'));
     }
@@ -309,7 +329,7 @@ class NativeElf {
       ))));
     }
     if (conflicts) children.push(row('Replace Figma edits affecting planned changes', 'elf.toggleReplace', this.planReplace ? 'On' : 'Off', this.planReplace ? 'checkbox' : 'square'));
-    if (!automatic) children.push(row('Keep syncing supported changes after this review', 'elf.toggleEnableAuto', unresolved ? 'Unavailable' : this.planAuto ? 'On' : 'Off', this.planAuto ? 'checkbox' : 'square', undefined, { tooltip: unresolved ? 'Resolve conflicts and removed resources first.' : 'Keep automatic sync enabled after applying this review.' }));
+    if (!automatic && !this.planSelection) children.push(row('Keep syncing supported changes after this review', 'elf.toggleEnableAuto', unresolved ? 'Unavailable' : this.planAuto ? 'On' : 'Off', this.planAuto ? 'checkbox' : 'square', undefined, { tooltip: unresolved ? 'Resolve conflicts and removed resources first.' : 'Keep automatic sync enabled after applying this review.' }));
     if (this.plan.entries?.length || this.planAuto) children.push(row(this.planAuto ? 'Apply and enable automatic sync' : 'Apply sync', 'elf.applySync', null, 'check', undefined, { color: 'charts.green', contextValue: 'elf.plan-action' }));
     children.push(row('Cancel review', 'elf.cancelPlan', null, 'close'));
     return children;
@@ -462,11 +482,40 @@ class NativeElf {
     await this.api('/api/config', 'PATCH', { notify: enabled ? { enabled: true, onlyOnChange: selected.has('onlyOnChange') } : { enabled: false } });
     await this.refresh();
   }
-  async reviewSync(automatic = false) {
+  async importTokens() {
+    const owner=await this.ensureRuntime(); if (!owner) return;
+    const path=await this.vscode.window.showInputBox({title:'Import Figma tokens',prompt:'New JSON filename in this project. Existing code is never overwritten.',value:'figma.tokens.json'});
+    if (!path) return;
+    const plan=await this.api('/api/project/plan-token-import','POST',{path},owner);
+    if (owner!==this.getRuntime()) throw new Error('The project changed. Review a fresh import.');
+    this.tokenImport=plan;this.tokenImportOwner=owner;
+    await this.text(plan.content,'json',`${plan.path} import preview`);
+    this.events.fire();await this.vscode.commands.executeCommand('elf.changes.focus');
+    void this.vscode.window.showInformationMessage(`Review ${plan.names.length} new tokens in ${plan.path}. ${plan.limitations.join(' ')} Apply through Changes when ready.`);
+  }
+  async applyTokenImport() {
+    const plan=this.tokenImport; const owner=this.tokenImportOwner;
+    if (!plan || owner!==this.getRuntime()) throw new Error('Review a token import in this project first.');
+    if (await this.vscode.window.showWarningMessage(`Create ${plan.path} with ${plan.names.length} imported Figma tokens? This writes the reviewed file and pauses automatic sync.`,{modal:true},'Create token file')!=='Create token file') return;
+    if (this.tokenImport!==plan || this.getRuntime()!==owner) throw new Error('The import review changed.');
+    const result=await this.api('/api/project/apply-token-import','POST',{planId:plan.id},owner);
+    this.tokenImport=null;await this.refresh({resources:true});
+    void this.vscode.window.showInformationMessage(`${result.imported} tokens imported into ${result.path}.`);
+  }
+  async componentChildren() {
+    const result = await this.api('/api/project/components', 'POST', {});
+    return (result.components || []).map(component => group(component.name, [
+      ...(component.descriptionStatus === 'needs-review' && !component.deprecated ? [row('Generate Figma description', 'elf.generateDescription', component.suggestion, 'sparkle', component.codeKey), row('Prepare description manually', 'elf.prepareDescription', null, 'edit', component.codeKey)] : []),
+      ...(!component.deprecated ? [row('Review this component sync', 'elf.reviewResource', 'Includes required dependencies', 'git-compare', {kind:'component',key:component.codeKey}), row('Edit Figma description', 'elf.prepareDescription', null, 'edit', component.codeKey)] : []),
+    ], {expanded:component.descriptionStatus === 'needs-review' && !component.deprecated,description:component.deprecated ? 'Deprecated · retained' : component.descriptionStatus === 'needs-review' ? 'Description needed' : 'Ready to review',icon:component.descriptionStatus === 'needs-review' ? 'lightbulb' : 'symbol-class'}));
+  }
+  async reviewSync(automatic = false, selection) {
     const owner = await this.ensureRuntime();
-    const plan = await this.api('/api/project/plan', 'POST', {});
+    const plan = await this.api('/api/project/plan', 'POST', selection ? {selection:{kind:selection.kind,key:selection.key}} : {});
     if (owner !== this.getRuntime()) throw new Error('The project changed. Review a fresh sync plan.');
+    if (selection && (plan.selection?.key!==selection.key || plan.selection?.kind!==selection.kind)) throw new Error('Update and restart Elf before reviewing individual resources.');
     const unresolved = plan.issues?.some(issue => issue.kind !== 'unsupported');
+    this.planSelection = selection;
     this.plan = plan; this.planOwner = this.getRuntime();
     this.planAuto = automatic && this.snapshot?.project?.mode !== 'automatic' && !unresolved;
     this.planReplace = false;
@@ -577,6 +626,7 @@ class NativeElf {
     await this.vscode.workspace.fs.writeFile(draft, Buffer.from(`${JSON.stringify(prepared.sidecar, null, 2)}\n`));
     this.drafts.set(draft.toString(), { owner, prepared, generated, uri: draft, before });
     await this.vscode.commands.executeCommand('vscode.diff', before, draft, `Review ${prepared.name} description`, { preview: false });
+    this.events.fire();
     if (prepared.warning) void this.vscode.window.showWarningMessage(prepared.warning);
     void this.vscode.window.showInformationMessage(useAI ? 'AI draft validated. Review its assumptions and unsupported details, edit the right side, then use Save Reviewed Description. Nothing has been saved to the project or Figma.' : 'Review the manual draft against the component source and tokens. Use Description Context for reference, then Save Reviewed Description.');
   }
@@ -595,11 +645,12 @@ class NativeElf {
     await this.prepareDescription(undefined,false,content);
     void this.vscode.window.showInformationMessage('Draft recovered against the current source revision. Review it again before saving; previous approval and AI notes were not restored.');
   }
-  async saveDescription() {
+  async saveDescription(uri, review = false) {
     const visible = this.vscode.window.visibleTextEditors || [];
     const active = this.vscode.window.activeTextEditor;
     const candidates = visible.filter(candidate => this.drafts.has(candidate.document.uri.toString()));
-    const editor = active && this.drafts.has(active.document.uri.toString()) ? active : candidates.length === 1 ? candidates[0] : null;
+    const requested = typeof uri === 'string' ? this.drafts.get(uri) : null;
+    const editor = requested ? {document:await this.vscode.workspace.openTextDocument(requested.uri)} : active && this.drafts.has(active.document.uri.toString()) ? active : candidates.length === 1 ? candidates[0] : null;
     const document = editor?.document;
     const draft = document && this.drafts.get(document.uri.toString());
     if (!draft || draft.owner !== this.getRuntime()) throw new Error('Open a description using Elf: Prepare Component Description first.');
@@ -613,7 +664,8 @@ class NativeElf {
     if (draft.before) { try { await this.vscode.workspace.fs.delete(draft.before, { useTrash: false }); } catch {} }
     this.plan = null; this.planAuto = false; this.planReplace = false;
     await this.refresh({ resources: true });
-    void this.vscode.window.showInformationMessage('Reviewed description saved. Use Review sync to inspect its Figma changes.');
+    if (review) await this.reviewSync(false, {kind:'component',key:draft.prepared.codeKey});
+    else {const next = await this.vscode.window.showInformationMessage('Reviewed description saved.', 'Review component sync'); if (next === 'Review component sync') await this.reviewSync(false,{kind:'component',key:draft.prepared.codeKey});}
   }
   async openResource(resource) {
     if (!resource || !publicLink(resource.figmaUrl)) throw new Error('Invalid Figma resource link.');

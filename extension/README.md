@@ -78,3 +78,12 @@ Figma-to-code token and component imports remain upcoming work.
 Verification respects Figma rate limits. Reconnecting an account does not bypass
 those limits. Older shared bridges without renewal support must be stopped
 after their clients close; saved pairings survive the replacement.
+
+### Component sync and token imports
+
+Use **Save and Review Component Sync** on a description diff or its row in Changes.
+**Project components** suggests descriptions where needed and offers individual
+reviews. Planned resources can also be reviewed individually. Required dependencies
+are listed before applying. **Manage → Import Figma tokens** previews a new JSON
+file with modes and alias source data; it never overwrites existing code.
+See the [workflow and limitations](https://github.com/nonyonah/elf/blob/main/docs/component-sync-and-imports.md).
