@@ -365,6 +365,20 @@ export class ProjectService {
     if (stat && stat.size > 128_000) throw new Error("This component description is too large to review in Elf.");
     return createHash("sha256").update(JSON.stringify({source: componentSourceHash(config.componentsDir, component), description: stat ? readFileSync(path, "utf8") : null})).digest("hex");
   }
+  async listComponents(): Promise<Record<string, unknown>> {
+    const { config, hasComponents } = this.batchConfig();
+    return { components: hasComponents ? parseComponents(config.componentsDir, config.componentFiles).map(item => ({name: item.name, codeKey: item.codeKey, file: item.file})) : [] };
+  }
+  async validateDescription(name: string, description: unknown, reviewHash: string): Promise<Record<string, unknown>> {
+    const { config, structured, hasComponents } = this.batchConfig();
+    const component = hasComponents ? parseComponents(config.componentsDir, config.componentFiles).find(item => item.name === name || item.codeKey === name) : undefined;
+    if (!component || reviewHash !== this.descriptionRevision(config, component)) throw new Error("The component or description changed. Prepare it again.");
+    const sidecar = validateSidecar(description as any, component.name);
+    const tokens = await this.tokens(config, structured);
+    const { variantMatrix } = await import("../batch/src/sync.js");
+    resolveSidecar(sidecar, variantMatrix(component), tokens.index, component.name);
+    return { valid: true, description: sidecar };
+  }
   async prepareComponent(name: string): Promise<Record<string, unknown>> {
     const { config, hasComponents, structured } = this.batchConfig();
     if (!hasComponents) throw new Error("No component source files were discovered in this project. Add a component and try again.");

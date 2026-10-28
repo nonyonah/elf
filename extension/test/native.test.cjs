@@ -38,6 +38,8 @@ function harness(options = {}) {
       else if (path === '/api/figma/account') data = { connected: options.figmaConnected !== false };
       else if (path === '/api/onboarding') data = project;
       else if (path === '/api/onboarding/validate' || path === '/api/onboarding/start') data = { ok: true };
+      else if (path === '/api/project/components') data = {components:[{name:'Button',file:'Button.tsx',codeKey:'button.tsx#Button'}]};
+      else if (path === '/api/project/validate-description') data = {valid:true};
       else if (path === '/api/project/plan') data = options.plan || { id: 'plan-1', entries: [{ kind: 'token', key: 'color.brand', name: 'color.brand', action: 'update' }], issues: [], expiresAt: '2026-10-27T00:10:00.000Z' };
       else if (path === '/api/project/apply') data = options.applyResult || { synced: 1, issues: [] };
       else if (path === '/api/project/resources') data = { resources: options.resources || [{ name: 'color.brand', verified: true, recorded: true, figmaUrl: 'https://www.figma.com/design/file' }] };
@@ -364,4 +366,20 @@ test('report and activity documents use a read-only provider rather than unsaved
   assert.equal(document.uri.scheme, 'elf-readonly');
   assert.equal(document.isUntitled, false);
   assert.equal(document.getText(), '# Drift');
+});
+
+test('AI description generation validates a draft without saving or applying it', async t => {
+  const h = harness(); t.after(() => h.native.dispose());
+  const model = { name: 'Test model', vendor: 'test', sendRequest: async () => ({text:(async function*(){yield JSON.stringify({description:{layoutMode:'HORIZONTAL'},assumptions:['Layout inferred'],unsupported:['Interaction behavior']});})()}) };
+  h.vscode.lm = {selectChatModels:async()=>[model]};
+  h.vscode.ProgressLocation = {Notification:1};
+  h.vscode.LanguageModelChatMessage = {User:content=>({content})};
+  h.vscode.window.withProgress = async (_, work) => work({}, {isCancellationRequested:false});
+  h.quickPicks.push({model}); h.warningResponses.push('Send context and generate');
+  await h.native.prepareDescription('Button', true);
+  assert(h.requests.some(request => request.path === '/api/project/validate-description'));
+  assert.equal(h.requests.some(request => request.path === '/api/project/save-description' || request.path === '/api/project/apply'), false);
+  assert.equal(h.native.drafts.size, 1);
+  assert(h.executed.some(item => item.name === 'vscode.diff'));
+  assert(h.documents.some(document => document.getText().includes('Interaction behavior')));
 });

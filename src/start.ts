@@ -160,6 +160,8 @@ export async function main(argv: string[]): Promise<number> {
         return runtime.transaction(key, client => client.call("show_ui"));
       }
       if (action === "plan") return project.plan();
+      if (action === "components") return project.listComponents();
+      if (action === "validate-description" && typeof body.component === "string" && typeof body.reviewHash === "string") return project.validateDescription(body.component, body.description, body.reviewHash);
       if (action === "apply") {
         if (typeof body.planId !== "string" || (body.enableAuto !== undefined && typeof body.enableAuto !== "boolean") || (body.overwriteConflicts !== undefined && typeof body.overwriteConflicts !== "boolean")) throw new Error("Invalid sync request.");
         const result = await project.apply(body.planId, { enableAuto: body.enableAuto === true, overwriteConflicts: body.overwriteConflicts === true });

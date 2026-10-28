@@ -50,14 +50,24 @@ do not advertise an unpublished extension as available there.
    differences, rate limits, recovery, privacy, and support. Provide a verified
    npm → extension installation link and keep both entry points documented.
 
-## Features after a stable core release
+## Additional first-release scope
 
 AI-generated component-description drafts and reviewed Figma-to-code token/
-component imports remain planned. They need source-sharing consent, model-secret
-storage, framework/library choices, previews, validation, and explicit write
-approval. They should not be advertised as shipping today. If included in the
-first release promise, they become release blockers; otherwise document them as
-future features and release the supported drift/sync workflow first.
+component imports are part of the agreed first-release scope.
+
+The local AI-description preview uses editor-provided models, per-request
+source-sharing consent, bounded responses, editable diffs, uncertainty notes,
+and shared schema/token/source-revision validation. It needs a live model-provider
+acceptance test before release; automated tests use mocks and send no source.
+Discovery and draft validation are also exposed through MCP. Editor token
+completion and a source/token context document are available for manual drafts.
+
+Imports still need implementation: select direction at connection, inspect Figma
+resources, detect project formats, preserve modes/aliases, preview naming and
+file conflicts, and apply only a reviewed plan. Component imports must ask for
+framework/library choices and identify unsupported behavior/accessibility.
+Neither import generation nor model output may overwrite project files or write
+to Figma without explicit reviewed approval. Do not advertise imports as shipping.
 
 Automated tests are evidence for the covered cases, not proof of every live
 provider flow or operating system. Keep observed live results separate from

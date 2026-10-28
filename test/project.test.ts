@@ -53,6 +53,23 @@ function project(components = false) {
   return { root, path, variables, refs, nodes, calls, race, service: new ProjectService(path, runtime), cleanup: () => rmSync(root, { recursive: true }) };
 }
 
+test('component discovery and generated-draft validation never save or call Figma', async () => {
+  const p = project(true);
+  try {
+    const listed = await p.service.listComponents();
+    assert.equal((listed.components as any[])[0].name, 'Button');
+    const prepared = await p.service.prepareComponent('Button');
+    const before = readFileSync(join(p.root, 'components/Button.figma.json'), 'utf8');
+    const valid = await p.service.validateDescription('Button', { fill: 'color-primary' }, prepared.reviewHash as string);
+    assert.equal(valid.valid, true);
+    await assert.rejects(p.service.validateDescription('Button', { fill: 'invented-token' }, prepared.reviewHash as string), /token/i);
+    assert.equal(readFileSync(join(p.root, 'components/Button.figma.json'), 'utf8'), before);
+    assert.equal(p.calls.length, 0);
+    writeFileSync(join(p.root, 'components/Button.tsx'), 'export function Button(){return <button>Changed</button>}');
+    await assert.rejects(p.service.validateDescription('Button', {}, prepared.reviewHash as string), /changed/);
+  } finally { p.cleanup(); }
+});
+
 test("managed plans reject changed code and only enable auto after a fresh reviewed apply", async () => {
   const p = project();
   try {

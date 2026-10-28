@@ -205,13 +205,18 @@ local workspace; reloading the editor stops the owned monitor.
   including stale-review protection and explicit write approval.
 - [ ] Add native token suggestions/context alongside description drafts; the
   former Settings form suggestions are not yet available in the diff editor.
-- [ ] Generate component-description drafts with AI in the extension, using the
+- [ ] Finish live acceptance of AI-generated component-description drafts in the extension, using the
   selected component source, discovered tokens, existing descriptions, and
   framework/library context. Show inferred values and unsupported behavior for
   review; generation must not save files or apply Figma changes automatically.
   Reuse schema/token validation and stale-review protection. Obtain consent
   before sending source to an external model; keep credentials in editor secret
   storage and project source out of diagnostic logs.
+  Local preview 0.3.1 implements editor model selection, context preview,
+  per-request consent, bounded generation, assumptions/unsupported notes, shared
+  validation, and a reviewed diff. Mock-based tests pass; no live model has been
+  called during implementation. Component discovery and validation are also
+  available to MCP; native JSON token completion and context inspection exist.
 - [ ] At file connection, offer **Code → Figma**, **Figma → Code**, or
   **Compare only**. A missing-in-code finding should offer an import action.
 - [ ] Implement Figma token import first: inspect variables, detect the project's

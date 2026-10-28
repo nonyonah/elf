@@ -1,4 +1,5 @@
 const { publicLink } = require('./api-policy.cjs');
+const { generateDescription } = require('./ai-description.cjs');
 const { join, basename } = require('node:path');
 const { randomUUID, createHash } = require('node:crypto');
 const { reportSection, compactActivity } = require('./report-details.cjs');
@@ -38,6 +39,23 @@ class NativeElf {
     this.error = null; this.refreshing = null; this.plan = null; this.planAuto = false; this.planReplace = false;
     this.activityRoot = null; this.seenActivity = new Set(); this.lastCheckMessage = null; this.lastErrorMessage = null;
     this.drafts = new Map(); this.documents = new Map();
+    if (vscode.languages?.registerCompletionItemProvider) context.subscriptions.push(vscode.languages.registerCompletionItemProvider({ scheme: 'file', pattern: '**/description-drafts/*.draft.json' }, {
+      provideCompletionItems: (document, position) => {
+        const draft = this.drafts.get(document.uri.toString());
+        if (!draft || draft.owner !== this.getRuntime()) return [];
+        const line = document.lineAt(position.line).text.slice(0, position.character);
+        const match = /"([^"]+)"\s*:\s*"[^"\n]*$/.exec(line);
+        if (!match) return [];
+        const expected = ['fill', 'color'].includes(match[1]) ? 'COLOR' : match[1] === 'fontFamily' ? 'STRING' : ['gap', 'cornerRadius', 'all', 'top', 'right', 'bottom', 'left', 'weight', 'fontSize'].includes(match[1]) ? 'FLOAT' : null;
+        if (!expected) return [];
+        return (draft.prepared.tokens || []).filter(token => token.type === expected).map(token => {
+          const item = new vscode.CompletionItem(token.key, vscode.CompletionItemKind.Variable);
+          item.detail = `${token.type} · ${token.name}`; item.insertText = token.key;
+          item.range = new vscode.Range(position.line, line.lastIndexOf('"') + 1, position.line, position.character);
+          return item;
+        });
+      },
+    }, '"', '{'));
     context.subscriptions.push(vscode.workspace.registerTextDocumentContentProvider('elf-readonly', { provideTextDocumentContent: uri => this.documents.get(uri.toString()) || '' }));
     this.view = vscode.window.createTreeView('elf.overview', { treeDataProvider: this, showCollapseAll: true });
     this.changesView = vscode.window.createTreeView('elf.changes', { treeDataProvider: this.provider('changes'), showCollapseAll: true });
@@ -72,6 +90,8 @@ class NativeElf {
     register('elf.notifications', () => this.notifications());
     register('elf.preferences', () => this.preferences());
     register('elf.prepareDescription', component => this.prepareDescription(component));
+    register('elf.generateDescription', component => this.prepareDescription(component, true));
+    register('elf.descriptionContext', () => this.descriptionContext());
     register('elf.saveDescription', () => this.saveDescription());
     register('elf.resource', resource => this.openResource(resource));
     register('elf.activity', item => this.openActivity(item));
@@ -111,7 +131,7 @@ class NativeElf {
     const response = await runtime.request(path, method, body === undefined ? undefined : JSON.stringify(body));
     let data;
     try { data = JSON.parse(response.body); } catch { throw new Error('Elf returned an unreadable response. Restart Elf.'); }
-    if (response.status < 200 || response.status >= 300) throw new Error(data.error || 'Elf could not complete this action.');
+    if (response.status < 200 || response.status >= 300) throw new Error(data.error === 'Unknown project action.' ? 'This Elf runtime needs an update. Reload the editor after updating Elf.' : data.error || 'Elf could not complete this action.');
     return data;
   }
   async refresh(options = {}) {
@@ -240,7 +260,9 @@ class NativeElf {
       { label: 'Notification preferences', command: 'elf.preferences' },
       { label: 'Coding assistants', description: 'Cursor, Claude Code, Codex', command: 'elf.assistants' },
       { label: 'Automatic sync', description: project?.mode === 'automatic' ? 'On · pause' : 'Off · review before enabling', command: 'elf.toggleAutomatic' },
-      { label: 'Prepare component description', command: 'elf.prepareDescription' },
+      { label: 'Generate component description with AI', command: 'elf.generateDescription' },
+      { label: 'Prepare component description manually', command: 'elf.prepareDescription' },
+      { label: 'Description source and token context', command: 'elf.descriptionContext' },
       { label: 'Save reviewed description', command: 'elf.saveDescription' },
       { label: 'Stop Elf', command: 'elf.stop' },
     ];
@@ -488,25 +510,47 @@ class NativeElf {
     const base = this.context.storageUri || this.context.globalStorageUri;
     return base ? this.vscode.Uri.joinPath(base, 'description-drafts') : this.vscode.Uri.file(join(tmpdir(), 'elf-extension-drafts'));
   }
-  async prepareDescription(component) {
-    if (typeof component !== 'string') component = await this.vscode.window.showInputBox({ title: 'Prepare component description', prompt: 'Enter a discovered component name or code key.' });
+  async prepareDescription(component, useAI = false) {
+    if (typeof component !== 'string') {
+      const { components } = await this.api('/api/project/components', 'POST', {});
+      if (!components?.length) throw new Error('No components discovered. Add a component source file first.');
+      const choice = await this.vscode.window.showQuickPick(components.map(item => ({ label: item.name, description: item.file, component: item.codeKey })), { title: useAI ? 'Generate a component description' : 'Prepare a component description', matchOnDescription: true });
+      component = choice?.component;
+    }
     if (!component) return;
     const owner = await this.ensureRuntime();
     const prepared = await this.api('/api/project/prepare-component', 'POST', { component });
     if (owner !== this.getRuntime()) throw new Error('The project changed. Prepare the description again.');
+    const original = JSON.stringify(prepared.sidecar, null, 2);
+    let generated;
+    if (useAI) {
+      await this.text(JSON.stringify({ component: prepared.name, file: prepared.file, source: prepared.source, sourceTruncated: prepared.sourceTruncated, tokens: prepared.tokens, variants: prepared.variantProps, dependencies: prepared.dependencies, description: prepared.sidecar }, null, 2), 'json', `${prepared.name} context to share`);
+      generated = await generateDescription(this.vscode, prepared);
+      if (!generated) return;
+      if (owner !== this.getRuntime() || !this.vscode.workspace.isTrusted) throw new Error('The project or workspace trust changed. Prepare again.');
+      await this.api('/api/project/validate-description', 'POST', { component: prepared.codeKey, reviewHash: prepared.reviewHash, description: generated.description }, owner);
+      prepared.sidecar = generated.description;
+      await this.text(JSON.stringify({ assumptions: generated.assumptions, unsupported: generated.unsupported, warning: prepared.warning }, null, 2), 'json', `${prepared.name} AI review notes`);
+    }
     const directory = this.draftDirectory();
     await this.vscode.workspace.fs.createDirectory(directory);
     const safe = String(prepared.codeKey || prepared.name).replace(/[^a-z0-9._-]+/gi, '-').slice(0, 80);
     const id = randomUUID();
     const before = this.vscode.Uri.joinPath(directory, `${safe}-${id}.before.json`);
     const draft = this.vscode.Uri.joinPath(directory, `${safe}-${id}.draft.json`);
-    const existing = prepared.existing ? `${JSON.stringify(prepared.sidecar, null, 2)}\n` : '{}\n';
+    const existing = prepared.existing ? `${original}\n` : '{}\n';
     await this.vscode.workspace.fs.writeFile(before, Buffer.from(existing));
     await this.vscode.workspace.fs.writeFile(draft, Buffer.from(`${JSON.stringify(prepared.sidecar, null, 2)}\n`));
-    this.drafts.set(draft.toString(), { owner, prepared, uri: draft, before });
+    this.drafts.set(draft.toString(), { owner, prepared, generated, uri: draft, before });
     await this.vscode.commands.executeCommand('vscode.diff', before, draft, `Review ${prepared.name} description`, { preview: false });
     if (prepared.warning) void this.vscode.window.showWarningMessage(prepared.warning);
-    void this.vscode.window.showInformationMessage('Review the description against the component source, edit the right side, then run Elf: Save Reviewed Description. It is not AI-generated yet.');
+    void this.vscode.window.showInformationMessage(useAI ? 'AI draft validated. Review its assumptions and unsupported details, edit the right side, then use Save Reviewed Description. Nothing has been saved to the project or Figma.' : 'Review the manual draft against the component source and tokens. Use Description Context for reference, then Save Reviewed Description.');
+  }
+  async descriptionContext() {
+    const active = this.vscode.window.activeTextEditor?.document;
+    const draft = active && this.drafts.get(active.uri.toString()) || (this.drafts.size === 1 ? [...this.drafts.values()][0] : null);
+    if (!draft) throw new Error('Select a component description draft first.');
+    await this.text(JSON.stringify({ file: draft.prepared.file, source: draft.prepared.source, sourceTruncated: draft.prepared.sourceTruncated, tokens: draft.prepared.tokens, variants: draft.prepared.variantProps, dependencies: draft.prepared.dependencies, reviewNotes: draft.generated ? { assumptions: draft.generated.assumptions, unsupported: draft.generated.unsupported } : undefined }, null, 2), 'json', `${draft.prepared.name} source and tokens`);
   }
   async saveDescription() {
     const visible = this.vscode.window.visibleTextEditors || [];

@@ -6,7 +6,8 @@ webview. Daily work is separated into **Overview**, **Changes**, and **Activity*
 Use the gear in Overview for **Manage**: account connections, pairing, Slack,
 notification preferences, automatic sync, and MCP setup.
 
-AI-generated descriptions are upcoming work. Slack/Figma authorization opens
+AI-generated descriptions are available as a development preview through editor
+language models. Slack/Figma authorization opens
 your browser; return to VS Code and the native view refreshes connection status.
 
 To use a prepared local `.vsix` in your current workspace, open the Extensions
@@ -40,6 +41,13 @@ in the new window and use the Elf activity-bar view:
 - **Manage** (the Overview gear) connects/disconnects Slack and Figma, generates
   pairing codes, changes alert preferences, enables reviewed automatic sync, and
   opens coding-assistant setup. Advanced description actions also live here.
+  Choose **Generate component description with AI** to select a discovered
+  component, inspect the exact source/token context, choose an available editor
+  model, and consent before sharing it. Elf opens a validated editable draft and
+  separate assumptions/unsupported-detail notes. Generation does not save a
+  project description or write to Figma. Manual preparation remains available.
+  If no model is available, configure an editor model provider or use MCP/manual
+  review; Elf does not install providers or ask for API keys itself.
 - **Elf: View Drift Report** opens Markdown as a native text document. Component
   descriptions use an editable native diff; reviewed saves still use the engine's
   validation and stale-review protection.
@@ -54,6 +62,12 @@ The extension authenticates through a fresh single-use link over the private
 process channel. Session credentials stay in the extension host. OAuth addresses
 must come from the local connection service before being opened externally.
 The Figma plugin must remain running for live Figma operations.
+
+Description drafts offer project token completion inside JSON string values.
+Use **Elf: Description Source and Token Context** to inspect source, variants,
+tokens, and AI review notes. Saving still requires explicit review and rejects
+stale source, unknown references, invalid schemas, and mismatched projects.
+Figma-to-code token and component imports remain upcoming work.
 Verification respects Figma rate limits. Reconnecting an account does not bypass
 those limits. Older shared bridges without renewal support must be stopped
 after their clients close; saved pairings survive the replacement.
