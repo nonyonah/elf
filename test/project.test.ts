@@ -534,3 +534,44 @@ test('local description uploads do not require a connected Figma plugin',async()
   assert.equal(result.saved,true);assert.equal(result.syncReady,false);
  }finally{p.cleanup();}
 });
+
+test('shadcn setup uses an explicit CLI recipe and requires selected local components',async()=>{
+ const p=project(true);try{
+  const setup=await p.service.componentLibrarySetup('shadcn');
+  assert.equal(setup.command,'npx shadcn@latest init');assert.equal(setup.executesSetup,true);
+  await assert.rejects(p.service.rememberComponentLibrary('shadcn'),/setup/);
+  writeFileSync(join(p.root,'package.json'),JSON.stringify({packageManager:'pnpm@10.0.0'}));
+  assert.equal((await p.service.componentLibrarySetup('shadcn')).command,'pnpm dlx shadcn@latest init');
+  writeFileSync(join(p.root,'package.json'),JSON.stringify({packageManager:'bun@1.0.0'}));
+  assert.equal((await p.service.componentLibrarySetup('shadcn')).command,'bunx --bun shadcn@latest init');
+  writeFileSync(join(p.root,'package.json'),JSON.stringify({packageManager:'unsafe;command@1'}));
+  assert.equal((await p.service.componentLibrarySetup('shadcn')).command,'npx shadcn@latest init');
+  writeFileSync(join(p.root,'components.json'),JSON.stringify({style:'default',aliases:{ui:'@/components/ui'}}));
+  const configured=await p.service.componentLibrarySetup('shadcn');assert.equal(configured.installed,true);
+  p.refs.push({id:'remote',name:'Notice'});p.nodes.remote={id:'remote',type:'COMPONENT',children:[]};
+  const options={nodeId:'remote',framework:'react' as const,library:'shadcn',path:'ImportedNotice.tsx',reuse:[] as string[]};
+  await assert.rejects(p.service.prepareComponentImport(options),/local shadcn/);
+  const local=(await p.service.listComponentImports()).reusable as any[];
+  const context=await p.service.prepareComponentImport({...options,reuse:[local[0].codeKey]});
+  assert.equal((context.libraryGuide as any).label,'shadcn/ui');
+  writeFileSync(join(p.root,'components.json'),JSON.stringify({style:'changed',aliases:{ui:'@/components/ui'}}));
+  await assert.rejects(p.service.applyComponentImport(String(context.id),"export function ImportedNotice(){return <div/>}"),/changed/);
+  await p.service.rememberComponentLibrary('shadcn');
+  assert.equal((await p.service.listComponentImports()).preferredLibrary,'shadcn');
+ }finally{p.cleanup();}
+});
+
+test('HeroUI v3 requires v3 packages plus React 19 and Tailwind 4 without upgrading automatically',async()=>{
+ const p=project();try{
+  let setup=await p.service.componentLibrarySetup('@heroui/react');
+  assert.equal(setup.command,'npm install --ignore-scripts @heroui/react@^3 @heroui/styles@^3');
+  assert.equal((setup.prerequisites as string[]).length,2);
+  writeFileSync(join(p.root,'package.json'),JSON.stringify({dependencies:{react:'^18.3.0','react-dom':'^18.3.0',tailwindcss:'^3.4.0','@heroui/react':'^2.8.0'}}));
+  setup=await p.service.componentLibrarySetup('@heroui/react');assert.equal(setup.installed,false);
+  await assert.rejects(p.service.rememberComponentLibrary('@heroui/react'),/19/);
+  writeFileSync(join(p.root,'package.json'),JSON.stringify({dependencies:{react:'^19.0.0','react-dom':'^19.0.0',tailwindcss:'^4.0.0','@heroui/react':'^3.2.6','@heroui/styles':'^3.2.6'}}));
+  setup=await p.service.componentLibrarySetup('@heroui/react');assert.equal(setup.installed,true);assert.deepEqual(setup.prerequisites,[]);
+  await p.service.rememberComponentLibrary('@heroui/react');
+  assert.equal((await p.service.listComponentImports()).preferredLibrary,'@heroui/react');
+ }finally{p.cleanup();}
+});

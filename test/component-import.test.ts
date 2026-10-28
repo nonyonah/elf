@@ -29,3 +29,17 @@ test('description token aliases preserve exact names, reject ambiguity and never
  assert.throws(()=>resolveDescriptionToken('spacing.2',index),/Ambiguous/);
  assert.equal(resolveDescriptionToken('spacing/2',index),other);
 });
+
+import {componentLibraryChoices} from '../src/component-library.js';
+test('library selections distinguish local shadcn from versioned HeroUI v3 packages',()=>{
+ const empty=componentLibraryChoices([]);
+ assert(empty.some(item=>item.id==='shadcn'&&!item.installed));
+ assert(empty.some(item=>item.id==='@heroui/react'&&item.label==='HeroUI v3'&&!item.installed));
+ assert.equal(componentLibraryChoices(['@heroui/react'],{versions:{'@heroui/react':'^2.8.0'}}).find(item=>item.id==='@heroui/react')?.installed,false);
+ assert.equal(componentLibraryChoices(['@heroui/react'],{versions:{'@heroui/react':'^3.2.6','@heroui/styles':'^3.2.6'}}).find(item=>item.id==='@heroui/react')?.installed,true);
+ assert.equal(componentLibraryChoices([],{shadcnConfigured:true}).find(item=>item.id==='shadcn')?.installed,true);
+ const local="import {Button} from './components/Button';export function ImportedAlert(){return <Button/>}";
+ assert.equal(validateImportedComponent(local,{...options,library:'shadcn'},'/project',['/project/components/Button.tsx']),local);
+ assert.throws(()=>validateImportedComponent("import {Button} from 'shadcn';export function ImportedAlert(){return <Button/>}",{...options,library:'shadcn'},'/project',[]),/confirmed/);
+ assert.throws(()=>validateImportedComponent("import {HeroUIProvider as Provider} from '@heroui/react';export function ImportedAlert(){return <Provider/>}",{...options,library:'@heroui/react'},'/project',[]),/v3/);
+});

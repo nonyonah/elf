@@ -14,7 +14,7 @@ export function validateImportedComponent(code:unknown,options:ComponentImportOp
  const allowedPath=(specifier:string):boolean=>{
   if(specifier.includes('\\')||!specifier.startsWith('.')&&specifier.split('/').includes('..')||specifier.includes('\0'))return false;
   if (specifier==='react' || specifier==='react/jsx-runtime') return true;
-  if (options.library!=='native' && (specifier===options.library || specifier.startsWith(options.library+'/'))) return true;
+  if (options.library!=='native' && options.library!=='shadcn' && (specifier===options.library || specifier.startsWith(options.library+'/'))) return true;
   if (!specifier.startsWith('.')) return false;
   const target=resolve(dirname(destination),specifier);
   return reusePaths.some(path=>path===target || path.slice(0,-extname(path).length)===target);
@@ -25,6 +25,7 @@ export function validateImportedComponent(code:unknown,options:ComponentImportOp
   if (ts.isIdentifier(node) && forbidden.has(node.text)) throw new Error(`Generated code uses a restricted API: ${node.text}. Remove it before review.`);
   if (ts.isCallExpression(node) && node.expression.kind===ts.SyntaxKind.ImportKeyword) throw new Error('Dynamic imports are not allowed in component drafts.');
   if (ts.isPropertyAccessExpression(node) && ['constructor','__proto__'].includes(node.name.text) || ts.isElementAccessExpression(node) && node.argumentExpression && ts.isStringLiteral(node.argumentExpression) && ['constructor','__proto__'].includes(node.argumentExpression.text)) throw new Error('Dynamic code access is not allowed.');
+  if(options.library==='@heroui/react' && ts.isImportSpecifier(node) && (node.propertyName?.text||node.name.text)==='HeroUIProvider')throw new Error('HeroUI v3 requires no HeroUIProvider. Use v3 component APIs.');
   if (ts.isImportDeclaration(node)) {
    if (!ts.isStringLiteral(node.moduleSpecifier) || !allowedPath(node.moduleSpecifier.text)) throw new Error('Use only React, the confirmed installed library, or explicitly selected local components.');
   }

@@ -2,7 +2,7 @@
   "name": "elf-design-system",
   "displayName": "Elf",
   "description": "Connect your project and Figma, monitor design drift, and review sync changes.",
-  "version": "0.3.8",
+  "version": "0.3.9",
   "publisher": "elf-local",
   "license": "MIT",
   "repository": {

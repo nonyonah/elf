@@ -499,3 +499,24 @@ test('saving a description with token warnings succeeds without automatically op
  assert(h.infoMessages.some(item=>item.message.includes('Description uploaded and saved')));
  assert.equal(h.requests.some(item=>item.path==='/api/project/plan'||item.path==='/api/project/apply'),false);
 });
+
+test('HeroUI prerequisite checks stop import before installation or generation',async t=>{
+ const h=harness({librarySetup:{installed:true,requiresReact:false,prerequisites:['HeroUI v3 requires Tailwind CSS v4.']}});t.after(()=>h.native.dispose());await h.native.refresh();
+ h.quickPicks.push({label:'Alert',nodeId:'remote'},{value:'react'},{label:'HeroUI v3',value:'@heroui/react'});
+ await h.commands.get('elf.importComponent')();
+ assert.equal(h.errors.length,0);
+ assert(h.infoMessages.some(item=>item.message.includes('Tailwind CSS v4')));
+ assert.equal(h.requests.some(item=>item.path==='/api/project/remember-component-library'||item.path==='/api/project/prepare-component-import'),false);
+});
+
+test('shadcn setup warns about CLI execution and stages the command without running it',async t=>{
+ const h=harness({librarySetup:{installed:false,requiresReact:false,prerequisites:[],executesSetup:true,command:'npx shadcn@latest init',steps:[]}});t.after(()=>h.native.dispose());await h.native.refresh();
+ const sent=[];h.vscode.window.createTerminal=()=>({show(){},sendText(text,execute){sent.push({text,execute});}});
+ h.quickPicks.push({label:'Alert',nodeId:'remote'},{value:'react'},{label:'shadcn/ui',value:'shadcn'},[{key:'button.tsx#Button'}],{value:'manual'});
+ h.warningResponses.push('Prepare install command');h.infoResponses.push('Installation and setup complete');h.inputResponses.push('ImportedAlert.tsx');
+ await h.commands.get('elf.importComponent')();
+ assert.equal(h.errors.length,0);assert.deepEqual(sent,[{text:'npx shadcn@latest init',execute:false}]);
+ assert(h.warningMessages.some(item=>item.message.includes('downloads and executes code')));
+ assert.equal(h.requests.filter(item=>item.path==='/api/project/component-imports').length,2);
+ assert.equal(JSON.parse(h.requests.find(item=>item.path==='/api/project/prepare-component-import').body).library,'shadcn');
+});

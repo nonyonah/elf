@@ -1,4 +1,4 @@
-import {componentLibraryChoices} from './component-library.js';
+import {componentLibraryChoices,declaredMajor} from './component-library.js';
 import {validateImportedComponent,type ComponentImportOptions} from './component-import.js';
 import {importedTokenDocument, type ImportSnapshot} from './token-import.js';
 import {discoverProject, readSource} from './discovery.js';
@@ -210,31 +210,44 @@ export class ProjectService {
       return {imported:plan.names.length,path:plan.path};
     }));
   }
-  private importEnvironment():{frameworks:string[];libraries:string[];dependencies:string[];components:{name:string;codeKey:string;file:string}[];fingerprint:string} {
+  private importEnvironment():{frameworks:string[];libraries:string[];dependencies:string[];versions:Record<string,string>;shadcnConfigured:boolean;components:{name:string;codeKey:string;file:string}[];fingerprint:string} {
     const root=realpathSync(dirname(this.configPath));
     const path=join(root,'package.json');
     const manifest=existsSync(path)?JSON.parse(readSource(path)):{};
-    const dependencies=Object.keys({...manifest.dependencies,...manifest.devDependencies}).sort();
+    const versions={...manifest.devDependencies,...manifest.dependencies};
+    const dependencies=Object.keys(versions).sort();
+    let shadcn: any = null;
+    const shadcnPath=join(root,'components.json');
+    if(existsSync(shadcnPath)) {try {shadcn=JSON.parse(readSource(shadcnPath));}catch { /* Invalid or unsafe metadata is not a configured library. */ }}
+    const shadcnConfigured=Boolean(shadcn&&typeof shadcn==='object'&&typeof shadcn.aliases?.ui==='string'&&shadcn.aliases.ui.length>0&&typeof shadcn.style==='string');
     const {config,hasComponents}=this.batchConfig();
     const components=hasComponents?parseComponents(config.componentsDir,config.componentFiles).filter(item=>item.deprecated===undefined).map(item=>({name:item.name,codeKey:item.codeKey,file:relative(root,resolve(config.componentsDir,item.file))})):[];
-    return {frameworks:[...(dependencies.includes('react')||components.some(item=>/\.[jt]sx$/.test(item.file))?['react']:[]),...(dependencies.includes('vue')||components.some(item=>item.file.endsWith('.vue'))?['vue']:[]),...(dependencies.includes('svelte')||components.some(item=>item.file.endsWith('.svelte'))?['svelte']:[])],libraries:dependencies.filter(name=>/^(?:@mui\/material|@chakra-ui\/react|@radix-ui\/react-[a-z-]+|@heroui\/react|antd|@mantine\/core)$/.test(name)),dependencies,components,fingerprint:hashSpec({manifest,components:components.map(item=>({...item,source:readSource(resolve(root,item.file))})),sources:this.importSources().hash})};
+    return {frameworks:[...(dependencies.includes('react')||components.some(item=>/\.[jt]sx$/.test(item.file))?['react']:[]),...(dependencies.includes('vue')||components.some(item=>item.file.endsWith('.vue'))?['vue']:[]),...(dependencies.includes('svelte')||components.some(item=>item.file.endsWith('.svelte'))?['svelte']:[])],versions,shadcnConfigured,libraries:dependencies.filter(name=>/^(?:@mui\/material|@chakra-ui\/react|@radix-ui\/react-[a-z-]+|@heroui\/react|antd|@mantine\/core)$/.test(name)),dependencies,components,fingerprint:hashSpec({manifest,shadcn,components:components.map(item=>({...item,source:readSource(resolve(root,item.file))})),sources:this.importSources().hash})};
   }
   async componentLibrarySetup(library: string): Promise<Record<string,unknown>> {
     const environment = this.importEnvironment();
-    const choice = componentLibraryChoices(environment.libraries).find(item => item.id === library);
+    const choice = componentLibraryChoices(environment.libraries,environment).find(item => item.id === library);
     if (!choice) throw new Error('Choose a supported component library.');
     const root = dirname(this.configPath);
-    const manager = existsSync(join(root,'pnpm-lock.yaml')) ? 'pnpm' : existsSync(join(root,'yarn.lock')) ? 'yarn' : 'npm';
     const manifestPath=join(root,'package.json');
     const manifest=existsSync(manifestPath)?JSON.parse(readSource(manifestPath)):{};
+    const declaredManager=typeof manifest.packageManager==='string'?manifest.packageManager.split('@')[0]:'';
+    const manager = ['npm','pnpm','yarn','bun'].includes(declaredManager) ? declaredManager : existsSync(join(root,'pnpm-lock.yaml')) ? 'pnpm' : existsSync(join(root,'yarn.lock')) ? 'yarn' : existsSync(join(root,'bun.lock'))||existsSync(join(root,'bun.lockb')) ? 'bun' : 'npm';
     const skipScripts=manager==='yarn' && (/^yarn@[2-9]/.test(manifest.packageManager||'')||existsSync(join(root,'.yarnrc.yml'))) ? '--mode=skip-build' : '--ignore-scripts';
-    const command = choice.installed ? null : `${manager} ${manager === 'npm' ? 'install' : 'add'} ${skipScripts} ${choice.packages.join(' ')}`;
-    return {...choice, command, requiresReact: !environment.dependencies.includes('react') || !environment.dependencies.includes('react-dom'), message:'Review package versions, installation scripts, provider and framework setup. Elf does not execute commands or rewrite application configuration.'};
+    const runner=manager==='bun'?'bunx --bun':manager==='pnpm'?'pnpm dlx':manager==='yarn'&&skipScripts==='--mode=skip-build'?'yarn dlx':'npx';
+    const command = choice.installed ? null : library==='shadcn' ? `${runner} shadcn@latest init` : `${manager} ${manager === 'npm' ? 'install' : 'add'} ${skipScripts} ${choice.packages.join(' ')}`;
+    const prerequisites:string[]=[];
+    if(library==='@heroui/react') {
+      if((declaredMajor(environment.versions.react)??0)<19||(declaredMajor(environment.versions['react-dom'])??0)<19)prerequisites.push('HeroUI v3 requires React and React DOM 19+. Upgrade using your framework guide, then retry.');
+      if(declaredMajor(environment.versions.tailwindcss)!==4)prerequisites.push('HeroUI v3 requires Tailwind CSS v4. Review the framework migration/setup guide, then retry.');
+    }
+    return {...choice, command, prerequisites, executesSetup:library==='shadcn', requiresReact: !environment.dependencies.includes('react') || !environment.dependencies.includes('react-dom'), message:'Review package versions, installation scripts, provider and framework setup. Elf does not execute commands or rewrite application configuration.'};
   }
   async rememberComponentLibrary(library: string): Promise<Record<string,unknown>> {
     return this.serial(async () => {
       const choice = await this.componentLibrarySetup(library);
-      if (!choice.installed) throw new Error('Install the selected library, then retry.');
+      if ((choice.prerequisites as string[])?.length) throw new Error((choice.prerequisites as string[]).join(' '));
+      if (!choice.installed) throw new Error('Install the selected library and complete setup, then retry.');
       const raw = this.raw();
       writeProjectConfig(this.configPath, {...raw, runtime:{...raw.runtime,componentLibrary:library}});
       return {saved:true,library};
@@ -244,7 +257,7 @@ export class ProjectService {
     return this.serial(()=>this.transaction(async client=>{
       const {components}=await client.call<{components:any[]}>('list_components',{deep:true});
       const environment=this.importEnvironment();
-      return {components:components.map(item=>({id:item.id,name:item.name})),frameworks:environment.frameworks,libraries:environment.libraries,libraryChoices:componentLibraryChoices(environment.libraries),preferredLibrary:this.raw().runtime?.componentLibrary||'native',reusable:environment.components.filter(item=>/\.(?:jsx|tsx|js)$/.test(item.file)),supportedFrameworks:['react'],limitations:['React TSX is the first supported output. No dependencies are installed.','Figma does not capture complete behavior, accessibility, or responsive intent.']};
+      return {components:components.map(item=>({id:item.id,name:item.name})),frameworks:environment.frameworks,libraries:environment.libraries,libraryChoices:componentLibraryChoices(environment.libraries,environment),preferredLibrary:this.raw().runtime?.componentLibrary||'native',reusable:environment.components.filter(item=>/\.(?:jsx|tsx|js)$/.test(item.file)),supportedFrameworks:['react'],limitations:['React TSX is the first supported output. No dependencies are installed.','Figma does not capture complete behavior, accessibility, or responsive intent.']};
     }));
   }
   async prepareComponentImport(options:ComponentImportOptions):Promise<Record<string,unknown>> {
@@ -256,7 +269,9 @@ export class ProjectService {
       if (isAbsolute(options.path) || !/^[A-Z][A-Za-z0-9]*\.tsx$/.test(basename(options.path))) throw new Error('Choose a new PascalCase .tsx file inside the project.');
       if (existsSync(target)) throw new Error('This output already exists. Choose a new filename; existing components are never overwritten.');
       const environment=this.importEnvironment();
-      if (options.library!=='native' && !environment.libraries.includes(options.library)) throw new Error('Select native elements or a supported library already declared in this project.');
+      const library=await this.componentLibrarySetup(options.library);
+      if(!library.installed||(library.prerequisites as string[]).length)throw new Error('Complete the selected library setup and prerequisites before importing.');
+      if(options.library==='shadcn' && options.reuse.length===0)throw new Error('Select the local shadcn components to reuse. Add them with the shadcn CLI first if none are available.');
       const reusable=options.reuse.map(key=>environment.components.find(item=>item.codeKey===key));
       if(reusable.some(item=>item && !/\.(?:jsx|tsx|js)$/.test(item.file)))throw new Error('Choose React-compatible local components for reuse.');
       if (reusable.some(item=>!item)) throw new Error('Select existing local components for reuse.');
@@ -266,7 +281,7 @@ export class ProjectService {
       if (!node || !['COMPONENT','COMPONENT_SET'].includes(node.type)) throw new Error('This node is not a Figma component or component set.');
       if (Buffer.byteLength(JSON.stringify(node))>100000) throw new Error('This component is too large for a bounded draft. Split it into smaller components.');
       const snapshot=await this.importSnapshot(client);
-      const context={variableCount:snapshot.variables.length,variablesTruncated:snapshot.variables.length>200,readLimits:{depth:6,childrenPerNode:50},node,variables:snapshot.variables.slice(0,200),collections:snapshot.collections,reuse:reusable,options:{...options},exportName:basename(options.path,'.tsx')};
+      const context={libraryGuide:{label:library.label,steps:library.steps,docs:library.docs},variableCount:snapshot.variables.length,variablesTruncated:snapshot.variables.length>200,readLimits:{depth:6,childrenPerNode:50},node,variables:snapshot.variables.slice(0,200),collections:snapshot.collections,reuse:reusable,options:{...options},exportName:basename(options.path,'.tsx')};
       if (Buffer.byteLength(JSON.stringify(context))>180000) throw new Error('Component and token context exceeds the review limit.');
       for (const [id,review] of this.componentImports) if (review.expires<Date.now()) this.componentImports.delete(id);
       if (this.componentImports.size>=20) this.componentImports.delete(this.componentImports.keys().next().value!);

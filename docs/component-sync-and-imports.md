@@ -134,7 +134,7 @@ provide access to project code. No REST variable reads are needed in plugin mode
 
 ### Library selection and setup
 
-Component imports offer native elements, Material UI, Mantine, and supported libraries already declared in the project. Existing local components can be selected for reuse; shadcn components are local source components rather than a package to install through this preview.
+Component imports offer native elements, Material UI, Mantine, shadcn/ui, HeroUI v3, and supported libraries already declared in the project. Existing local components can be selected for reuse; shadcn components are local source components, with a separate interactive setup recipe.
 
 Select **Review library setup** in npm Settings, or choose the library in the native extension. Elf displays a fixed installation recipe, official guide, and required provider/framework steps. It detects npm, pnpm, and Yarn lockfiles. The extension can place the reviewed command in a project terminal; you press Enter yourself. Commands disable installation scripts. No dependency is installed by merely choosing a library, and application entry points, providers, PostCSS, and SSR settings are never rewritten automatically. Review peer versions before installing. Complete setup, then continue; Elf verifies the library declaration and remembers the selection. This check does not prove the provider or application build is correct. Run the project's own build and visual checks.
 
@@ -143,3 +143,11 @@ Recipes follow [Material UI installation](https://mui.com/material-ui/getting-st
 Description references accept an exact token key first, then a unique separator-equivalent key (`spacing.2` → `spacing-2`). Ambiguous aliases are rejected. Type checks still apply, and missing references show available keys. Editing a private AI draft does not update a component sidecar until **Save reviewed description** succeeds.
 
 Description uploads can be saved with missing, ambiguous, or wrong-type token bindings. Validation and saving return `warnings` and `syncReady: false` while preserving the description exactly as reviewed. Schema, source-revision, path, and variant checks remain enforced. Saving pauses automatic sync; sync planning still blocks unresolved component bindings. Elf never invents token values or silently removes bindings to make an upload succeed. The extension and npm Settings confirm the local save without launching a failing sync review automatically.
+
+#### shadcn/ui and HeroUI v3
+
+Both are first-class library selections in the extension, npm Settings, and MCP catalog. shadcn readiness is detected from a readable local `components.json` with style and UI alias metadata. Its reviewed setup command uses the project package runner to launch interactive `shadcn init`; unlike package installation with scripts disabled, this CLI executes downloaded code and can change project CSS, configuration, and dependencies. Elf never runs it automatically. Add the UI components you want with the CLI, refresh project choices, then explicitly select local files to reuse. Generated drafts use relative imports only to those selected files, never a fictional `shadcn` package. The config participates in stale-review detection.
+
+HeroUI uses the v3 package line (`@heroui/react@^3`, `@heroui/styles@^3`). Elf checks declared React/React DOM 19+ and Tailwind v4 prerequisites and does not upgrade them automatically. HeroUI v2 does not count as ready. Import Tailwind before HeroUI styles in your application CSS; no HeroUIProvider is needed. Generated context includes v3 guidance, and draft validation rejects the v2 provider import. Dependency declaration checks do not replace peer resolution, CSS setup, or application testing.
+
+References: [shadcn installation](https://ui.shadcn.com/docs/installation), [HeroUI v3 quick start](https://heroui.com/en/docs/react/getting-started/quick-start).
