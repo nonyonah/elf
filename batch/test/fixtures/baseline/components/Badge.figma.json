@@ -1,0 +1,12 @@
+{
+  "layoutMode": "HORIZONTAL",
+  "padding": { "all": "space.2" },
+  "cornerRadius": "radius.md",
+  "fill": "color.primary.500",
+  "text": {
+    "characters": "New",
+    "fontFamily": "fontFamily.sans",
+    "fontSize": "fontSize.body",
+    "color": "color.surface.base"
+  }
+}

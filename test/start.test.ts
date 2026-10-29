@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 import { FakePlugin } from "../mcp/test/helpers/plugin-connection.js";
 
-const bin = fileURLToPath(new URL("../bin/elf-tokens.js", import.meta.url));
+const bin = process.env.ELF_TEST_INSTALLED_BIN ?? fileURLToPath(new URL("../bin/elf-tokens.js", import.meta.url));
 const token = "isolated-startup-test-credential";
 
 async function eventually<T>(fn: () => T | Promise<T>, accept: (value: T) => boolean, detail: () => string): Promise<T> {

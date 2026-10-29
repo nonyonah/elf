@@ -1,0 +1,13 @@
+{
+  "layoutMode": "HORIZONTAL",
+  "gap": "space.2",
+  "padding": { "all": "space.4" },
+  "cornerRadius": "radius.md",
+  "fill": "color.primary.500",
+  "text": { "characters": "Continue", "fontSize": "fontSize.body" },
+  "children": [{ "type": "instance", "component": "Icon.tsx#Icon" }],
+  "variants": {
+    "size=sm, intent=primary": { "padding": { "all": "space.2" } },
+    "size=md, intent=secondary": { "fill": "color.surface.base" }
+  }
+}

@@ -1,6 +1,6 @@
 # Production readiness
 
-## Release gate update — 28 October 2026
+## Release gate update — 29 October 2026
 
 The local preview now includes prose Figma documentation separately from visual
 specifications, reviewed individual sync, independent automatic-sync filtering,
@@ -12,12 +12,12 @@ results rather than treating every old unchecked item as missing code.
 
 Before calling this production-ready, record results for these remaining gates:
 
-Settings layout check: an isolated mock browser run passed card-control
-containment and no horizontal overflow at 320, 375, 420 and 800px, dropdown item
-visibility, and cancellation without a strict-authorization request. The headless
-keyboard-focus assertion did not pass; verify ArrowDown, item activation, Escape
-and focus return in the live Settings page before release. RTL and 200% zoom
-have not been verified in this pass.
+The [29 October acceptance record](acceptance-2026-10-29.md) supersedes the
+earlier headless keyboard-focus uncertainty. The reproducible mock-browser check
+passes keyboard opening, Escape/focus return, RTL, 200% CSS zoom and card-control
+containment at 320/375/420/800px. Actual browser toolbar zoom, operating-system
+scaling and real-provider behavior remain separate live checks. The same record
+separates automated results from live checks deferred while Figma is unavailable.
 
 1. Run the full release suites and artifact audits against the final commit;
    inspect dependencies, OAuth/IPC/credential boundaries and private-file exclusion.

@@ -57,6 +57,8 @@ function createFigmaStub(sendToSocket) {
   const pluginData = () => {
     const data = new Map();
     return {
+      getPluginData: (key) => data.get(`private/${key}`) ?? "",
+      setPluginData: (key, value) => data.set(`private/${key}`, String(value)),
       getSharedPluginData: (namespace, key) => data.get(`${namespace}/${key}`) ?? "",
       setSharedPluginData: (namespace, key, value) => {
         data.set(`${namespace}/${key}`, String(value));
@@ -259,7 +261,7 @@ function createFigmaStub(sendToSocket) {
 
   return {
     mixed: Symbol("figma.mixed"),
-    root: { name: "Throwaway", children: [page] },
+    root: { name: "Throwaway", children: [page], ...pluginData() },
     currentPage: page,
     fileKey: "throwawaykey",
     apiVersion: "1.0.0",

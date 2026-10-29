@@ -79,7 +79,11 @@ function figmaRefs(manifestPath: string): FigmaRef[] {
 
 async function syncedScratch(): Promise<Scratch> {
   const scratch = scratchFixtures();
-  await runSync({ config: scratch.config, client: new FakeBridge(), log: silent });
+  const result = await runSync({ config: scratch.config, client: new FakeBridge(), log: silent });
+  try {
+    assert.equal(result.aborted, undefined, "test baseline token sync must succeed");
+    assert.deepEqual(result.components.filter(item => item.action === "failed" || item.action === "skipped"), [], "test baseline components must sync before comparing drift");
+  } catch (error) { scratch.cleanup(); throw error; }
   return scratch;
 }
 

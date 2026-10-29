@@ -1,0 +1,14 @@
+---
+import Divider from "./Divider.jsx";
+
+interface Props {
+  note?: string;
+}
+
+const { note } = Astro.props;
+---
+
+<footer>
+  <p>{note}</p>
+  <Divider />
+</footer>

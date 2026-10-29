@@ -6,9 +6,9 @@ import type { BatchConfig, BridgeCaller } from "../src/types.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 export const FIXTURES = resolve(here, "fixtures");
-export const FIXTURE_COMPONENTS = resolve(FIXTURES, "components");
+export const FIXTURE_COMPONENTS = resolve(FIXTURES, "baseline", "components");
 export const FIXTURE_CYCLE = resolve(FIXTURES, "cycle");
-export const FIXTURE_TOKENS = resolve(FIXTURES, "tokens.json");
+export const FIXTURE_TOKENS = resolve(FIXTURES, "baseline", "tokens.json");
 
 export function fixtureConfig(overrides: Partial<BatchConfig> = {}): BatchConfig {
   return {

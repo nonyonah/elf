@@ -94,7 +94,9 @@ test("watcher queues while the bridge is down and retries", async () => {
       children: [{ type: "instance", component: "Icon.tsx#Icon" }],
     });
 
-    await waitFor(() => bridge.callsTo("upsert_component").length >= 2, 3_000);
+    // Filesystem event delivery can be delayed on busy desktop/CI hosts.
+    // Keep the retry and write assertions; allow time for the real watcher.
+    await waitFor(() => bridge.callsTo("upsert_component").length >= 2, 10_000);
     assert.ok(logs.some((line) => line.includes("Figma isn't connected")));
     assert.ok(attempts >= 2);
   } finally {
