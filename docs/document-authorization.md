@@ -56,3 +56,12 @@ approval or AI notes, save the project description, or write to Figma.
 MCP exposes `pending_document_approval`, `approve_plugin_document`, and
 `require_strict_file_verification`. Assistants must present the exact pending
 document and obtain explicit human approval; they must never approve automatically.
+
+
+For local MCP work in a new or different file, use `select_figma_file` rather
+than changing project monitoring. `inspect_figma_target_approval` and
+`approve_figma_target` approve that explicitly selected plugin-only connection
+without rewriting the project's configuration. Display names may differ from
+the specification; exact file keys and fresh approval tickets must match.
+`connect_figma_account` provides browser consent for strict verification.
+See [MCP onboarding](markdown-design-system.md#figma-onboarding-and-target-selection).

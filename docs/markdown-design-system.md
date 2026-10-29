@@ -98,11 +98,39 @@ identities, expose ambiguous matches and ownership conflicts, preserve unrelated
 resources, and review adoption into managed drift tracking separately. Never
 assume matching component names alone authorize replacing an existing resource.
 
-The remaining onboarding gap is a dedicated MCP account/file-selection/pairing
-flow. `status`, `pending_document_approval` and `approve_plugin_document` cover
-parts of it; approval currently requires the project's already configured file
-key. The current tool list does not provide account sign-in or a dedicated
-choose/change-target-file tool.
+Local stdio MCP now provides this onboarding flow (unpublished preview):
+
+1. Call `figma_onboarding_status` to inspect the account and target.
+2. For strict verification, call `connect_figma_account` and have the user open
+   the returned authorization link and consent in their browser. Account tokens
+   stay in private local storage; the assistant receives no credentials.
+3. Ask the user for the intended file URL and whether it is new or existing.
+   Call `select_figma_file({url,purpose:"new"|"existing",authorization:"strict"|"plugin"})`.
+   This is a session selection, not a change to project drift configuration.
+4. Open that file and Elf Bridge. If its saved pairing does not reconnect, call
+   `get_figma_pairing_code` and paste the code into the plugin. Choose the matching
+   verification mode in the plugin. Reissuing a code replaces unused codes.
+5. For plugin-only connections, call `inspect_figma_target_approval`, present the
+   actual document key/name and trust mode, and obtain explicit user approval.
+   Call `approve_figma_target` with the fresh selection ID, ticket and file key.
+   This approves the current connection only and does not enable automatic sync.
+6. Confirm `figma_onboarding_status` reports `ready:true`, then inspect resources
+   before proposing any creates or updates. Selecting a file is not permission
+   to modify it. Reconnecting or changing the selected target requires reviewing
+   the current connection and any proposed writes again.
+
+Raw Figma reads and writes use this selected target and the shared transaction
+lane. Existing managed project tools such as `check_drift`, `plan_sync` and
+`apply_sync` continue to use the project's configured target. Without an explicit
+selection, a configured project remains the default raw-tool target. A fresh
+project can launch with `--project /absolute/project/path` without a config file;
+Markdown extraction does not require a connected Figma file.
+
+These account/target tools are local stdio tools, excluded from HTTP transport.
+They do not yet provide a Claude website connector. Closing MCP closes its
+callback listener; it does not disconnect the saved account or erase pairings.
+Disconnecting the account or starting a newer authorization cancels older pending
+OAuth callbacks, including callbacks started by another local Elf process.
 
 ### Extract, review and create
 

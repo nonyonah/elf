@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 
-import { existsSync } from "node:fs";
-import { resolve } from "node:path";
-import { findConfigPath, loadConfig } from "../../src/config.js";
+import { McpFigmaOnboarding } from '../../src/mcp-figma-onboarding.js';
+import { registerFigmaOnboardingTools } from './tools/onboarding.js';
+import { existsSync, statSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { findConfigPath } from "../../src/config.js";
 import { ProjectService } from "../../src/project.js";
 import { registerProjectTools } from "./tools/project.js";
 import { fileURLToPath } from "node:url";
@@ -22,9 +24,10 @@ console.log = (...args: unknown[]) => console.error(...args);
 
 const USE_HTTP = process.argv.includes("--http");
 
-function createServer(client: PluginClient, project?: ProjectService): McpServer {
+function createServer(client: PluginClient, project?: ProjectService, onboarding?: McpFigmaOnboarding): McpServer {
   const server = new McpServer({ name: "elf-figma", version: "0.1.0" });
   registerAllTools(server, client);
+  if (onboarding) registerFigmaOnboardingTools(server, onboarding);
   if (project) registerProjectTools(server, project);
   return server;
 }
@@ -44,7 +47,7 @@ async function main(): Promise<void> {
   const projectIndex = process.argv.indexOf("--project");
   if (projectIndex >= 0 && !process.argv[projectIndex + 1]) throw new Error("--project needs a project folder.");
   const explicitProject = projectIndex >= 0 ? resolve(process.argv[projectIndex + 1], "elf.config.json") : null;
-  if (explicitProject && !existsSync(explicitProject)) throw new Error("No elf.config.json exists in the selected project. Complete Elf setup there first.");
+  if (explicitProject && (!existsSync(dirname(explicitProject)) || !statSync(dirname(explicitProject)).isDirectory())) throw new Error("Choose an existing project directory.");
   const projectPath = !USE_HTTP ? explicitProject ?? findConfigPath() : null;
   const config = loadRuntimeBridgeConfig();
   const runtime = await acquireBridge(config, stderrLogger);
@@ -60,7 +63,10 @@ async function main(): Promise<void> {
   }
   stderrLogger.log(`token fingerprint ${tokenFingerprint(config.token)} (${TOKEN_ENV})`);
 
-  const client = new PluginClient(runtime.connection, (fileKey, work) => runtime.transaction(projectPath ? loadConfig(projectPath).figma.fileKey : fileKey, work, {authorization: projectPath ? loadConfig(projectPath).figma.authorization : "strict"}));
+  const onboarding = USE_HTTP ? undefined : new McpFigmaOnboarding(runtime, projectPath);
+  const client = onboarding
+    ? new PluginClient(onboarding.connection(), (_fileKey, work) => onboarding.transaction(work))
+    : new PluginClient(runtime.connection, (fileKey, work) => runtime.transaction(fileKey, work, {authorization: 'strict'}));
   client.onStatus((status) => {
     stderrLogger.log(
       status.connected
@@ -88,12 +94,13 @@ async function main(): Promise<void> {
       process.exit(0);
     };
   } else {
-    const server = createServer(client, project);
+    const server = createServer(client, project, onboarding);
     const transport = new StdioServerTransport();
     await server.connect(transport);
     stderrLogger.log("stdio transport ready");
     shutdown = async () => {
       await server.close().catch(() => {});
+      await onboarding?.close().catch(() => {});
       await runtime.close().catch(() => {});
       process.exit(0);
     };

@@ -15,6 +15,7 @@ function ui() {
   let id = 0;
   const document = { body: { dataset: {phase: "loading"} }, getElementById(key: string) {
     if (!elements.has(key)) elements.set(key, { value: "", hidden: false, textContent: "", listeners: {} as any,
+      setAttribute() {}, removeAttribute() {}, querySelector() {return document.getElementById(key + '-label');},
       addEventListener(event: string, listener: unknown) { this.listeners[event] = listener; },
       children: [] as any[], replaceChildren(){this.children=[];},appendChild(child:any){this.children.push(child);}, classList: {toggle() {}, add() {}, remove() {}} });
     return elements.get(key);

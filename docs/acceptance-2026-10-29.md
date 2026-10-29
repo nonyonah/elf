@@ -80,3 +80,24 @@ Next feature work is the read-only Markdown specification extraction/review
 foundation in [the final-feature plan](markdown-design-system.md). Figma writes
 must follow a concrete reviewed resource plan; no Markdown generation is claimed
 implemented by these acceptance checks.
+
+## Local MCP onboarding follow-up
+
+Added local stdio account sign-in, explicit session target selection, pairing
+code retrieval and fresh plugin-only approval. New/Untitled and existing files
+use exact file keys; names need not match the source specification. Selection
+never redirects configured project monitoring. Raw resource operations require
+readiness and run through the shared transaction lane; changing the target or
+connection interrupts subsequent operations. HTTP transport excludes these tools.
+
+Verified 220 root tests, 106 MCP tests and 60 extension tests, plus root/MCP
+TypeScript checks and production Settings/plugin/runtime builds. Fresh-project
+stdio acceptance needs no configuration file and performs no live Figma writes.
+OAuth callback tests cover private sessions, replay and disconnect during
+exchange. Updated the plugin UI test stub for the existing Refresh button.
+
+Packaging now explicitly lists public guides instead of including every local
+file under docs. The local design-system specification must be excluded from
+both npm and VSIX artifacts. Live browser consent, plugin pairing and actual
+new/existing-file resource operations remain user acceptance checks. Combined
+Markdown plan/apply remains the next implementation stage.

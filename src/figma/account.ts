@@ -34,7 +34,20 @@ export function writeFigmaAccount(value: FigmaAccount): void {
   const temporary = `${path}.${randomBytes(12).toString("hex")}.tmp`;
   try {writeFileSync(temporary, JSON.stringify(value), {flag: "wx", mode: 0o600}); renameSync(temporary, path);} finally {rmSync(temporary, {force: true});}
 }
-export function removeFigmaAccount(): void {directory(); rmSync(accountPath(), {force: true});}
+/** Cross-process OAuth generation: later sign-in or disconnect wins. */
+export function beginFigmaAuthorization(): string {
+  directory();const path=accountPath()+'.oauth-generation';
+  const existing=lstatSync(path,{throwIfNoEntry:false});
+  if(existing&&(!existing.isFile()||existing.isSymbolicLink()||existing.nlink!==1))throw new Error('Figma authorization state must be a regular file.');
+  const generation=randomBytes(32).toString('hex'),temporary=path+'.'+randomBytes(12).toString('hex')+'.tmp';
+  try{writeFileSync(temporary,generation,{flag:'wx',mode:0o600});renameSync(temporary,path);}finally{rmSync(temporary,{force:true});}
+  return generation;
+}
+export function figmaAuthorizationCurrent(generation:string):boolean {
+  let fd:number;try{fd=openSync(accountPath()+'.oauth-generation',constants.O_RDONLY|constants.O_NOFOLLOW|constants.O_NONBLOCK);}catch(error){if((error as NodeJS.ErrnoException).code==='ENOENT')return false;throw error;}
+  try{const stat=fstatSync(fd);if(!stat.isFile()||stat.nlink!==1||stat.size!==64||(process.platform!=='win32'&&((stat.mode&0o077)||stat.uid!==process.getuid?.())))throw new Error('Figma authorization state must be private.');return readFileSync(fd,'utf8')===generation;}finally{closeSync(fd);}
+}
+export function removeFigmaAccount(): void {beginFigmaAuthorization(); rmSync(accountPath(), {force: true});}
 
 let refreshing: Promise<string> | null = null;
 export async function figmaAccessToken(forceRefresh = false): Promise<string> {

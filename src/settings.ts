@@ -9,7 +9,7 @@
  * enough: it has no /api routes and will show a 404.
  */
 import { startConnection, startSlackConnection, finishSlackConnection, finishConnection } from "./connection-service.js";
-import { readFigmaAccount, writeFigmaAccount, removeFigmaAccount, validateAccount } from "./figma/account.js";
+import { readFigmaAccount, writeFigmaAccount, removeFigmaAccount, validateAccount, beginFigmaAuthorization, figmaAuthorizationCurrent } from "./figma/account.js";
 import { readVerificationLimit } from './figma/verification-limit.js';
 import { SETTINGS_API_VERSION } from "./settings-protocol.js";
 import { readDriftReport } from "./reports.js";
@@ -99,6 +99,8 @@ async function readBody(req: IncomingMessage): Promise<string> {
 
 export interface SettingsServerOptions {
   identityToken?: string;
+  /** MCP uses the existing OAuth callback without exposing project Settings. */
+  figmaConnectionOnly?: boolean;
   onboarding?: OnboardingController;
   /** Folder holding the built Next.js settings page. Defaults to the package's dist/settings. */
   distPath?: string;
@@ -135,7 +137,7 @@ export async function createSettingsServer(
   const canonicalPath = (): string => { try { return realpathSync(configPath); } catch { return resolvePath(configPath); } };
   const validProof = (supplied: unknown, expected: Buffer): boolean => typeof supplied === "string" && /^[a-f0-9]{64}$/.test(supplied) && timingSafeEqual(expected, Buffer.from(supplied, "hex"));
   let figmaGeneration = 0; let slackGeneration = 0;
-  let pendingFigma: ReturnType<typeof startConnection> | null = null;
+  let pendingFigma: (ReturnType<typeof startConnection> & {generation:string}) | null = null;
   let pendingBroker: ReturnType<typeof startSlackConnection> | null = null;
   let pendingSlack: {
     state: string;
@@ -167,6 +169,9 @@ export async function createSettingsServer(
       res.writeHead(403, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ error: "This action must come from Elf settings." }));
       return;
+    }
+    if(options.figmaConnectionOnly&&!['/api/figma/account','/api/figma/connect','/api/figma/disconnect','/api/figma/broker-callback'].includes(path)){
+      res.writeHead(404,{'Content-Type':'application/json'});res.end(JSON.stringify({error:'This endpoint serves Figma account connection only.'}));return;
     }
     if (path === "/api/identity" && req.method === "GET") {
       const challenge = req.headers["x-elf-challenge"];
@@ -359,7 +364,7 @@ export async function createSettingsServer(
     }
     if (path === "/api/figma/connect" && req.method === "POST") {
       figmaGeneration++;
-      pendingFigma = startConnection("figma", req.socket.localPort!);
+      pendingFigma = {...startConnection("figma", req.socket.localPort!),generation:beginFigmaAuthorization()};
       res.writeHead(200, {"Content-Type": "application/json"}); res.end(JSON.stringify({url: pendingFigma.url, authorizationOrigin: pendingFigma.origin})); return;
     }
     if (path === "/api/figma/disconnect" && req.method === "POST") {
@@ -374,9 +379,13 @@ export async function createSettingsServer(
         const supplied = url.searchParams.get("reason") ?? "";
         reason = ["access_denied", "invalid_client", "invalid_grant", "invalid_scope", "redirect_uri_mismatch", "unauthorized_client", "missing_code", "provider_rejected", "service_error", "credential_storage"].includes(supplied) ? supplied : "service_error";
         if (grant && !url.searchParams.has("error")) {
-          try {const account = validateAccount(await finishConnection(grant, pending.verifier, pending.origin, "figma"), pending.origin); if (generation !== figmaGeneration) throw new Error("Connection canceled"); writeFigmaAccount(account); status = "connected";}
+          try {const account = validateAccount(await finishConnection(grant, pending.verifier, pending.origin, "figma"), pending.origin); if (generation !== figmaGeneration || !figmaAuthorizationCurrent(pending.generation)) throw new Error("Connection canceled"); writeFigmaAccount(account); status = "connected";}
           catch {reason = "local_exchange"; console.error("Figma account connection failed. Reconnect from Elf Settings.");}
         }
+      }
+      if(options.figmaConnectionOnly){
+        res.writeHead(status==='connected'?200:400,{'Content-Type':'text/plain; charset=utf-8','Content-Security-Policy':"default-src 'none'"});
+        res.end(status==='connected'?'Figma connected. Return to your coding assistant and check Elf onboarding status.':'Figma connection was not completed. Return to your assistant and request a new sign-in link.');return;
       }
       res.writeHead(302, {Location: `http://127.0.0.1:${req.socket.localPort}/?figma=${status}${status === "error" ? `&figma_reason=${reason}` : ""}`}); res.end(); return;
     }
@@ -556,6 +565,7 @@ export async function createSettingsServer(
 
   const close = (): Promise<void> =>
     new Promise<void>((fulfill) => {
+      figmaGeneration++;pendingFigma=null;
       if (!server.listening) {
         fulfill();
         return;
