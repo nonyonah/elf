@@ -31,6 +31,11 @@ validated, resumable design-system import.
 
 ## MCP-only workflow
 
+The agreed hosted direction retains Elf Bridge and removes the requirement to
+run a local IDE, terminal or tunnel. See [Hosted Elf MCP with Elf Bridge](hosted-mcp-plugin.md)
+for the architecture, implementation order and acceptance checks. This hosted
+workflow is planned, not deployed; local MCP remains the available execution path.
+
 Markdown-to-Figma design-system generation belongs solely to MCP. The coding
 assistant in Cursor, Claude Code, Codex or another MCP host reads the selected
 Markdown, extracts an editable draft, presents questions and the resource plan,
