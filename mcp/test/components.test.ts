@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import {z} from 'zod';
 import { after, before, describe, test } from "node:test";
 import { Bridge } from "../src/bridge.js";
 import { PluginClient } from "../src/client.js";
@@ -9,6 +10,13 @@ import type { MethodHandler } from "./helpers/plugin-connection.js";
 import { FakePlugin } from "./helpers/plugin-connection.js";
 
 const TOKEN = "test-token-0123456789";
+
+test('component fill parsing preserves a variable when a literal fallback color is supplied',()=>{
+ const input=z.object(upsertComponentTool.inputSchema).parse({name:'Bound preview',fill:{variable:'Color/Accent',color:'#4a55c9'},text:{characters:'Label',color:{variable:'Color/Ink 900',color:'#17181c'}},stroke:{color:{variable:'Color/Line',color:'#e0ddd7'}}});
+ assert.deepEqual(input.fill,{variable:'Color/Accent',color:'#4a55c9'});
+ assert.deepEqual(input.text?.color,{variable:'Color/Ink 900',color:'#17181c'});
+ assert.deepEqual(input.stroke?.color,{variable:'Color/Line',color:'#e0ddd7'});
+});
 
 test('rich component calls require updated plugin capabilities and forward prose, position and layers',async()=>{
  const calls:{method:string;params:any}[]=[];

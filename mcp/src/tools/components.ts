@@ -49,7 +49,7 @@ const fillInput = z.union([
   z.object({
     color: z.string().describe('Hex or rgb(), e.g. "#6366f1".'),
     opacity: z.number().min(0).max(1).optional(),
-  }),
+  }).strict(),
   z.object({
     variable: z.string().describe('COLOR variable name, "collection/name", or id.'),
     color: z
