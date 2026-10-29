@@ -153,6 +153,8 @@ export async function main(argv: string[]): Promise<number> {
     }),
     projectAction: async (action, input) => {
       const body = input as Record<string, unknown>;
+      if (action === 'prepare-design-system') return project.prepareDesignSystem(body.path);
+      if (action === 'validate-design-system' && typeof body.id === 'string') return project.validateDesignSystem(body.id,body.draft);
       if (action === "pairing-code") {
         const pairing = await runtime.refreshPairingCode();
         console.log(`New pairing code: ${pairing.code}\nPaste it into the Figma plugin within five minutes.`);

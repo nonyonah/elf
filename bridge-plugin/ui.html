@@ -255,6 +255,12 @@
     .file-link-actions .primary, .pairing-box .file-link-actions .secondary { width: auto; height: 34px; margin: 0; }
     .file-link-actions .primary { flex: 1; }
     .file-link-actions .secondary { padding: 0 12px; }
+    .export-toolbar { align-items: center; justify-content: space-between; flex-wrap: wrap; }
+    .export-toolbar .secondary { width: auto; min-height: 34px; padding: 0 12px; }
+    .export-toolbar svg { width: 14px; height: 14px; flex-shrink: 0; }
+    .export-toolbar .refresh { color: var(--fg-default); background: var(--surface-subtle); }
+    .export-toolbar .refresh:hover:not(:disabled) { border-color: var(--primary); }
+
     .pairing-box .secondary { width: auto; height: 28px; margin-top: 14px; padding: 0 12px; }
 
     .connected-head {
@@ -485,9 +491,9 @@
         </div>
       </section>
       <section data-panel="export" aria-labelledby="export-heading"><div class="card">
-        <h2 id="export-heading">Code → Figma</h2><p class="sub">Review tokens and components from the connected project. Missing resources are created; changed resources are updated after approval.</p>
+        <h2 id="export-heading">Code → Figma</h2><p class="sub">Optional controls for the same sync workflow in the Elf extension and npm Settings. Review here when you are already in Figma. The plugin applies approved changes from either interface.</p>
         <label class="field-label" for="export-project">Local project</label><select id="export-project"></select>
-        <div class="file-link-actions"><button class="secondary" id="export-back">Back</button><button class="primary" id="export-refresh">Refresh changes</button></div>
+        <div class="file-link-actions export-toolbar"><button class="secondary" id="export-back">Back</button><button class="secondary refresh" id="export-refresh"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5"/><path d="M6.1 7a7 7 0 0 1 11.5-1L20 9M4 15l2.4 3A7 7 0 0 0 18 17"/></svg><span>Refresh</span></button></div>
         <p class="sub" id="export-status" role="status" aria-live="polite"></p><div id="export-items"></div>
         <label id="export-conflicts-label" hidden class="sub"><input type="checkbox" id="export-conflicts" /> Replace the Figma edits listed in this review</label>
         <button class="primary" id="export-apply" hidden>Apply reviewed changes</button>
@@ -980,8 +986,8 @@ function pairingHmac(key, text) {
       return new Promise((resolve,reject)=>{const timer=setTimeout(()=>{projectRequests.delete(id);reject(new Error('The project did not respond. Refresh and review again.'));},125000);projectRequests.set(id,{resolve,reject,timer});state.send({type:'project-operation',id,owner:$('export-project').value,action,params});});
     }
     async function exportWork(work) {
-      if(exportBusy)return;exportBusy=true;$('export-project').disabled=true;$('export-refresh').disabled=true;$('export-apply').disabled=true;$('export-status').textContent='Reading the local project…';
-      try{await work();}catch(error){$('export-status').textContent=error.message;}finally{exportBusy=false;$('export-project').disabled=false;$('export-refresh').disabled=false;$('export-apply').disabled=Boolean(exportPlan?.issues?.some(issue=>issue.kind==='conflict'&&issue.blocksApply!==false)&&!$('export-conflicts').checked);}
+      if(exportBusy)return;exportBusy=true;$('export-refresh').setAttribute('aria-busy','true');$('export-refresh').querySelector('span').textContent='Refreshing…';$('export-project').disabled=true;$('export-refresh').disabled=true;$('export-apply').disabled=true;$('export-status').textContent='Reading the local project…';
+      try{await work();}catch(error){$('export-status').textContent=error.message;}finally{exportBusy=false;$('export-refresh').removeAttribute('aria-busy');$('export-refresh').querySelector('span').textContent='Refresh';$('export-project').disabled=false;$('export-refresh').disabled=false;$('export-apply').disabled=Boolean(exportPlan?.issues?.some(issue=>issue.kind==='conflict'&&issue.blocksApply!==false)&&!$('export-conflicts').checked);}
     }
     function renderExport(plan,reviewed) {
       exportPlan=reviewed?plan:null;

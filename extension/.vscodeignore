@@ -7,3 +7,6 @@ runtime/package.json
 **/.env
 **/.env.*
 **/.elf/**
+**/description-drafts/**
+**/component-import-drafts/**
+**/design-system-drafts/**

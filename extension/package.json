@@ -2,7 +2,7 @@
   "name": "elf-design-system",
   "displayName": "Elf",
   "description": "Connect your project and Figma, monitor design drift, and review sync changes.",
-  "version": "0.3.16",
+  "version": "0.3.17",
   "publisher": "elf-local",
   "license": "MIT",
   "repository": {
@@ -255,6 +255,14 @@
         "command": "elf.generateVisualSpec",
         "title": "Elf: Generate Component Visual Specification",
         "icon": "$(sparkle)"
+      },
+      {
+        "command": "elf.prepareDesignSystem",
+        "title": "Elf: Prepare Design System from Markdown"
+      },
+      {
+        "command": "elf.validateDesignSystem",
+        "title": "Elf: Validate Design System Draft"
       }
     ],
     "menus": {

@@ -1,3 +1,4 @@
+import {DesignSystemReviews} from './design-system.js';
 import {componentLibraryChoices,declaredMajor} from './component-library.js';
 import {validateImportedComponent,type ComponentImportOptions} from './component-import.js';
 import {importedTokenDocument, type ImportSnapshot} from './token-import.js';
@@ -37,6 +38,9 @@ export class ProjectService {
   private importReviews = new Map<string,{id:string;path:string;content:string;names:string[];issues:string[];fingerprint:string;expiresAt:string;ids?:string[]}>();
   private componentImports=new Map<string,{options:ComponentImportOptions;fingerprint:string;expires:number;reusePaths:string[]}>();
   private documentationReviews=new Map<string,{component:string;revision:string;fileKey:string;nodeId:string;remote:string;codeKey:unknown;path:string;local:string;expires:number}>();
+  private designSystemReviews?: DesignSystemReviews;
+  prepareDesignSystem(path:unknown) { return (this.designSystemReviews ??= new DesignSystemReviews(dirname(resolve(this.configPath)))).prepare(path); }
+  validateDesignSystem(id:string,draft:unknown) { if(!this.designSystemReviews)throw new Error('Prepare a Markdown extraction review first.'); return this.designSystemReviews.validate(id,draft); }
   private tail: Promise<unknown> = Promise.resolve();
   constructor(readonly configPath: string, private readonly runtime: BridgeRuntime) { this.migrate(); }
 

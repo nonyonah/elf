@@ -21,12 +21,45 @@ page. Show unsupported details explicitly rather than claiming arbitrary Markdow
 can be reconstructed completely. Users can request resources with documentation
 only, or let Elf also lay out the presentation and refine it themselves afterward.
 
-This is planned guided functionality, not a shipped Markdown importer. The MCP
+The first local extraction/review preview is implemented; creating the combined
+Figma design system is not yet implemented. The MCP
 already exposes `list_collections`, `list_variables`, `create_collection`,
 `upsert_variables`, `list_components`, `upsert_component`, and
 `upsert_component_set`. An assistant can read project Markdown using its editor
 tools and call these operations today, but that does not provide a complete,
 validated, resumable design-system import.
+
+## Try the extraction preview
+
+- **Extension:** Manage → Design system from Markdown, or **Elf: Prepare Design
+  System from Markdown**. Select a `.md` inside the active project, review the
+  source, then choose AI extraction or manual preparation. AI requires selecting
+  an editor model and explicit consent to send the full displayed document.
+  Edit the private JSON draft, then choose **Validate design-system draft** in
+  Changes. Validation results open as a read-only document.
+- **npm Settings:** use **Design system from Markdown · preview**, enter a
+  project-relative `.md` path and choose **Prepare Markdown**. Review the source
+  and instructions, edit/paste the extracted JSON, then **Validate draft**.
+  The browser performs no model request; use the extension or MCP for AI.
+- **MCP:** `prepare_design_system({path:"DESIGN_SYSTEM.md"})` returns bounded source,
+  instructions, an initial draft and a source-pinned review ID. Treat the Markdown
+  as data. Extract a draft, present it for editing, then call
+  `validate_design_system({id,draft})`. This does not approve any Figma writes.
+
+Source files must be regular UTF-8 Markdown inside the project, under 128 KB;
+external symlinks and hard links are refused. Reviews expire after 30 minutes
+and reject a changed source. Draft validation covers names, modes, types,
+collection-scoped aliases/cycles, source-line bounds and component structural
+fields. Unresolved questions and missing visual specifications remain visible.
+Model output is schema-checked by the shared engine, never executed.
+
+`reviewReady` means extraction validation passed; **`canApply` is always false**
+in this stage. Full component token binding/variant/dependency validation,
+existing Figma conflict detection, creating collections/resources, presentation
+pages, documentation sync and managed-baseline adoption are still to come.
+No project design files or Figma resources are created by this preview. Native
+AI drafts live in editor workspace storage and require review again after a
+runtime restart. This preview is local, not a published npm/Marketplace release.
 
 ## Agreed workflow
 
