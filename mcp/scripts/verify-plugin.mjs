@@ -861,6 +861,15 @@ async function main() {
     return 'no orphan components or implicit name adoption';
   });
 
+  await check('hosted snapshot is bounded, deterministic and changes with the page',async()=>{
+    const before=JSON.stringify(await callOk('get_hosted_snapshot'));
+    if(before!==JSON.stringify(await callOk('get_hosted_snapshot')))throw new Error('unchanged snapshot is unstable');
+    const node=figma.createText();node.characters='Hosted guard';figma.currentPage.appendChild(node);
+    if(before===JSON.stringify(await callOk('get_hosted_snapshot')))throw new Error('page edits did not change the snapshot');
+    node.remove();
+    return 'current page, variables, modes and styles included';
+  });
+
   await check("unknown methods are reported", async () => {
     const message = await callFail("nope");
     errorContains(message, 'Unknown method "nope".');

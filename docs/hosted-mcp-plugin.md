@@ -9,8 +9,15 @@ This removes the IDE, repository clone, local terminal and tunnel requirements
 from the hosted design-system workflow. The plugin must remain running for
 Figma reads and writes; do not describe it as an unattended background service.
 
-This is an implementation plan, not a deployed connector. There is no public
-hosted Elf MCP URL to give users yet.
+The hosted preview is implemented behind `HOSTED_MCP_ENABLED=false`. It is not
+deployed or externally accepted. There is no enabled public connector to give
+users yet. See [deployment and acceptance](hosted-mcp-deployment.md).
+
+The preview uses an authenticated HTTPS polling transport and a D1 queue rather
+than WebSockets/Durable Objects. Polling avoids credentials in WebSocket URLs
+and keeps ordering, one-use approvals and operation receipts in transactional
+storage. Durable Objects remain an option if measured latency or scale warrants
+a transport change. Local WebSocket pairing remains available.
 
 ## Intended user flow
 
@@ -30,7 +37,7 @@ file key and connection identity. Preserve unrelated resources and original
 master IDs. Interrupted writes require inspection and reconciliation before
 retrying; never blindly replay an operation whose outcome is unknown.
 
-## Current implementation and gaps
+## Local transport and hosted preview
 
 - `mcp/src/http.ts` is a local Node HTTP transport, bound to loopback. A tunnel
   exposes that process; it is not a hosted multi-user service.
@@ -43,6 +50,27 @@ retrying; never blindly replay an operation whose outcome is unknown.
 - The existing Elf Console Worker provides account/workspace infrastructure and
   hosted OAuth callbacks. Its local connection tokens and callbacks must not be
   treated as MCP access tokens or reused as hosted bridge credentials.
+
+Hosted code is in `console/src/hosted`, with browser review in
+`console/client/src/screens/hosted-review.tsx`. OAuth uses Cloudflare's provider
+library; protected API requests derive ownership from its validated props.
+The hosted tools accept Markdown content, share extraction/token validation,
+and validate resource operations against the existing local MCP schemas.
+Humans approve the exact document and operation plan through Clerk-protected
+browser routes; model tokens cannot approve their own writes.
+
+Plans pin a connection generation and current-page/variable/style snapshot.
+The plugin rechecks the snapshot before every write and returns a new snapshot
+after each operation. Inspection is bounded to 4,000 current-page nodes and
+5,000 variables; cross-page mutation targets are refused. This is optimistic
+concurrency checking, not an atomic Figma transaction. Live edits during an
+operation remain a risk and require inspection after conflicts or interruptions.
+
+Reads and apply return job IDs. The assistant polls `get_operation_result` and
+must perform independent resource reads before claiming verification. Results
+are retained for 24 hours after expiry; Markdown reviews expire after 30 minutes,
+pairing codes after five minutes and write approvals after ten minutes. Saved
+plugin credentials expire after 30 days and can be revoked from either end.
 
 ## Implementation sequence
 

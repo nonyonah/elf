@@ -2,6 +2,11 @@
 
 ## Release gate update — 29 October 2026
 
+Hosted MCP plus Elf Bridge now has a disabled local preview. Complete its
+[deployment and desktop/web acceptance](hosted-mcp-deployment.md) before enabling
+the public connector. This adds a new OAuth and tenant-isolation release gate;
+it does not replace the existing installation and distribution checks below.
+
 The local preview now includes prose Figma documentation separately from visual
 specifications, reviewed individual sync, independent automatic-sync filtering,
 token imports with collection identity, reviewed React component import drafts,

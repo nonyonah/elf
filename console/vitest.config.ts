@@ -8,6 +8,7 @@ export default defineConfig({
     cloudflareTest({
       wrangler: { configPath: "./wrangler.jsonc" },
       miniflare: {
+        kvNamespaces: ['OAUTH_KV'],
         bindings: {
           TEST_MIGRATIONS: migrations,
           SECRETS_KEY: Buffer.from("elf-console-test-secrets-key-32b").toString("base64"),

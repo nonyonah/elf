@@ -14,6 +14,7 @@ import { ActivityScreen } from "@/screens/activity";
 import { OverviewScreen } from "@/screens/overview";
 import { ProjectScreen } from "@/screens/project";
 import { SettingsScreen } from "@/screens/settings";
+import { HostedReviewScreen, isHostedReview } from '@/screens/hosted-review';
 
 function Console({
   devMode = false,
@@ -80,7 +81,7 @@ export function App(): React.ReactElement {
 
   return (
     <ApiProvider client={api}>
-      {isSignedIn ? <Console /> : <LandingScreen />}
+      {isSignedIn ? (isHostedReview() ? <HostedReviewScreen /> : <Console />) : <LandingScreen />}
     </ApiProvider>
   );
 }
@@ -90,7 +91,7 @@ export function DevApp(): React.ReactElement {
   const api = React.useMemo(() => createApi(async () => null), []);
   return (
     <ApiProvider client={api}>
-      <Console devMode />
+      {isHostedReview() ? <HostedReviewScreen /> : <Console devMode />}
     </ApiProvider>
   );
 }

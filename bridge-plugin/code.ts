@@ -195,7 +195,8 @@ async function loadBridgeState(): Promise<BridgeState> {
     | { host?: string; token?: string }
     | undefined;
   const storedHost = (await figma.clientStorage.getAsync(HOST_KEY)) as string | undefined;
-  const session = (await figma.clientStorage.getAsync(`${SESSION_KEY}:${currentFile().key}`) ?? await figma.clientStorage.getAsync(SESSION_KEY)) as string | undefined;
+  const hosted = storedHost === 'https://elf-console.nonyonah.workers.dev';
+  const session = (await figma.clientStorage.getAsync(`${SESSION_KEY}:${hosted ? 'hosted:' : ''}${currentFile().key}`) ?? (hosted ? undefined : await figma.clientStorage.getAsync(SESSION_KEY))) as string | undefined;
 
   // Drop the old handshake token from storage; pairing replaces it.
   if (legacy?.token) {
@@ -213,12 +214,15 @@ async function saveHost(host: string): Promise<void> {
 }
 
 async function saveSession(session: string): Promise<void> {
-  await figma.clientStorage.setAsync(`${SESSION_KEY}:${currentFile().key}`, session);
+  const hosted = (await figma.clientStorage.getAsync(HOST_KEY)) === 'https://elf-console.nonyonah.workers.dev';
+  if (hosted !== session.startsWith('elfh_')) throw new Error('Session does not match the selected bridge.');
+  await figma.clientStorage.setAsync(`${SESSION_KEY}:${hosted ? 'hosted:' : ''}${currentFile().key}`, session);
   await figma.clientStorage.deleteAsync(SESSION_KEY);
 }
 
 async function forgetSession(): Promise<void> {
-  await figma.clientStorage.deleteAsync(`${SESSION_KEY}:${currentFile().key}`);
+  const hosted = (await figma.clientStorage.getAsync(HOST_KEY)) === 'https://elf-console.nonyonah.workers.dev';
+  await figma.clientStorage.deleteAsync(`${SESSION_KEY}:${hosted ? 'hosted:' : ''}${currentFile().key}`);
   await figma.clientStorage.deleteAsync(SESSION_KEY);
 }
 
@@ -1559,6 +1563,33 @@ async function getNode(params: Record<string, unknown>): Promise<unknown> {
   return { node: await nodePayload(node as SceneNode, depth) };
 }
 
+/** Bounded current-page guard used only by the hosted transport, never sent to models. */
+async function hostedSnapshot(): Promise<unknown> {
+  const nodes: Record<string, unknown>[] = [];
+  const visit = async (node: SceneNode, depth: number): Promise<void> => {
+    if (nodes.length >= 4000 || depth > 32) throw new Error('This page exceeds the hosted preview inspection limit. Use a smaller page or local Elf.');
+    const data = await nodePayload(node, 0);
+    data.parentId = node.parent?.id;
+    data.opacity = 'opacity' in node ? node.opacity : null;
+    data.visible = node.visible;
+    nodes.push(data);
+    if ('children' in node) for (const child of node.children) await visit(child, depth + 1);
+  };
+  for (const node of figma.currentPage.children) await visit(node, 0);
+  const variables = await figma.variables.getLocalVariablesAsync();
+  const collections = await figma.variables.getLocalVariableCollectionsAsync();
+  const textStyles = await figma.getLocalTextStylesAsync();
+  const effectStyles = await figma.getLocalEffectStylesAsync();
+  if (variables.length > 5000) throw new Error('Too many variables for the hosted preview. Use local Elf.');
+  const snapshot = {pageId:figma.currentPage.id,nodes,
+    textStyles:textStyles.map(s=>({id:s.id,name:s.name,description:s.description,fontName:s.fontName,fontSize:s.fontSize,lineHeight:s.lineHeight,letterSpacing:s.letterSpacing})).sort((a,b)=>a.id.localeCompare(b.id)),
+    effectStyles:effectStyles.map(s=>({id:s.id,name:s.name,description:s.description,effects:s.effects})).sort((a,b)=>a.id.localeCompare(b.id)),
+    collections:collections.map(c=>({id:c.id,name:c.name,modes:c.modes,defaultModeId:c.defaultModeId})).sort((a,b)=>a.id.localeCompare(b.id)),
+    variables:variables.map(v=>({id:v.id,name:v.name,resolvedType:v.resolvedType,valuesByMode:v.valuesByMode})).sort((a,b)=>a.id.localeCompare(b.id))};
+  if (JSON.stringify(snapshot).length > 2000000) throw new Error('Page inspection exceeds the hosted preview limit. Use a smaller page or local Elf.');
+  return snapshot;
+}
+
 /** Never substitute a shared placeholder for a document identity. */
 function nativeFileKey(): string | undefined {
   if (PUBLIC_FILE_LINK_REQUIRED) return undefined;
@@ -1614,6 +1645,8 @@ async function handle(method: string, params: Record<string, unknown>): Promise<
       return upsertComponent(params);
     case "get_plugin_capabilities":
       return {visualLayers:1,componentMetadata:1,safeVariantUpdates:1};
+    case "get_hosted_snapshot":
+      return hostedSnapshot();
     case "upsert_component_set":
       return upsertComponentSet(params);
     case "upsert_text_style":
@@ -1687,6 +1720,12 @@ figma.ui.onmessage = async (message: UiMessage) => {
       postUi({ type: "host-saved" });
       return;
     }
+    if (message.type === 'open-hosted-approval') {
+      const id = String(message.connectionId ?? '');
+      if (!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(id)) throw new Error('Invalid connection.');
+      figma.openExternal('https://elf-console.nonyonah.workers.dev/?elf_connection=' + id);
+      return;
+    }
 
     if (message.type === "save-session") {
       const session = String(message.session ?? "");
@@ -1705,6 +1744,11 @@ figma.ui.onmessage = async (message: UiMessage) => {
     if (message.type === "request") {
       const request = message as unknown as UiRequest;
       try {
+        if (message.hosted === true && request.params?.parentId) {
+          let parent = await figma.getNodeByIdAsync(String(request.params.parentId));
+          while (parent && parent.type !== 'PAGE') parent = parent.parent;
+          if (!parent || parent.id !== figma.currentPage.id) throw new Error('Hosted writes are scoped to the current page. Switch pages and prepare a fresh review.');
+        }
         const result = await handle(request.method, request.params ?? {});
         postUi({ type: "response", id: request.id, ok: true, result });
       } catch (error) {

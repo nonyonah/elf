@@ -412,7 +412,9 @@
       <section data-panel="disconnected" aria-labelledby="pair-heading">
         <div class="card">
           <h2 id="pair-heading">Pair this file</h2>
-          <p class="sub">In Elf, choose Manage → Figma plugin pairing, then paste the fresh code.</p>
+          <p class="sub">Request a pairing code in Elf or your connected assistant, then paste it here.</p>
+          <label class="field-label" for="connection-kind">Connect through</label>
+          <select id="connection-kind"><option value="local">Local Elf · editor or npm</option><option value="hosted">Hosted Elf · desktop or web assistant</option></select>
 
           <label class="field-label" for="code">Pairing code</label>
           <input
@@ -447,6 +449,7 @@
           <div class="spinner" aria-hidden="true"></div>
           <h2 id="pairing-heading">Pairing this file…</h2>
           <p class="sub" id="pairing-detail">Waiting for the local bridge to accept the code.</p>
+          <button class="primary" id="hosted-approve" hidden>Review this connection in Elf</button>
           <button class="secondary" id="cancel-pair">Cancel</button>
         </div>
       </section>
@@ -461,7 +464,7 @@
             </div>
             <div style="min-width: 0">
               <h2 id="connected-heading" class="file-name">Connected</h2>
-              <p class="file-meta">This Figma file is paired with the local bridge.</p>
+              <p class="file-meta" id="connection-description">This Figma file is paired with the local bridge.</p>
             </div>
           </div>
 
@@ -618,6 +621,16 @@ function pairingHmac(key, text) {
 
     const $ = (id) => document.getElementById(id);
 
+    const HOSTED_ORIGIN = 'https://elf-console.nonyonah.workers.dev';
+    const hostedSnapshots = new Map();
+    function getHostedSnapshot() {
+      const id = 'hosted-snapshot-' + Array.from(crypto.getRandomValues(new Uint8Array(16)), b => b.toString(16).padStart(2, '0')).join('');
+      return new Promise((resolve, reject) => {
+        const timer = setTimeout(() => {hostedSnapshots.delete(id);reject(new Error('Page inspection timed out.'));}, 30000);
+        hostedSnapshots.set(id,{resolve,reject,timer});
+        postPluginMessage({type:'request',id,method:'get_hosted_snapshot',params:{}});
+      });
+    }
     const state = {
       host: "localhost:8765",
       session: "",
@@ -691,6 +704,7 @@ function pairingHmac(key, text) {
     }
 
     function renderConnected() {
+      $('connection-description').textContent = state.host === HOSTED_ORIGIN ? 'Connected through hosted Elf. Keep this plugin open.' : 'This Figma file is paired with the local bridge.';
       $("connected-heading").textContent = state.file ? state.file.name : "Connected";
       $("bridge-label").textContent = shortHost();
       $("file-key").textContent = state.file ? state.file.key : "—";
@@ -709,8 +723,88 @@ function pairingHmac(key, text) {
       state.reconnectTimer = null;
     }
 
+    async function connectHosted(mode) {
+      if (state.socket) return;
+      if (!state.file?.key || state.file.verification?.method !== 'plugin') {
+        showPairing('Hosted Elf uses explicit plugin-only approval. Choose Change file link and Approve open document in Elf, then pair again.'); return;
+      }
+      clearReconnectTimer();
+      let closed = false, timer = null, generation = '', inFlight = null, snapshot = '';
+      const socket = {readyState: 1, close() { closed = true; this.readyState = 3; clearTimeout(timer); if(state.socket === this)state.socket = null; }};
+      state.socket = socket; state.manualClose = false; state.ready = false; state.identityVerified = false;
+      setPhase('pairing'); setStatus('pairing', 'connecting…');
+      $('pairing-detail').textContent = 'Connecting securely to hosted Elf.';
+      const request = async (path, body) => {
+        const response = await fetch(HOSTED_ORIGIN + '/api/hosted-bridge/' + path, {
+          method: 'POST', headers: {'Content-Type':'application/json', ...(state.session?.startsWith('elfh_') ? {Authorization:'Bearer '+state.session} : {})},
+          body: JSON.stringify(body), signal: AbortSignal.timeout(15000), credentials: 'omit', redirect: 'error',
+        });
+        if(!response.ok)throw new Error(response.status === 404 ? 'Hosted Elf preview is not enabled yet.' : 'Hosted connection rejected. Check the code, file and approval in Elf.');
+        return response.json();
+      };
+      const fail = error => {
+        if(closed)return;
+        socket.close(); state.ready = false; state.identityVerified = false;
+        showPairing(error.message || 'Hosted connection lost. Reconnect and approve this file again.');
+      };
+      try {
+        const connected = await request('connect', {fileKey:state.file.key,fileName:state.file.name || 'Untitled',...(mode === 'code' ? {code:normalizedCode()} : {})});
+        if(closed)return;
+        generation = connected.generation;
+        $('hosted-approve').hidden = false;
+        $('hosted-approve').onclick = () => postPluginMessage({type:'open-hosted-approval',connectionId:connected.connectionId});
+        if(connected.session) {state.session = connected.session;state.sessionSaved = false;postPluginMessage({type:'save-session',session:connected.session});}
+        snapshot = await getHostedSnapshot();
+        state.ready = true; state.projectPanel = false;
+        $('export-code').disabled = true; $('export-code').textContent = 'Manage code sync in local Elf';
+        $('pairing-heading').textContent = 'Approve this document in Elf';
+        $('pairing-detail').textContent = 'Open the connection link from your assistant. Confirm this exact file using plugin-only trust.';
+        state.send = async message => {
+          if(closed || message.type !== 'response' || message.id !== inFlight)return;
+          try {
+            snapshot = await getHostedSnapshot();
+            await request('result', {generation,id:message.id,ok:message.ok,snapshot,...(message.ok ? {result:message.result} : {error:message.error})});
+            inFlight = null;
+          } catch(error) { fail(error); }
+        };
+        const tick = async () => {
+          if(closed)return;
+          try {
+            const update = await request('poll',{generation,snapshot,busy:!!inFlight});
+            if(closed)return;
+            state.identityVerified = update.approved === true;
+            if(state.identityVerified) {setPhase('connected');setStatus('online','connected');renderConnected();}
+            else {setPhase('pairing');setStatus('pairing','approval needed');}
+            $('mcp-status').textContent = update.assistantActive ? 'Recently active' : 'Waiting for assistant';
+            $('mcp-status').classList.toggle('ok', update.assistantActive === true);
+            if(update.command && !inFlight && state.identityVerified) {
+              inFlight = update.command.id;
+              snapshot = await getHostedSnapshot();
+              if(update.command.expectedSnapshot && update.command.expectedSnapshot !== snapshot) {
+                await request('result',{generation,id:inFlight,ok:false,error:{message:'The Figma page or variables changed after review. Inspect resources and prepare a new plan.'},snapshot});
+                inFlight = null;
+              } else {state.requestCount++;renderConnected();postPluginMessage({...update.command,hosted:true});}
+            }
+            timer = setTimeout(tick, 2000);
+          }catch(error){fail(error);}
+        };
+        await tick();
+      }catch(error){fail(error);}
+    }
+
+    $('connection-kind').addEventListener('change', event => {
+      closeCurrentSocket();
+      state.host = event.target.value === 'hosted' ? HOSTED_ORIGIN : 'localhost:8765';
+      state.session = '';state.ready = false;state.identityVerified = false;
+      $('host').value = state.host;
+      postPluginMessage({type:'save-host',host:state.host});
+      showPairing('');
+    });
+
     function connect(mode) {
       if (state.socket) return;
+      if (state.host === HOSTED_ORIGIN) { connectHosted(mode); return; }
+      $('hosted-approve').hidden = true;
       clearReconnectTimer();
       if (mode === "session" && !state.session) {
         showPairing("Pair this file again to refresh the saved session.");
@@ -915,6 +1009,9 @@ function pairingHmac(key, text) {
     }
 
     function disconnect() {
+      if (state.host === HOSTED_ORIGIN && state.session) {
+        fetch(HOSTED_ORIGIN + '/api/hosted-bridge/disconnect', {method:'POST',headers:{Authorization:'Bearer '+state.session}}).catch(() => {});
+      }
       state.manualClose = true;
       state.session = "";
       state.sessionSaved = true;
@@ -1062,6 +1159,7 @@ function pairingHmac(key, text) {
         $('file-authorization').value = state.file && state.file.verification && state.file.verification.method === 'plugin' ? 'plugin' : 'strict';
         state.plugin = message.plugin || null;
         state.host = (message.bridge && message.bridge.host) || "localhost:8765";
+        $('connection-kind').value = state.host === HOSTED_ORIGIN ? 'hosted' : 'local';
         state.session = (message.bridge && message.bridge.session) || "";
         $("host").value = state.host;
         renderConnected();
@@ -1078,6 +1176,13 @@ function pairingHmac(key, text) {
       }
 
       if (message.type === "response") {
+        const pendingSnapshot = hostedSnapshots.get(message.id);
+        if(pendingSnapshot) {
+          clearTimeout(pendingSnapshot.timer);hostedSnapshots.delete(message.id);
+          if(message.ok)pendingSnapshot.resolve(sha256Hex(JSON.stringify(message.result)));
+          else pendingSnapshot.reject(new Error(message.error?.message || 'Could not inspect this page.'));
+          return;
+        }
         if (state.socket && state.socket.readyState === WebSocket.OPEN) {
           state.send(message);
         }

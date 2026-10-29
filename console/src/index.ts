@@ -1,4 +1,7 @@
 import { localOAuth } from "./local-oauth.js";
+import { hostedFetch } from './hosted/oauth.js';
+import { hostedRoutes, pluginRoutes } from './hosted/routes.js';
+import { cleanupHosted } from './hosted/cleanup.js';
 import { Hono } from "hono";
 import { apiV1 } from "./api.js";
 import { getSession, requireSession, workspaceNameFor, type AppEnv, type SessionResolver } from "./auth.js";
@@ -22,6 +25,7 @@ export function createApp(options: { sessionResolver?: SessionResolver } = {}) {
   app.get("/api/health", (c) => c.json({ ok: true, service: "elf-console", version: "0.1.0" }));
 
   app.route("/api/local-connect", localOAuth());
+  app.route('/api/hosted-bridge', pluginRoutes());
 
   // Slack's OAuth callback — public by design. It trusts only the signed,
   // expiring state minted by the authenticated install endpoint.
@@ -50,6 +54,7 @@ export function createApp(options: { sessionResolver?: SessionResolver } = {}) {
   app.route("/api/v1", apiV1());
 
   app.use("/api/*", requireSession(options.sessionResolver));
+  app.route('/api/hosted', hostedRoutes());
 
   // Dashboard API (workspace-scoped) — registered after the gate, so every
   // route below is Clerk-protected.
@@ -75,7 +80,7 @@ export function createApp(options: { sessionResolver?: SessionResolver } = {}) {
 const app = createApp();
 
 export default {
-  fetch: app.fetch,
+  fetch: (request: Request, env: Env, ctx: ExecutionContext) => hostedFetch(request, env, ctx, app),
   /**
    * Minute cron sweeps the jobs table (drift jobs are usually kicked earlier
    * by ingest); the 15-minute cron first polls Figma file versions so the UI
@@ -83,6 +88,7 @@ export default {
    */
   async scheduled(controller: ScheduledController, env: Env): Promise<void> {
     if (controller.cron === POLL_CRON) await pollFigmaSources(env);
+    if (env.HOSTED_MCP_ENABLED === 'true') await cleanupHosted(env);
     await env.DB.prepare("DELETE FROM local_oauth WHERE expiresAt < ?").bind(Date.now()).run();
     await runDueJobs(env);
   },

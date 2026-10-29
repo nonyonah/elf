@@ -1,5 +1,9 @@
 /** Worker bindings and secrets. Secrets arrive via `wrangler secret put` / `.dev.vars` — never from the repo. */
 export interface Env {
+  /** Hosted MCP stays disabled until OAuth storage and acceptance checks are ready. */
+  HOSTED_MCP_ENABLED?: string;
+  OAUTH_KV?: KVNamespace;
+  OAUTH_PROVIDER?: import('@cloudflare/workers-oauth-provider').OAuthHelpers;
   DB: D1Database;
   ASSETS: Fetcher;
 

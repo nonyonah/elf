@@ -55,6 +55,8 @@
     "docs/designer-workflow.md",
     "docs/document-authorization.md",
     "docs/markdown-design-system.md",
+    "docs/hosted-mcp-plugin.md",
+    "docs/hosted-mcp-deployment.md",
     "docs/mcp-setup.md",
     "docs/production-readiness.md",
     "docs/runtime-workflow.md",

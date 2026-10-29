@@ -5,10 +5,17 @@
   "enablePrivatePluginApi": true,
   "main": "code.js",
   "ui": "ui.html",
-  "editorType": ["figma"],
+  "editorType": [
+    "figma"
+  ],
   "networkAccess": {
-    "allowedDomains": ["wss://*.ngrok-free.app"],
-    "reasoning": "During development the bridge runs on the developer's own machine. ngrok is only listed as an optional tunnel for setups where Figma cannot reach localhost directly; the bridge itself still binds to 127.0.0.1 and requires a one-time pairing code or a paired session, so no design data is exposed.",
-    "devAllowedDomains": ["ws://localhost:8765"]
+    "allowedDomains": [
+      "wss://*.ngrok-free.app",
+      "https://elf-console.nonyonah.workers.dev"
+    ],
+    "reasoning": "Elf connects to your authenticated local bridge or the hosted Elf service you select. Hosted pairing uses a revocable file-scoped credential; account OAuth credentials are never sent to the plugin. Document connections and write plans require explicit approval.",
+    "devAllowedDomains": [
+      "ws://localhost:8765"
+    ]
   }
 }

@@ -72,6 +72,7 @@ export function LandingScreen(): React.ReactElement {
             <span className="font-heading font-semibold">elf console</span>
           </div>
           <SignIn
+            forceRedirectUrl={new URLSearchParams(location.search).has('elf_authorize') || new URLSearchParams(location.search).has('elf_connection') || new URLSearchParams(location.search).has('elf_plan') ? location.pathname + location.search : undefined}
             appearance={{
               variables: {
                 borderRadius: "0.625rem",

@@ -5,9 +5,14 @@
   "documentAccess": "dynamic-page",
   "main": "code.js",
   "ui": "ui.html",
-  "editorType": ["figma"],
+  "editorType": [
+    "figma"
+  ],
   "networkAccess": {
-    "allowedDomains": ["ws://localhost:8765"],
-    "reasoning": "Elf connects only to the authenticated bridge on your computer. Figma account credentials stay in the local Elf process; this plugin never receives them. The bridge verifies the file before allowing managed writes."
+    "allowedDomains": [
+      "ws://localhost:8765",
+      "https://elf-console.nonyonah.workers.dev"
+    ],
+    "reasoning": "Elf connects to your authenticated local bridge or the hosted Elf service you select. Hosted pairing uses a revocable file-scoped credential; account OAuth credentials are never sent to the plugin. Document connections and write plans require explicit approval."
   }
 }
