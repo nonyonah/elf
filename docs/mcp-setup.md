@@ -33,6 +33,14 @@ arguments cannot select arbitrary directories.
 
 ## Connect a new or existing Figma file
 
+The connected Figma plugin shows an **MCP** status row. It reports initialized
+assistant sessions separately from the bridge and file approval, updates as
+clients connect/disconnect, and shows a client count when multiple sessions are
+active. Watchers and ordinary CLI controllers do not count as MCP sessions.
+This status does not grant permission to modify the document. If it says
+**Restart bridge to enable**, close Elf/MCP clients before restarting the shared
+bridge, then reopen the updated plugin and reconnect MCP.
+
 Local stdio MCP can also start in an existing project directory without an
 `elf.config.json`. Use `figma_onboarding_status`, `connect_figma_account`, then
 `select_figma_file` with the user-provided URL, new/existing purpose and explicit

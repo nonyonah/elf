@@ -30,6 +30,20 @@ function ui() {
   return {window, parent, document, elements, messages, timers, sockets};
 }
 
+test('MCP indicator follows authenticated ready and presence messages, and clears on disconnect',()=>{
+ const app=ui(),channel=app.messages[0].channel;
+ app.window.onmessage({data:{pluginMessage:{type:'context',channel,file:{name:'File',key:'file123456'},bridge:{host:'localhost:8765',session:''}}}});
+ app.document.getElementById('code').value='abcd-efgh-jkmn';app.elements.get('pair').listeners.click();const socket=app.sockets[0];
+ socket.onmessage({data:JSON.stringify({type:'ready',mcpPresence:{connected:true,count:1}})});
+ assert.equal(app.elements.get('mcp-status').textContent,'Connected');
+ socket.onmessage({data:JSON.stringify({type:'mcp-presence',connected:true,count:2})});
+ assert.equal(app.elements.get('mcp-status').textContent,'Connected · 2 clients');
+ socket.onmessage({data:JSON.stringify({type:'mcp-presence',connected:false,count:0})});
+ assert.equal(app.elements.get('mcp-status').textContent,'Not connected');
+ socket.onmessage({data:JSON.stringify({type:'mcp-presence',connected:true,count:1})});
+ socket.onclose({code:1000,reason:''});assert.equal(app.elements.get('mcp-status').textContent,'Not connected');
+});
+
 test("Desktop messages without a Window source finish loading only on the private channel", () => {
   const app = ui(); const channel = app.messages[0].channel;
   assert.match(channel, /^[a-f0-9]{64}$/);

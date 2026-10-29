@@ -479,6 +479,10 @@
               <dd class="ok" id="session-label">Saved in this file</dd>
             </div>
             <div class="row">
+              <dt>MCP</dt>
+              <dd id="mcp-status" role="status" aria-live="polite">Not connected</dd>
+            </div>
+            <div class="row">
               <dt>Requests</dt>
               <dd id="request-count">0 this session</dd>
             </div>
@@ -679,6 +683,13 @@ function pairingHmac(key, text) {
       return host.length > 24 ? host.slice(0, 22) + "…" : host;
     }
 
+    function renderMcpPresence(presence) {
+      const connected = presence?.connected === true && Number.isSafeInteger(presence.count) && presence.count > 0;
+      const label = $('mcp-status');
+      label.textContent = presence === undefined ? 'Restart bridge to enable' : connected ? (presence.count === 1 ? 'Connected' : `Connected · ${presence.count} clients`) : 'Not connected';
+      label.classList.toggle('ok', connected);
+    }
+
     function renderConnected() {
       $("connected-heading").textContent = state.file ? state.file.name : "Connected";
       $("bridge-label").textContent = shortHost();
@@ -779,7 +790,9 @@ function pairingHmac(key, text) {
           received++;
           try { message = JSON.parse(message.payload); } catch { socket.close(1000, "invalid bridge message"); return; }
         }
+        if (message.type === 'mcp-presence') {renderMcpPresence(message);return;}
         if (message.type === "ready") {
+          renderMcpPresence(message.mcpPresence);
           if (state.file && state.file.verification && state.file.verification.method === 'plugin' && message.documentApproval !== 1) {socket.close(4003, 'Restart the updated Elf bridge to enable document approval.'); return;}
           if (state.file && state.file.verification && message.fileVerification !== 1) {socket.close(4003, "Restart the Elf bridge to enable secure file verification."); return;}
           state.projectPanel = message.projectPanel === 1;
@@ -842,6 +855,7 @@ function pairingHmac(key, text) {
         state.socket = null;
         state.authMode = null;
         state.ready = false;
+        renderMcpPresence(null);
         clearReadyTimer();
 
         if (event.code === 4003) {showPairing(event.reason || "This file could not be verified. Check its link and your Figma account in Settings."); return;}

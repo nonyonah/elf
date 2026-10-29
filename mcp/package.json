@@ -11,7 +11,7 @@
   "scripts": {
     "start": "tsx src/index.ts",
     "start:http": "tsx src/index.ts --http",
-    "test": "node --import tsx --test test/project-panel.test.ts test/document-approval.test.ts test/plugin-startup.test.ts test/auth.test.ts test/bridge.test.ts test/config.test.ts test/client.test.ts test/tools.test.ts test/components.test.ts test/http.test.ts test/pairing.test.ts",
+    "test": "node --import tsx --test test/presence.test.ts test/project-panel.test.ts test/document-approval.test.ts test/plugin-startup.test.ts test/auth.test.ts test/bridge.test.ts test/config.test.ts test/client.test.ts test/tools.test.ts test/components.test.ts test/http.test.ts test/pairing.test.ts",
     "typecheck": "tsc --noEmit",
     "verify:plugin": "node --import tsx scripts/verify-plugin.mjs"
   },

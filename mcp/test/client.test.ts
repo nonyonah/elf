@@ -235,7 +235,7 @@ test("shared host survives a client exit and authenticates reused connections", 
   let a: Awaited<ReturnType<typeof acquireBridge>> | undefined; let b: typeof a;
   try {
     a = await acquireBridge(config); b = await acquireBridge(config);
-    assert.deepEqual(await a.connection.request("__elf_capabilities"), {fileVerification: 1, accountRenewal: 1, documentApproval: 1, projectPanel: 1});
+    assert.deepEqual(await a.connection.request("__elf_capabilities"), {fileVerification: 1, accountRenewal: 1, documentApproval: 1, projectPanel: 1, mcpPresence: 1});
     assert.equal(a.owned, false); assert.equal(b.owned, false);
     await a.close(); a = undefined;
     const refreshed = await b.refreshPairingCode(); assert.ok(refreshed.code);

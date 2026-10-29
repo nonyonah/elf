@@ -2,6 +2,7 @@
 
 import { McpFigmaOnboarding } from '../../src/mcp-figma-onboarding.js';
 import { registerFigmaOnboardingTools } from './tools/onboarding.js';
+import { registerMcpPresence } from './presence.js';
 import { existsSync, statSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { findConfigPath } from "../../src/config.js";
@@ -76,12 +77,17 @@ async function main(): Promise<void> {
   });
 
   let shutdown: () => Promise<void>;
+  const makeServer = () => {
+    const server = createServer(client, project, onboarding);
+    registerMcpPresence(server, {...config, port: port!}, stderrLogger);
+    return server;
+  };
   if (USE_HTTP) {
     const httpPort = loadHttpPort();
     const http = await startHttpTransport({
       token: config.token,
       port: httpPort,
-      createServer: () => createServer(client),
+      createServer: makeServer,
       logger: stderrLogger,
     });
     stderrLogger.log(
@@ -94,7 +100,7 @@ async function main(): Promise<void> {
       process.exit(0);
     };
   } else {
-    const server = createServer(client, project, onboarding);
+    const server = makeServer();
     const transport = new StdioServerTransport();
     await server.connect(transport);
     stderrLogger.log("stdio transport ready");

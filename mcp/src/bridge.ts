@@ -212,6 +212,7 @@ export class Bridge {
     this.pairing = null;
     for (const control of this.controls) control.close(1001, "bridge shutting down");
     this.controls.clear();
+    this.mcpClients.clear();
     this.rejectAll("bridge shut down");
     for (const job of this.jobs.splice(0)) job.reject(new BridgeError("disconnected", "The bridge shut down."));
     this.releaseLock();
@@ -457,6 +458,7 @@ export class Bridge {
         fileVerification: 1,
         documentApproval: 1,
         projectPanel: 1,
+        mcpPresence: {connected: this.mcpClients.size > 0, count: this.mcpClients.size},
         ...(issued
           ? { session: issued.session, ...(issued.expiresAt ? { sessionExpiresAt: new Date(issued.expiresAt).toISOString() } : {}) }
           : {}),
@@ -491,9 +493,8 @@ export class Bridge {
 
   /**
    * The /control lane: a local process (the batch CLI) sending `{ call }`
-   * envelopes. Calls are answered per-connection and never touch the plugin
-   * socket or its status — a controller coming and going goes unnoticed by
-   * the plugin.
+   * envelopes. Ordinary controllers do not change plugin connection status.
+   * Initialized MCP sessions explicitly register a separate presence indicator.
    */
   private acceptControl(socket: WebSocket): void {
     this.controls.add(socket);
@@ -503,6 +504,7 @@ export class Bridge {
     socket.on("message", (data) => { try { void this.receiveControl(socket, this.decodePlugin(socket, data.toString())); } catch { socket.close(AUTH_FAILED_CODE, "invalid authenticated message"); } });
     socket.on("close", () => {
       this.controls.delete(socket);
+      if (this.mcpClients.delete(socket)) this.emitMcpPresence();
       const abandoned = this.jobs.filter(job => job.owner === socket);
       this.jobs = this.jobs.filter(job => job.owner !== socket);
       for (const job of abandoned) job.reject(new BridgeError("disconnected", "The transaction controller disconnected."));
@@ -529,7 +531,11 @@ export class Bridge {
 
     try {
       let result: unknown;
-      if (message.method === "__elf_capabilities") result = {fileVerification: 1, accountRenewal: 1, documentApproval: 1, projectPanel: 1};
+      if (message.method === "__elf_capabilities") result = {fileVerification: 1, accountRenewal: 1, documentApproval: 1, projectPanel: 1, mcpPresence: 1};
+      else if (message.method === '__elf_mcp_presence') {
+        if (message.params?.connected !== true) throw new Error('MCP presence requires an initialized client. Close its controller to unregister.');
+        this.mcpClients.add(socket); this.emitMcpPresence(); result = {ok:true};
+      }
       else if (message.method === '__elf_document_pending') result = this.documentApproval ? {file: {key: this.documentApproval.file.key, name: this.documentApproval.file.name}, ticket: this.documentApproval.ticket, expiresAt: this.documentApproval.expiresAt} : null;
       else if (message.method === '__elf_document_approve') {
         const pending = this.documentApproval;
@@ -678,6 +684,13 @@ export class Bridge {
   private tokenMatches(candidate: string | null): boolean {
     if (!candidate) return false;
     return safeEqual(digest(candidate), digest(this.options.token));
+  }
+
+  private mcpClients = new Set<WebSocket>();
+  private emitMcpPresence(): void {
+    if (this.socket?.readyState === WebSocket.OPEN) this.socket.send(this.encodePlugin(this.socket, {
+      type:'mcp-presence', connected:this.mcpClients.size > 0, count:this.mcpClients.size,
+    }));
   }
 
   private emitStatus(): void {

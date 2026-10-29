@@ -96,7 +96,15 @@ const chromePath = process.env.ELF_CHROME_PATH || '/Applications/Google Chrome.a
     await plugin.evaluate('exportWork(async()=>{throw new Error("Isolated refresh test")})');
     assert.match(await plugin.locator('#export-status').textContent(),/Isolated refresh test/);
     assert.equal(await refresh.isEnabled(),true);
+    await plugin.setViewportSize({width:320,height:480});
+    await plugin.evaluate('setPhase("connected"); renderMcpPresence({connected:true,count:2})');
+    assert.equal(await plugin.locator('#mcp-status').textContent(),'Connected · 2 clients');
+    assert.equal(await plugin.locator('#mcp-status').evaluate(label=>{const r=label.getBoundingClientRect(),card=label.closest('.card').getBoundingClientRect();return r.left>=card.left&&r.right<=card.right;}),true);
+    await plugin.locator('#disconnect').scrollIntoViewIfNeeded();
+    assert.equal(await plugin.locator('#disconnect').evaluate(button=>{const r=button.getBoundingClientRect();return r.top>=0&&r.bottom<=innerHeight;}),true);
+    await plugin.evaluate('renderMcpPresence({connected:false,count:0})');
+    assert.equal(await plugin.locator('#mcp-status').textContent(),'Not connected');
     await plugin.close();
-    console.log('PASS: card containment at 320/375/420/800px, expanded documentation actions, 200% CSS zoom, RTL, keyboard open/Escape/focus return, cancelled authorization actions, MCP-only Markdown interface separation, and plugin Refresh containment/busy/error recovery. Mock APIs only.');
+    console.log('PASS: card containment at 320/375/420/800px, expanded documentation actions, 200% CSS zoom, RTL, keyboard open/Escape/focus return, cancelled authorization actions, MCP-only Markdown interface separation, plugin Refresh containment/busy/error recovery, and MCP presence at 320×480 with reachable disconnect. Mock APIs only.');
   } finally {await browser?.close(); await new Promise(resolve=>server.close(resolve));}
 })().catch(error=>{console.error(error);process.exitCode=1;});
