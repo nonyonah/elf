@@ -19,3 +19,9 @@ test('only public Figma design links can open from the native tree', () => {
   assert.equal(publicLink('https://www.figma.com/design/file'), true);
   assert.equal(publicLink('https://figma.com/design/file?node-id=1%3A2'), true);
 });
+
+test('Markdown design-system generation is available only through MCP', () => {
+  for (const path of ['/api/project/prepare-design-system','/api/project/validate-design-system']) {
+    assert.equal(allowedRequest(path,'POST','{}'),false);
+  }
+});

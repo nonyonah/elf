@@ -1,8 +1,7 @@
-const {generateDesignSystem}=require('./ai-design-system.cjs');
 const {generateComponentCode}=require('./ai-component-import.cjs');
 const { publicLink } = require('./api-policy.cjs');
 const { generateDescription } = require('./ai-description.cjs');
-const { join, basename, relative, isAbsolute } = require('node:path');
+const { join, basename } = require('node:path');
 const { randomUUID, createHash } = require('node:crypto');
 const { reportSection, compactActivity } = require('./report-details.cjs');
 const { tmpdir } = require('node:os');
@@ -42,7 +41,6 @@ class NativeElf {
     this.error = null; this.refreshing = null; this.plan = null; this.planAuto = false; this.planReplace = false;
     this.activityRoot = null; this.seenActivity = new Set(); this.lastCheckMessage = null; this.lastErrorMessage = null;
     this.componentDrafts=new Map();
-    this.designSystemDrafts=new Map();
     this.drafts = new Map(); this.documents = new Map();
     if (vscode.languages?.registerCompletionItemProvider) context.subscriptions.push(vscode.languages.registerCompletionItemProvider({ scheme: 'file', pattern: '**/description-drafts/*.draft.json' }, {
       provideCompletionItems: (document, position) => {
@@ -104,8 +102,6 @@ class NativeElf {
       await this.reviewSync(false, entry);
     });
     register('elf.saveAndReviewDescription', uri => this.saveDescription(uri, true));
-    register('elf.prepareDesignSystem', () => this.prepareDesignSystem());
-    register('elf.validateDesignSystem', uri => this.validateDesignSystem(uri));
     register('elf.cancelPlan', () => this.cancelPlan());
     register('elf.toggleReplace', () => this.toggleReplace());
     register('elf.toggleEnableAuto', () => this.toggleEnableAuto());
@@ -302,7 +298,6 @@ class NativeElf {
       { label: 'Notification preferences', command: 'elf.preferences' },
       {label:'Import Figma component',description:'Confirm framework/library, then review a new code draft',command:'elf.importComponent'},
       { label: 'Import Figma tokens', description:'Preview a new JSON file; existing files stay unchanged', command:'elf.importTokens' },
-      { label: 'Design system from Markdown', description:'Extract and review a draft · preview', command:'elf.prepareDesignSystem' },
       { label: 'Coding assistants', description: 'Cursor, Claude Code, Codex', command: 'elf.assistants' },
       { label: 'Automatic sync', description: project?.mode === 'automatic' ? 'On · pause' : 'Off · review before enabling', command: 'elf.toggleAutomatic' },
       { label: 'Generate component description with AI', command: 'elf.generateDescription' },
@@ -328,7 +323,6 @@ class NativeElf {
       row('Apply reviewed token import','elf.applyTokenImport','Creates the reviewed JSON file','check'),
       row('Cancel token import','elf.cancelTokenImport',null,'close'),
     ]));
-    for(const [uri,draft]of this.designSystemDrafts)if(draft.owner===this.getRuntime())children.push(row('Validate design-system draft','elf.validateDesignSystem',draft.prepared.source.path,'check',uri));
     if (!this.plan) return children;
     const conflicts = this.plan.issues?.some(issue => issue.kind === 'conflict' && issue.blocksApply !== false);
     if (this.plan.entries?.length) {
@@ -668,43 +662,6 @@ class NativeElf {
   draftDirectory() {
     const base = this.context.storageUri || this.context.globalStorageUri;
     return base ? this.vscode.Uri.joinPath(base, 'description-drafts') : this.vscode.Uri.file(join(tmpdir(), 'elf-extension-drafts'));
-  }
-  async prepareDesignSystem() {
-    const owner=await this.ensureRuntime();if(!owner||!this.vscode.workspace.isTrusted)return;
-    const picked=await this.vscode.window.showOpenDialog({canSelectMany:false,filters:{Markdown:['md']},defaultUri:this.vscode.Uri.file(owner.root),title:'Select a project design-system Markdown file'});
-    if(!picked?.length)return;
-    if(picked[0].scheme!=='file')throw new Error('Choose a local Markdown file.');
-    const path=relative(owner.root,picked[0].fsPath);
-    if(isAbsolute(path)||path==='..'||path.startsWith('../')||path.startsWith('..\\'))throw new Error('Choose a Markdown file inside this project.');
-    const prepared=await this.api('/api/project/prepare-design-system','POST',{path},owner);
-    await this.text(prepared.source.markdown,'markdown',`Design-system source: ${prepared.source.path}`);
-    const choice=await this.vscode.window.showQuickPick([{label:'Extract with AI',ai:true},{label:'Prepare manually',ai:false}],{title:'Prepare design-system draft'});
-    if(!choice)return;
-    const draft=choice.ai?await generateDesignSystem(this.vscode,prepared):prepared.draft;if(!draft)return;
-    if(owner!==this.getRuntime()||!this.vscode.workspace.isTrusted)throw new Error('Project changed. Prepare the Markdown again.');
-    const directory=this.vscode.Uri.joinPath(this.context.storageUri||this.context.globalStorageUri,'design-system-drafts');
-    await this.vscode.workspace.fs.createDirectory(directory);
-    const uri=this.vscode.Uri.joinPath(directory,`${randomUUID()}.draft.json`);
-    await this.vscode.workspace.fs.writeFile(uri,Buffer.from(JSON.stringify(draft,null,2)));
-    this.designSystemDrafts.set(uri.toString(),{owner,prepared,uri});this.events.fire();
-    await this.vscode.window.showTextDocument(await this.vscode.workspace.openTextDocument(uri),{preview:false});
-    void this.vscode.window.showInformationMessage('Review and edit this extraction draft. Use Validate Design System Draft in Changes. Figma generation is not enabled in this preview.');
-  }
-  async validateDesignSystem(uri) {
-    const active=this.vscode.window.activeTextEditor?.document;
-    const key=typeof uri==='string'?uri:active?.uri.toString();
-    let draft=this.designSystemDrafts.get(key);
-    if(!draft){
-      const candidates=[...this.designSystemDrafts.values()].filter(item=>item.owner===this.getRuntime());
-      draft=candidates.length===1?candidates[0]:candidates.length?await this.vscode.window.showQuickPick(candidates.map(item=>({label:item.prepared.source.path,description:item.uri.fsPath,draft:item})),{title:'Choose the design-system draft to validate'}).then(choice=>choice?.draft):null;
-    }
-    if(!draft)throw new Error('Choose an open design-system draft or prepare one first.');
-    if(draft.owner!==this.getRuntime())throw new Error('Project changed. Prepare the Markdown again.');
-    const document=active?.uri.toString()===draft.uri.toString()?active:await this.vscode.workspace.openTextDocument(draft.uri);
-    const text=document.getText();if(Buffer.byteLength(text)>128000)throw new Error('Draft exceeds 128 KB.');
-    let content;try{content=JSON.parse(text);}catch{throw new Error('Correct the JSON draft before validation.');}
-    const result=await this.api('/api/project/validate-design-system','POST',{id:draft.prepared.id,draft:content},draft.owner);
-    await this.text(JSON.stringify(result,null,2),'json','Design-system extraction review');
   }
   async prepareDocumentation(component,useAI=false,recoveredContent) {
     const owner=await this.ensureRuntime();if(!owner)return;

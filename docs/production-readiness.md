@@ -33,10 +33,11 @@ separates automated results from live checks deferred while Figma is unavailable
    Publish only after these gates pass and release approval is given.
 
 The Markdown-to-design-system goal is tracked in
-[its implementation plan](markdown-design-system.md). The local preview now includes bounded Markdown ingestion and editable
-AI/manual extraction review through the shared engine, extension, npm Settings
-and MCP. Combined Figma plans/apply, presentation generation and baseline adoption
-remain work. This is the final planned feature addition before
+[its implementation plan](markdown-design-system.md). The local preview includes
+bounded Markdown ingestion and assistant-driven extraction review through MCP only. The extension and npm
+Settings keep their existing drift/sync workflows and have no Markdown creation
+controls or HTTP endpoints. Combined Figma plans/apply, presentation generation
+and baseline adoption remain work. This is the final planned feature addition before
 production acceptance and release hardening, not an existing importer. Its input
 is the user's existing Claude-generated project `.md`; its output includes Figma
 usage documentation as well as supported design-system resources.

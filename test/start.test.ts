@@ -62,12 +62,12 @@ test("startup pairs, saves setup, monitors edits, and restarts a configured proj
   try {
     const { url, port } = await launch();
     const post = (path: string, body?: unknown) => request(url + path, { method: "POST", headers: { "X-Elf-Request": "1", "Content-Type": "application/json" }, ...(body ? { body: JSON.stringify(body) } : {}) });
-    const extractionResponse = await post('/api/project/prepare-design-system', {path:'system.md'});
-    assert.equal(extractionResponse.status,200);
-    const extraction=await extractionResponse.json();assert.equal(extraction.canApply,false);
-    const validationResponse=await post('/api/project/validate-design-system',{id:extraction.id,draft:extraction.draft});
-    assert.equal(validationResponse.status,200);const validation=await validationResponse.json();
-    assert.equal(validation.reviewReady,false);assert.equal(validation.canApply,false);
+    // Design-system creation belongs to MCP, never the Settings HTTP interface.
+    for (const action of ['prepare-design-system','validate-design-system']) {
+      const response=await post(`/api/project/${action}`,{path:'system.md',id:'review',draft:{}});
+      assert.equal(response.status,400);
+      assert.match((await response.json()).error,/Unknown project action/);
+    }
     const refresh = await post("/api/onboarding/pairing");
     assert.equal(refresh.status, 200);
     const refreshBody = await refresh.text();

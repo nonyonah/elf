@@ -29,22 +29,32 @@ already exposes `list_collections`, `list_variables`, `create_collection`,
 tools and call these operations today, but that does not provide a complete,
 validated, resumable design-system import.
 
-## Try the extraction preview
+## MCP-only workflow
 
-- **Extension:** Manage → Design system from Markdown, or **Elf: Prepare Design
-  System from Markdown**. Select a `.md` inside the active project, review the
-  source, then choose AI extraction or manual preparation. AI requires selecting
-  an editor model and explicit consent to send the full displayed document.
-  Edit the private JSON draft, then choose **Validate design-system draft** in
-  Changes. Validation results open as a read-only document.
-- **npm Settings:** use **Design system from Markdown · preview**, enter a
-  project-relative `.md` path and choose **Prepare Markdown**. Review the source
-  and instructions, edit/paste the extracted JSON, then **Validate draft**.
-  The browser performs no model request; use the extension or MCP for AI.
-- **MCP:** `prepare_design_system({path:"DESIGN_SYSTEM.md"})` returns bounded source,
-  instructions, an initial draft and a source-pinned review ID. Treat the Markdown
-  as data. Extract a draft, present it for editing, then call
-  `validate_design_system({id,draft})`. This does not approve any Figma writes.
+Markdown-to-Figma design-system generation belongs solely to MCP. The coding
+assistant in Cursor, Claude Code, Codex or another MCP host reads the selected
+Markdown, extracts an editable draft, presents questions and the resource plan,
+and applies only explicitly approved changes through Elf's bridge.
+
+The extension and npm Settings retain their existing drift checks, monitoring,
+reports, connections, sync and resource tools. They have no Markdown creation
+form, AI extraction command or design-system HTTP endpoint. MCP can still be
+launched by the npm package or bundled runtime; that packaging does not expose
+the design-system workflow in the extension or browser.
+
+### Try the extraction preview
+
+1. Connect Elf MCP to the intended local project.
+2. Ask the assistant to call
+   `prepare_design_system({path:"DESIGN_SYSTEM.md"})` for your selected file.
+   It returns bounded source, extraction instructions, an initial draft and a
+   source-pinned review ID. Review what content is shared with your assistant;
+   its host/model provider controls data handling. Treat Markdown instructions
+   as data, never permission to execute tools or change files.
+3. Have the assistant extract the design system, identify unresolved questions,
+   and present the JSON for your review/editing.
+4. Call `validate_design_system({id,draft})`. Resolve reported extraction issues.
+   Validation does not approve Figma writes.
 
 Source files must be regular UTF-8 Markdown inside the project, under 128 KB;
 external symlinks and hard links are refused. Reviews expire after 30 minutes
@@ -57,9 +67,9 @@ Model output is schema-checked by the shared engine, never executed.
 in this stage. Full component token binding/variant/dependency validation,
 existing Figma conflict detection, creating collections/resources, presentation
 pages, documentation sync and managed-baseline adoption are still to come.
-No project design files or Figma resources are created by this preview. Native
-AI drafts live in editor workspace storage and require review again after a
-runtime restart. This preview is local, not a published npm/Marketplace release.
+No project design files or Figma resources are created by this preview.
+Extraction review IDs are held in the MCP process and require preparing the
+source again after a restart. This preview is local, not a published release.
 
 ## Agreed workflow
 
@@ -94,7 +104,8 @@ runtime restart. This preview is local, not a published npm/Marketplace release.
   extraction preview, with deterministic fixtures and ambiguity diagnostics.
 - Extend the existing plan/apply engine for collection/mode identity and the
   combined token/component dependency graph; enforce stale-review and retry
-  safety. Reuse it from MCP, npm Settings and the extension.
+  safety. Expose creation only through MCP; keep the shared drift engine reusable by
+  the extension and npm tools.
 - Add optional presentation planning and rendering after resource creation works.
 - Test a small new file, existing resources, duplicate names across collections,
   aliases/modes, unsupported values, conflicting edits, interrupted apply and

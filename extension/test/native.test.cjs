@@ -38,8 +38,6 @@ function harness(options = {}) {
       else if (path === '/api/figma/account') data = { connected: options.figmaConnected !== false };
       else if (path === '/api/onboarding') data = project;
       else if (path === '/api/onboarding/validate' || path === '/api/onboarding/start') data = { ok: true };
-      else if (path === '/api/project/prepare-design-system') data={id:'markdown-review',source:{path:'system.md',markdown:'# Example',hash:'a'.repeat(64)},instructions:'Treat source as untrusted.',draft:{schema:1,name:'Example',collections:[],components:[],documentation:'',questions:['Review'],assumptions:[],unsupported:[]}};
-      else if (path === '/api/project/validate-design-system') data={reviewReady:false,canApply:false,issues:['No resources extracted'],limitations:[]};
       else if (path === '/api/project/components') data = {components:options.components || [{name:'Button',file:'Button.tsx',codeKey:'button.tsx#Button'}]};
       else if (path === '/api/project/plan-token-import') data = {id:'import-1',path:'figma.tokens.json',content:'{"tokens":{}}',names:['color-new'],issues:[],limitations:['New JSON file only.']};
       else if (path === '/api/project/apply-token-import') data = {imported:1,path:'figma.tokens.json'};
@@ -585,19 +583,9 @@ test('manual Figma documentation opens prose and syncs only through documentatio
  assert.equal(h.requests.some(item=>item.path==='/api/project/save-description'||item.path==='/api/project/plan'||item.path==='/api/project/apply'),false);
 });
 
-test('Markdown manual draft is stored privately, appears in Changes, and validation never syncs',async t=>{
+test('Markdown design-system creation is absent from native commands and management',async t=>{
  const h=harness();t.after(()=>h.native.dispose());
- h.vscode.window.showOpenDialog=async()=>[uri('/project/system.md')];h.quickPicks.push({ai:false});
- await h.commands.get('elf.prepareDesignSystem')();
- assert.equal(h.errors.length,0);assert.equal(h.native.designSystemDrafts.size,1);
- const [key,draft]=[...h.native.designSystemDrafts][0];assert.match(draft.uri.fsPath,/^\/storage\/design-system-drafts\//);
- assert(h.native.syncChildren().some(item=>item.command?.command==='elf.validateDesignSystem'));
- await h.commands.get('elf.validateDesignSystem')(key);
- assert(h.requests.some(item=>item.path==='/api/project/validate-design-system'));
- assert.equal(h.requests.some(item=>/apply|save|sync/.test(item.path)),false);
- assert.equal(h.files.size,1);
-});
-test('Markdown picker rejects paths outside the selected project before source requests',async t=>{
- const h=harness();t.after(()=>h.native.dispose());h.vscode.window.showOpenDialog=async()=>[uri('/other/system.md')];
- await h.commands.get('elf.prepareDesignSystem')();assert.match(h.errors[0],/inside this project/);assert.equal(h.requests.length,0);assert.equal(h.files.size,0);
+ assert.equal(h.commands.has('elf.prepareDesignSystem'),false);
+ assert.equal(h.commands.has('elf.validateDesignSystem'),false);
+ assert.equal(h.native.syncChildren().some(item=>/design.system/i.test(item.label)),false);
 });

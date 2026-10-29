@@ -7,7 +7,7 @@ export function ServerNotice() {
   useEffect(() => {
     let active = true;
     void settingsFetch("/api/runtime").then(settingsJson).then(status => {
-      if (active && status.apiVersion < 15) setError(RESTART_ELF_MESSAGE);
+      if (active && status.apiVersion < 16) setError(RESTART_ELF_MESSAGE);
     }).catch(cause => { if (active) setError((cause as Error).message); });
     return () => {active = false;};
   }, []);
