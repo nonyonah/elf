@@ -10,6 +10,24 @@ import { FakePlugin } from "./helpers/plugin-connection.js";
 
 const TOKEN = "test-token-0123456789";
 
+test('rich component calls require updated plugin capabilities and forward prose, position and layers',async()=>{
+ const calls:{method:string;params:any}[]=[];
+ let supported=false;
+ const bridge:any={request:async(method:string,params:any)=>{
+  calls.push({method,params});
+  if(method==='get_plugin_capabilities')return supported?{visualLayers:1,componentMetadata:1}:{};
+  return {component:{id:'rich:1',created:true},boundVariables:{},text:null,children:[]};
+ }};
+ const client=new PluginClient(bridge);
+ const input={name:'Switch',codeKey:'rift/switch',description:'Immediate on/off setting.',position:{x:100,y:200},layers:[{type:'text' as const,name:'Label',text:{characters:'Email receipts on'}}]};
+ await assert.rejects(upsertComponentTool.handler(client,input),/Reopen the updated/);
+ assert.deepEqual(calls.map(call=>call.method),['get_plugin_capabilities']);
+ supported=true;
+ await upsertComponentTool.handler(client,input);
+ assert.equal(calls.at(-1)?.method,'upsert_component');
+ for(const key of ['description','position','layers'] as const)assert.deepEqual(calls.at(-1)?.params[key],input[key]);
+});
+
 /**
  * A stand-in for the plugin's node side: components matched by codeKey then
  * name, with the bound fields recorded so the tools can be checked against it.

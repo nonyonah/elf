@@ -117,6 +117,27 @@ const childrenInput = z
       "existing children alone.",
   );
 
+const strokeInput = z.object({color:fillInput.optional(),weight:z.number().finite().min(0).max(100).optional()}).optional();
+const positionInput=z.object({x:z.number().finite().min(-100000).max(100000),y:z.number().finite().min(-100000).max(100000)}).optional();
+const layerInput=z.object({
+  type:z.enum(['frame','rectangle','ellipse','text','vector']),name:z.string().min(1).max(200),
+  parent:z.number().int().min(0).max(199).optional(),position:positionInput,
+  layoutMode:layoutModeInput,padding:paddingInput,gap:gapInput,cornerRadius:cornerRadiusInput,
+  fill:fillField,stroke:strokeInput,size:sizeInput,text:textInput,
+  opacity:z.number().min(0).max(1).optional(),
+  align:z.enum(['LEFT','CENTER','RIGHT']).optional(),
+  points:z.array(z.object({x:z.number().finite(),y:z.number().finite()})).min(2).max(256).optional(),closed:z.boolean().optional(),
+}).strict();
+const layersInput=z.array(layerInput).max(200).optional().describe('Owned visual layers, max 200, depth 8. Flat ordered tree: parent is an earlier frame index; omit for component roots. Replaces only Elf visual layers. Requires codeKey. Separate from legacy text/children. No scripts, URLs or external assets.');
+
+async function requireVisualPlugin(client:PluginClient):Promise<void>{
+  try{
+    const capabilities=await client.call<{visualLayers?:number;componentMetadata?:number}>('get_plugin_capabilities');
+    if(capabilities.visualLayers===1&&capabilities.componentMetadata===1)return;
+  }catch{/* Older plugins must fail before any component write. */}
+  throw new Error('Reopen the updated Elf Bridge plugin before creating rich components.');
+}
+
 /** The styling fields shared by components, component sets and their variants. */
 const componentSpecShape = {
   layoutMode: layoutModeInput,
@@ -127,6 +148,8 @@ const componentSpecShape = {
   size: sizeInput,
   text: textInput,
   children: childrenInput,
+  stroke:strokeInput,
+  layers:layersInput,
 } satisfies z.ZodRawShape;
 
 type ComponentSpecShape = typeof componentSpecShape;
@@ -158,6 +181,8 @@ export const upsertComponentTool: ToolDefinition<
     name: z.ZodString;
     codeKey: z.ZodOptional<z.ZodString>;
     parentId: z.ZodOptional<z.ZodString>;
+    description:z.ZodOptional<z.ZodString>;
+    position:typeof positionInput;
   }
 > = {
   name: "upsert_component",
@@ -167,7 +192,7 @@ export const upsertComponentTool: ToolDefinition<
     "optional text child, instance slot children). Matched by codeKey first, then by name — running this " +
     "twice updates instead of duplicating. Every numeric property and the fill take either a literal value " +
     'or { variable: "name" } to bind a Figma variable. Omitted properties are left untouched; `children` ' +
-    "rebuilds the instance slots.",
+    "rebuilds the instance slots. Optional bounded layers support nested frames, text, rectangles, ellipses and point-based vectors. Description is usage prose; position places the master on the canvas. Rich layers require a matching codeKey and the updated plugin.",
   inputSchema: {
     name: z.string().describe('Component name, e.g. "Button/Primary".'),
     codeKey: z
@@ -177,9 +202,14 @@ export const upsertComponentTool: ToolDefinition<
         'Code-side key stored as shared plugin data (namespace "elf", key "codeKey"); preferred match key.',
       ),
     parentId: z.string().optional().describe("Container node id. Defaults to the current page."),
+    description:z.string().max(4000).optional().describe('Plain usage/behavior prose for the Figma Description field.'),
+    position:positionInput,
     ...componentSpecShape,
   },
   handler: async (client: PluginClient, args): Promise<ToolPayload> => {
+    if(args.layers!==undefined||args.description!==undefined||args.position!==undefined){
+      await requireVisualPlugin(client);
+    }
     const result = await client.call<UpsertComponentResult>("upsert_component", {
       name: args.name,
       codeKey: args.codeKey,
@@ -192,6 +222,10 @@ export const upsertComponentTool: ToolDefinition<
       size: args.size,
       text: args.text,
       children: args.children,
+      stroke:args.stroke,
+      layers:args.layers,
+      description:args.description,
+      position:args.position,
     });
     return {
       ok: true,
@@ -220,6 +254,8 @@ export const upsertComponentSetTool: ToolDefinition<
     codeKey: z.ZodOptional<z.ZodString>;
     parentId: z.ZodOptional<z.ZodString>;
     variants: z.ZodArray<typeof variantInput>;
+    description:z.ZodOptional<z.ZodString>;
+    position:typeof positionInput;
   }
 > = {
   name: "upsert_component_set",
@@ -238,8 +274,13 @@ export const upsertComponentSetTool: ToolDefinition<
       .min(1)
       .describe("Variant list. The first variant defines the property keys every other variant must match."),
     ...componentSpecShape,
+    description:z.string().max(4000).optional(),
+    position:positionInput,
   },
   handler: async (client: PluginClient, args): Promise<ToolPayload> => {
+    if(args.layers!==undefined||args.description!==undefined||args.position!==undefined||args.variants.some(variant=>variant.spec?.layers!==undefined)){
+      await requireVisualPlugin(client);
+    }
     const result = await client.call<UpsertComponentSetResult>("upsert_component_set", {
       name: args.name,
       codeKey: args.codeKey,
@@ -253,6 +294,10 @@ export const upsertComponentSetTool: ToolDefinition<
       size: args.size,
       text: args.text,
       children: args.children,
+      stroke:args.stroke,
+      layers:args.layers,
+      description:args.description,
+      position:args.position,
     });
     return { ok: true, set: result.set, created: result.set.created };
   },

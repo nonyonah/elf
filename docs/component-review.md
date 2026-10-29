@@ -57,3 +57,29 @@ and unsupported behavior must be visible for review. The same validation and
 review hash checks apply; generation alone must neither save a description nor
 write to Figma. Source must only be sent to an external model with the user's
 consent, and model credentials must stay in editor secret storage.
+# Rich MCP component previews
+
+The local MCP `upsert_component` and `upsert_component_set` tools accept bounded
+declarative `layers`: frames, text, rectangles, ellipses and point-based vectors.
+Layers form a flat ordered tree; `parent` is the index of an earlier frame.
+Each component/variant accepts at most 200 layers, depth 8, under 64 KB. Fonts,
+variable references and geometry are checked before creating canvas nodes.
+Scripts, external assets, URLs and arbitrary SVG input are unsupported.
+
+Use an explicit matching `codeKey`. Rich writes refuse name-only adoption of an
+unowned component. Repeating a layer write replaces Elf's own visual roots and
+preserves unrelated sibling layers. Designer edits inside an owned visual root
+are part of that replacement; inspect and review existing work before updating.
+Figma operations are not atomic and no complete rollback is promised.
+
+`description` writes plain usage prose to Figma's Description field; `position`
+places the component or set on the canvas. These fields are separate from visual
+specification data. `stroke` supports literal or variable-bound colors. Read
+back descriptions, positions, strokes, layers and vector paths with `get_node`.
+
+New fields require the updated Figma plugin. MCP checks plugin capabilities and
+refuses these writes on older plugins rather than silently omitting fields.
+Close/reopen the plugin and restart MCP after updating the local package.
+Static examples do not implement ARIA, validation or keyboard behavior. This
+primitive renderer does not complete the combined Markdown plan/apply workflow
+or create documentation pages automatically.

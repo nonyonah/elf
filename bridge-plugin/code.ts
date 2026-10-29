@@ -104,12 +104,27 @@ interface ComponentSpecFields {
   size?: { width: number; height: number };
   text?: TextInput;
   children?: InstanceChildInput[];
+  layers?: VisualLayerInput[];
+}
+
+/** Declarative, bounded primitives. No scripts, SVG input, URLs or external assets. */
+interface VisualLayerInput extends Omit<ComponentSpecFields, 'children' | 'layers'> {
+  type: 'frame' | 'rectangle' | 'ellipse' | 'text' | 'vector';
+  name: string;
+  parent?: number;
+  position?: {x:number;y:number};
+  opacity?: number;
+  points?: {x:number;y:number}[];
+  closed?: boolean;
+  align?:'LEFT'|'CENTER'|'RIGHT';
 }
 
 interface ComponentInput extends ComponentSpecFields {
   name: string;
   codeKey?: string;
   parentId?: string;
+  description?: string;
+  position?: {x:number;y:number};
 }
 
 interface ComponentVariantInput {
@@ -124,6 +139,8 @@ interface ComponentSetInput extends ComponentSpecFields {
   codeKey?: string;
   parentId?: string;
   variants: ComponentVariantInput[];
+  description?:string;
+  position?:{x:number;y:number};
 }
 
 type LineHeightInput = number | { percent: number } | "auto";
@@ -828,6 +845,7 @@ interface PreparedSpec {
   text: TextInput | null;
   /** null = leave existing children alone; otherwise the slot list to sync. */
   slots: ResolvedSlot[] | null;
+  layers: {input:VisualLayerInput;prepared:PreparedSpec}[] | null;
 }
 
 async function resolveSlot(child: InstanceChildInput, index: number): Promise<ResolvedSlot> {
@@ -888,7 +906,88 @@ async function prepareSpec(input: ComponentSpecFields, currentLayout: string): P
 
   const slots = input.children ? await Promise.all(input.children.map((child, index) => resolveSlot(child, index))) : null;
 
-  return { layoutMode: input.layoutMode ?? null, padding, gap, radius, fill, stroke, size, text: input.text ?? null, slots };
+  const layers = input.layers === undefined ? null : await prepareVisualLayers(input.layers);
+  if (layers && (input.children !== undefined || input.text !== undefined)) throw new Error('Use layers separately from legacy text/instance children.');
+  return { layoutMode: input.layoutMode ?? null, padding, gap, radius, fill, stroke, size, text: input.text ?? null, slots, layers };
+}
+
+function checkedPosition(value:unknown):asserts value is {x:number;y:number} {
+  const p=value as {x:number;y:number};
+  if(!p||!Number.isFinite(p.x)||!Number.isFinite(p.y)||Math.abs(p.x)>100000||Math.abs(p.y)>100000)throw new Error('Positions need finite x/y within ±100000.');
+}
+
+async function prepareVisualLayers(value:VisualLayerInput[]):Promise<NonNullable<PreparedSpec['layers']>> {
+  if(!Array.isArray(value)||value.length>200||JSON.stringify(value).length>64000)throw new Error('Layers must contain at most 200 primitives under 64 KB.');
+  const allowed=new Set(['type','name','parent','position','opacity','points','closed','align','layoutMode','padding','gap','cornerRadius','fill','stroke','size','text']);
+  const depths:number[]=[];
+  const output:NonNullable<PreparedSpec['layers']>=[];
+  for(let index=0;index<value.length;index++){
+    const input=value[index];
+    if(!input||Object.keys(input).some(key=>!allowed.has(key))||!['frame','rectangle','ellipse','text','vector'].includes(input.type)||typeof input.name!=='string'||!input.name.trim()||input.name.length>200)throw new Error('Invalid visual layer fields, type or name.');
+    const depth=input.parent===undefined?1:(depths[input.parent]??100)+1;
+    if(input.parent!==undefined&&(!Number.isInteger(input.parent)||input.parent<0||input.parent>=index||value[input.parent].type!=='frame'))throw new Error('A layer parent must be an earlier frame index.');
+    if(depth>8)throw new Error('Visual layers exceed the maximum depth of 8.');depths.push(depth);
+    if(input.position)checkedPosition(input.position);
+    if(input.opacity!==undefined&&(!Number.isFinite(input.opacity)||input.opacity<0||input.opacity>1))throw new Error('Layer opacity must be between 0 and 1.');
+    if(input.size&&(!Number.isFinite(input.size.width)||!Number.isFinite(input.size.height)||input.size.width<=0||input.size.height<=0||input.size.width>10000||input.size.height>10000))throw new Error('Layer size must be positive and at most 10000px per axis.');
+    if(input.type==='text'&&(!input.text||typeof input.text.characters!=='string'||input.text.characters.length>8000))throw new Error('Text layers require at most 8000 characters.');
+    if(input.type!=='text'&&input.text!==undefined)throw new Error('Text properties require a text layer.');
+    if(input.align!==undefined&&(input.type!=='text'||!['LEFT','CENTER','RIGHT'].includes(input.align)))throw new Error('Text alignment must be LEFT, CENTER or RIGHT on a text layer.');
+    if(input.text?.fontSize!==undefined&&(!Number.isFinite(input.text.fontSize)||input.text.fontSize<=0||input.text.fontSize>512))throw new Error('Font size must be between 0 and 512.');
+    if(input.type!=='frame'&&(input.layoutMode!==undefined||input.padding!==undefined||input.gap!==undefined))throw new Error('Auto layout properties require a frame.');
+    if(input.type==='vector'){
+      if(!Array.isArray(input.points)||input.points.length<2||input.points.length>256)throw new Error('Vectors require 2–256 finite points.');
+      for(const point of input.points)checkedPosition(point);
+      if(input.closed!==undefined&&typeof input.closed!=='boolean')throw new Error('Vector closed must be boolean.');
+    }else if(input.points!==undefined||input.closed!==undefined)throw new Error('Points require a vector layer.');
+    if(input.cornerRadius!==undefined&&!['frame','rectangle'].includes(input.type))throw new Error('Corner radius requires a frame or rectangle.');
+    if(input.type==='text'&&(input.fill!==undefined||input.stroke!==undefined))throw new Error('Use text.color for text layers.');
+    output.push({input,prepared:await prepareSpec(input as ComponentSpecFields,'NONE')});
+    // Resolve text colors before creating any canvas nodes as well.
+    if(input.text?.color)await prepareFill(input.text.color);
+  }
+  return output;
+}
+
+function visualNumber(node:SceneNode,field:string,entry:PreparedNumber):void {
+  const target=node as unknown as LayoutNode;
+  target.setBoundVariable(field as VariableBindableNodeField,entry.variable);
+  if(entry.literal!==null)(node as unknown as Record<string,unknown>)[field]=entry.literal;
+}
+
+async function syncVisualLayers(component:ComponentNode,layers:NonNullable<PreparedSpec['layers']>):Promise<void>{
+  const created:SceneNode[]=[];
+  try{
+    for(const {input,prepared} of layers){
+      const node:SceneNode=input.type==='frame'?figma.createFrame():input.type==='text'?figma.createText():input.type==='ellipse'?figma.createEllipse():input.type==='vector'?figma.createVector():figma.createRectangle();
+      created.push(node);node.name=input.name;node.setSharedPluginData(NAMESPACE,ROLE_KEY,'visual-layer');
+      if(node.type==='FRAME'){
+        node.layoutMode=prepared.layoutMode??'NONE';node.clipsContent=false;
+        if(node.layoutMode!=='NONE'){node.primaryAxisSizingMode='FIXED';node.counterAxisSizingMode='FIXED';}
+        for(const entry of prepared.padding)visualNumber(node,entry.field,entry.value);
+        if(prepared.gap)visualNumber(node,'itemSpacing',prepared.gap);
+      }
+      if('fills' in node)node.fills=prepared.fill?[prepared.fill.paint]:[];
+      if(prepared.radius)visualNumber(node,'cornerRadius',prepared.radius);
+      if(prepared.stroke&&'strokes' in node){node.strokes=[prepared.stroke.paint];node.strokeWeight=prepared.stroke.weight;node.strokeAlign='INSIDE';}
+      if(node.type==='TEXT'&&prepared.text){
+        node.fontName={family:prepared.text.fontFamily??'Inter',style:prepared.text.fontStyle??'Regular'};
+        node.fontSize=prepared.text.fontSize??14;node.characters=prepared.text.characters;node.textAutoResize='HEIGHT';
+        node.textAlignHorizontal=input.align??'LEFT';
+        node.fills=[(await prepareFill(prepared.text.color??{color:'#000000'})).paint];
+      }
+      if(node.type==='VECTOR')node.vectorPaths=[{windingRule:'NONZERO',data:input.points!.map((p,i)=>`${i?'L':'M'} ${p.x} ${p.y}`).join(' ')+(input.closed?' Z':'')}];
+      if(prepared.size)node.resize(prepared.size.width,prepared.size.height);
+      if(input.opacity!==undefined)node.opacity=input.opacity;
+      if(input.parent!==undefined)(created[input.parent] as FrameNode).appendChild(node);
+      if(input.position){node.x=input.position.x;node.y=input.position.y;}
+    }
+    const roots=created.flatMap((node,index)=>layers[index].input.parent===undefined?[{node,input:layers[index].input}]:[]);
+    const previous=component.children.filter(child=>child.getSharedPluginData(NAMESPACE,ROLE_KEY)==='visual-layer');
+    for(const {node,input} of roots){component.appendChild(node);if(input.position){node.x=input.position.x;node.y=input.position.y;}}
+    // Replace only owned visual roots, after all new layers have been built.
+    for(const child of previous)child.remove();
+  }catch(error){for(const node of created.reverse())if(!node.removed)node.remove();throw error;}
 }
 
 /** Writes a prepared spec onto a component. Only called after all prep succeeded. */
@@ -945,6 +1044,7 @@ async function applySpec(
   }
 
   const children = prepared.slots === null ? [] : syncSlots(component, prepared.slots);
+  if(prepared.layers!==null){component.clipsContent=false;await syncVisualLayers(component,prepared.layers);}
 
   return { bound, text, children };
 }
@@ -980,6 +1080,9 @@ async function upsertComponent(params: Record<string, unknown>): Promise<unknown
   const parent = await resolveParent(input.parentId);
   const codeKey = input.codeKey ? String(input.codeKey) : "";
   const existing = findComponent(parent, name, codeKey);
+  if(input.position)checkedPosition(input.position);
+  if(input.description!==undefined&&(typeof input.description!=='string'||input.description.length>4000))throw new Error('Component description must be text under 4000 characters.');
+  if(input.layers!==undefined&&(!codeKey||(existing&&codeKeyOf(existing)!==codeKey)))throw new Error('Visual layers require an explicit matching codeKey; name-only replacement is refused.');
 
   const prepared = await prepareSpec(input, existing?.layoutMode ?? "NONE");
 
@@ -996,7 +1099,10 @@ async function upsertComponent(params: Record<string, unknown>): Promise<unknown
   component.name = name;
   tagCodeKey(component, codeKey);
 
-  const applied = await applySpec(component, prepared);
+  let applied:Awaited<ReturnType<typeof applySpec>>;
+  try{applied=await applySpec(component, prepared);}catch(error){if(created)component.remove();throw error;}
+  if(input.description!==undefined)component.description=input.description;
+  if(input.position){component.x=input.position.x;component.y=input.position.y;}
 
   return {
     component: {
@@ -1027,6 +1133,7 @@ function specFields(input: ComponentSpecFields): ComponentSpecFields {
     size: input.size,
     text: input.text,
     children: input.children,
+    layers: input.layers,
   };
 }
 
@@ -1122,6 +1229,9 @@ async function upsertComponentSet(params: Record<string, unknown>): Promise<unkn
   const parent = await resolveParent(input.parentId);
   const codeKey = input.codeKey ? String(input.codeKey) : "";
   const existing = findComponentSet(parent, name, codeKey);
+  if(input.position)checkedPosition(input.position);
+  if(input.description!==undefined&&(typeof input.description!=='string'||input.description.length>4000))throw new Error('Component description must be text under 4000 characters.');
+  if((input.layers!==undefined||variants.some(variant=>variant.spec?.layers!==undefined))&&(!codeKey||(existing&&codeKeyOf(existing)!==codeKey)))throw new Error('Visual layers require an explicit matching codeKey; name-only replacement is refused.');
   const existingVariants = existing
     ? (existing.children.filter((child) => child.type === "COMPONENT") as ComponentNode[])
     : [];
@@ -1166,11 +1276,14 @@ async function upsertComponentSet(params: Record<string, unknown>): Promise<unkn
     const component = plan.component as ComponentNode;
     if (canUpdate) component.name = plan.name;
     await applySpec(component, plan.spec);
+    if(input.description!==undefined)component.description=input.description;
     variantPayloads.push({ id: component.id, name: component.name });
   }
 
   // A set the designer has switched to auto layout keeps its own arrangement.
   if (set.layoutMode === "NONE") arrangeVariants(set, variants, variantLabel);
+  if(input.description!==undefined)set.description=input.description;
+  if(input.position){set.x=input.position.x;set.y=input.position.y;}
 
   return {
     set: {
@@ -1376,6 +1489,8 @@ async function nodePayload(node: SceneNode, depth: number): Promise<Record<strin
     payload.letterSpacing = node.letterSpacing === figma.mixed ? "mixed" : node.letterSpacing;
   }
   if (node.type === "INSTANCE") payload.mainComponentId = (await node.getMainComponentAsync())?.id ?? null;
+  if(node.type==='COMPONENT'||node.type==='COMPONENT_SET')payload.description=node.description;
+  if(node.type==='VECTOR')payload.vectorPaths=node.vectorPaths;
   if ("effects" in node) payload.effects = node.effects;
   if ("variantProperties" in node) payload.variantProperties = node.variantProperties;
   if ("fills" in node && node.fills !== figma.mixed) {
@@ -1485,6 +1600,8 @@ async function handle(method: string, params: Record<string, unknown>): Promise<
       return listComponents(params);
     case "upsert_component":
       return upsertComponent(params);
+    case "get_plugin_capabilities":
+      return {visualLayers:1,componentMetadata:1};
     case "upsert_component_set":
       return upsertComponentSet(params);
     case "upsert_text_style":

@@ -83,6 +83,8 @@ function createFigmaStub(sendToSocket) {
     parentId: null,
     children: [],
     appendChild(node) {
+      const previous=registry.get(node.parentId);
+      if(previous?.children){const index=previous.children.indexOf(node);if(index>=0)previous.children.splice(index,1);}
       node.parentId = this.id;
       this.children.push(node);
       registry.set(node.id, node);
@@ -100,6 +102,7 @@ function createFigmaStub(sendToSocket) {
       return null;
     },
     remove() {
+      this.removed=true;
       const parent = registry.get(this.parentId);
       if (parent && Array.isArray(parent.children)) {
         const index = parent.children.indexOf(this);
@@ -122,6 +125,8 @@ function createFigmaStub(sendToSocket) {
       width: 100,
       height: 100,
       fills: [],
+      strokes: [],
+      description: '',
       layoutMode: "NONE",
       itemSpacing: 0,
       cornerRadius: 0,
@@ -232,6 +237,8 @@ function createFigmaStub(sendToSocket) {
       fontSize: 12,
       ...pluginData(),
       ...boundVariableApi(),
+      ...childrenMixin(),
+      resize(width,height){this.width=width;this.height=height;},
     });
 
   const createVariableCollection = (name) => {
@@ -281,6 +288,10 @@ function createFigmaStub(sendToSocket) {
     },
     createComponent,
     createText,
+    createFrame:()=>Object.assign(createComponent(),{type:'FRAME'}),
+    createRectangle:()=>Object.assign(createComponent(),{type:'RECTANGLE'}),
+    createEllipse:()=>Object.assign(createComponent(),{type:'ELLIPSE'}),
+    createVector:()=>Object.assign(createComponent(),{type:'VECTOR'}),
     combineAsVariants,
     createTextStyle,
     createEffectStyle,
@@ -777,6 +788,57 @@ async function main() {
     const styles = await figma.getLocalEffectStylesAsync();
     if (styles.some((style) => style.name === "Elevation/2")) throw new Error("orphan effect style left behind");
     return "both refusals clean";
+  });
+
+  await check('rich components stage nested bound layers, prose and canvas placement, and rerun without duplicate roots',async()=>{
+    const input={name:'Rich switch',codeKey:'test/rich-switch',description:'Immediate on/off setting; no separate save step.',position:{x:800,y:400},layoutMode:'NONE',size:{width:240,height:32},layers:[
+      {type:'frame',name:'Track',position:{x:0,y:6},size:{width:36,height:20},fill:{variable:'color/primary/500'},cornerRadius:10},
+      {type:'ellipse',name:'Thumb',parent:0,position:{x:18,y:2},size:{width:16,height:16},fill:{color:'#ffffff'}},
+      {type:'text',name:'Label',position:{x:44,y:6},align:'RIGHT',text:{characters:'Email receipts on',fontSize:14,color:{variable:'color/primary/500'}}},
+      {type:'vector',name:'Illustrative trend',position:{x:0,y:40},points:[{x:0,y:20},{x:20,y:0},{x:40,y:10}],stroke:{color:{color:'#112233'},weight:2}},
+    ]};
+    const first=await callOk('upsert_component',input),node=await figma.getNodeByIdAsync(first.component.id);
+    if(node.description!==input.description||node.x!==800||node.y!==400)throw new Error('metadata/position not applied');
+    if(node.children.length!==3||node.children[0].children[0].type!=='ELLIPSE')throw new Error('nested shapes missing');
+    if(!node.children[0].fills[0].boundVariables?.color||!node.children[1].fills[0].boundVariables?.color)throw new Error('variable bindings missing');
+    if(node.children[1].textAlignHorizontal!=='RIGHT')throw new Error('text alignment missing');
+    if(node.children[2].vectorPaths[0].data!=='M 0 20 L 20 0 L 40 10')throw new Error('vector path differs');
+    const manual=figma.createText();manual.name='Designer note';node.appendChild(manual);
+    const again=await callOk('upsert_component',input);
+    if(again.component.id!==first.component.id||node.children.length!==4||!node.children.includes(manual))throw new Error('rerun changed identity, duplicated roots or removed designer work');
+    return 'nested geometry, bindings, prose, position and owned-root replacement verified';
+  });
+
+  await check('rich variant sets preserve identities and put usage prose on both the set and variants',async()=>{
+    const input={name:'Rich toggle set',codeKey:'test/rich-toggle-set',description:'Immediate setting; label describes the on state.',position:{x:1200,y:400},layoutMode:'NONE',size:{width:36,height:20},layers:[{type:'ellipse',name:'Thumb',size:{width:16,height:16},fill:{color:'#ffffff'}}],variants:[{props:{Checked:'Off'}},{props:{Checked:'On'}}]};
+    const first=await callOk('upsert_component_set',input),set=await figma.getNodeByIdAsync(first.set.id);
+    if(set.description!==input.description||set.x!==1200||set.y!==400||set.children.some(child=>child.description!==input.description))throw new Error('variant metadata missing');
+    const ids=set.children.map(child=>child.id).join(',');
+    await callOk('upsert_component_set',input);
+    if(set.children.map(child=>child.id).join(',')!==ids||set.children.some(child=>child.children.length!==1))throw new Error('variant update duplicated or replaced identities');
+    return 'metadata and same-roster reruns verified';
+  });
+
+  await check('rich layer validation refuses unsafe, oversized, unowned and unresolved input before creating components',async()=>{
+    const base={name:'Rejected rich',codeKey:'test/rejected-rich',layers:[{type:'text',name:'Label',text:{characters:'Hello'}}]};
+    const count=figma.currentPage.children.length;
+    for(const patch of [
+      {layers:[{...base.layers[0],url:'https://example.com'}]},
+      {layers:[{type:'rectangle',name:'Bad',parent:0}]},
+      {layers:Array.from({length:201},()=>({type:'rectangle',name:'Too many'}))},
+      {layers:[{type:'vector',name:'Bad',points:[{x:Infinity,y:0},{x:1,y:2}]}]},
+      {layers:[{type:'text',name:'Bad font',text:{characters:'No',fontFamily:'Unavailable'}}]},
+      {layers:[{type:'rectangle',name:'Missing variable',fill:{variable:'does-not-exist'}}]},
+      {layers:[{type:'ellipse',name:'Bad radius',cornerRadius:4}]},
+      {position:{x:1e10,y:0}},
+      {codeKey:''},
+    ])await callFail('upsert_component',{...base,...patch});
+    if(figma.currentPage.children.length!==count)throw new Error('invalid layers left canvas nodes');
+    const existing=await callOk('upsert_component',{name:base.name,layoutMode:'NONE'});
+    await callFail('upsert_component',base);
+    const node=await figma.getNodeByIdAsync(existing.component.id);
+    if(node.getSharedPluginData('elf','codeKey'))throw new Error('name collision silently adopted');
+    return 'no orphan components or implicit name adoption';
   });
 
   await check("unknown methods are reported", async () => {
