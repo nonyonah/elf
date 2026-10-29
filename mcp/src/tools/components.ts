@@ -30,6 +30,8 @@ interface UpsertComponentSetResult {
     created: boolean;
     variantCount: number;
     variants: { id: string; name: string }[];
+    retainedVariants?:{id:string;name:string}[];
+    promotedComponentId?:string|null;
     parentId: string;
   };
 }
@@ -263,8 +265,9 @@ export const upsertComponentSetTool: ToolDefinition<
   description:
     "Create or update a Figma component set from explicit variants (e.g. size × intent). Each variant names " +
     "its property values and can override any styling field; all variants must declare the same properties. " +
-    "A matching roster updates variants in place; a changed roster rebuilds the set — instances of the old " +
-    "set detach (documented Figma behaviour).",
+    "Existing variants update in place, additions keep prior IDs and unrequested variants are retained. " +
+    "An original master with the exact codeKey in this container becomes the first/default variant, preserving its instances. " +
+    "Property-schema changes require a separate migration. Requires the updated safe-variant plugin.",
   inputSchema: {
     name: z.string().describe('Component set name, e.g. "Button".'),
     codeKey: z.string().optional().describe('Code-side key stored as shared plugin data; preferred match key.'),
@@ -272,12 +275,15 @@ export const upsertComponentSetTool: ToolDefinition<
     variants: z
       .array(variantInput)
       .min(1)
+      .max(256)
       .describe("Variant list. The first variant defines the property keys every other variant must match."),
     ...componentSpecShape,
     description:z.string().max(4000).optional(),
     position:positionInput,
   },
   handler: async (client: PluginClient, args): Promise<ToolPayload> => {
+    const capabilities=await client.call<{safeVariantUpdates?:number}>('get_plugin_capabilities');
+    if(capabilities.safeVariantUpdates!==1)throw new Error('Reopen the updated Elf Bridge plugin to add states without rebuilding existing masters.');
     if(args.layers!==undefined||args.description!==undefined||args.position!==undefined||args.variants.some(variant=>variant.spec?.layers!==undefined)){
       await requireVisualPlugin(client);
     }

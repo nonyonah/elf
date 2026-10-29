@@ -59,6 +59,29 @@ write to Figma. Source must only be sent to an external model with the user's
 consent, and model credentials must stay in editor secret storage.
 # Rich MCP component previews
 
+## Interaction states and safe variant updates
+
+Use `upsert_component_set` with separate properties such as `Style`, `Size` and
+`State`; checked/selected/expanded values belong in their own properties. Supply
+the default variant first when promoting an existing master. A direct child
+master with the exact `codeKey` becomes that first variant: its Figma ID and
+existing instance attachments are retained. Name-only promotion is not allowed.
+Updating Elf-owned visual layers can reset overrides within those layers; this
+does not promise preservation of every nested instance override.
+
+Adding states preserves the set and matching variant IDs. Unrequested variants
+are retained and returned as `retainedVariants`; omission is not a deletion.
+Changing property names/order requires a separately reviewed migration and is
+refused. The response includes `promotedComponentId`, actual `variantCount` and
+requested variant IDs. Sets support up to 256 variants. MCP checks the plugin's
+`safeVariantUpdates` capability before writing, and older plugins are refused.
+
+Default, hover, pressed, focus, disabled and loading are distinct visual states;
+their presence does not wire prototype transitions or implement browser behavior.
+Use semantic properties such as `Tone` for noninteractive status messages instead
+of manufacturing hover/disabled states for static content. Never represent a
+hidden dialog or tooltip with an empty component just to create a Closed state.
+
 The local MCP `upsert_component` and `upsert_component_set` tools accept bounded
 declarative `layers`: frames, text, rectangles, ellipses and point-based vectors.
 Layers form a flat ordered tree; `parent` is the index of an earlier frame.

@@ -169,7 +169,7 @@ function createFigmaStub(sendToSocket) {
       width: 0,
       height: 0,
       fills: [],
-      layoutMode: "HORIZONTAL",
+      layoutMode: "NONE",
       itemSpacing: 0,
       cornerRadius: 0,
       paddingTop: 0,
@@ -181,6 +181,7 @@ function createFigmaStub(sendToSocket) {
       get defaultVariant() {
         return this.children.find((child) => child.type === "COMPONENT") ?? null;
       },
+      resizeWithoutConstraints(width,height){this.width=width;this.height=height;},
     });
     // Figma re-parents the components into the set.
     if (parent) {
@@ -667,7 +668,8 @@ async function main() {
     return message;
   });
 
-  await check("a changed variant roster rebuilds the set", async () => {
+  await check("a changed variant roster retains omitted variants without rebuilding the set", async () => {
+    const before=await figma.getNodeByIdAsync(buttonSet.set.id),ids=before.children.map(child=>child.id).join(',');
     const rebuilt = await callOk("upsert_component_set", {
       name: "Button",
       codeKey: "button",
@@ -676,12 +678,30 @@ async function main() {
         { props: { size: "md", intent: "primary" } },
       ],
     });
-    if (!rebuilt.set.created) throw new Error("expected a rebuild");
-    if (rebuilt.set.variantCount !== 2) throw new Error(`variants: ${rebuilt.set.variantCount}`);
-    return `${rebuilt.set.id}, rebuilt with 2 variants`;
+    if (rebuilt.set.created||rebuilt.set.id!==buttonSet.set.id) throw new Error("unexpected rebuild");
+    if (rebuilt.set.variantCount !== 4||rebuilt.set.retainedVariants.length!==2||before.children.map(child=>child.id).join(',')!==ids) throw new Error('omitted variants changed or were removed');
+    return `${rebuilt.set.id}, original 4 variants preserved`;
   });
 
   let slotId = null;
+  await check('original masters promote into sets and added states preserve master, set and instance identities',async()=>{
+    const original=await callOk('upsert_component',{name:'Promoted button',codeKey:'test/promoted-button',layoutMode:'NONE',size:{width:100,height:32}});
+    const master=await figma.getNodeByIdAsync(original.component.id),instance=master.createInstance();
+    const input={name:'Promoted button',codeKey:'test/promoted-button',layoutMode:'NONE',size:{width:100,height:32},variants:[{props:{State:'Default'}},{props:{State:'Hover'}}]};
+    const first=await callOk('upsert_component_set',input);
+    if(first.set.promotedComponentId!==master.id||first.set.variants[0].id!==master.id||(await instance.getMainComponentAsync()).id!==master.id)throw new Error('promotion lost the existing master or instance');
+    const set=await figma.getNodeByIdAsync(first.set.id),ids=set.children.map(child=>child.id);
+    const added=await callOk('upsert_component_set',{...input,variants:[...input.variants,{props:{State:'Pressed'}},{props:{State:'Focus'}},{props:{State:'Disabled'}}]});
+    if(added.set.id!==set.id||added.set.created||ids.some(id=>!set.children.some(child=>child.id===id))||set.children.length!==5)throw new Error('state addition replaced existing variants');
+    const schemaError=await callFail('upsert_component_set',{...input,variants:[{props:{Mode:'New property'}}]});
+    errorContains(schemaError,'separate migration');
+    const before=set.children.map(child=>child.id).join(',');
+    await callFail('upsert_component_set',{...input,variants:[...input.variants,{props:{State:'Error'},spec:{text:{characters:'No',fontFamily:'Unavailable'}}}]});
+    if(set.children.map(child=>child.id).join(',')!==before)throw new Error('failed preparation changed existing states');
+    if(!set.width||!set.height)throw new Error('variant set bounds were not resized');
+    return 'promotion, additions, schema refusal and failed preparation preserve identities';
+  });
+
   await check("instance children point at components by codeKey", async () => {
     const result = await callOk("upsert_component", {
       name: "IconSlot",

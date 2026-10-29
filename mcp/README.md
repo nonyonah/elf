@@ -313,7 +313,9 @@ never touches the slots. (Destructive by design: re-runs stay deterministic.)
 Variants each name their property values; the first variant defines the property keys every other
 variant must match (same keys, same order). Set-level styling fields apply to all variants, and a
 variant's `spec` overrides them per variant. A matching roster updates the variants **in place**;
-a changed roster rebuilds the set — Figma detaches instances of the old set when that happens.
+a changed roster adds states in place and retains unrequested variants. Existing
+set/master IDs remain stable. A direct master with the exact codeKey is promoted
+into the first variant rather than duplicated; property-schema changes are refused.
 
 ```jsonc
 {
@@ -382,7 +384,7 @@ without Figma: it loads the bundle against a stub `figma` global and drives it t
 bridge, so requests, responses and error strings travel the production path. It proves mode
 handling, per-mode values, aliases, rename/delete, codeKey tagging, component bindings, verbatim
 plan-limit errors (`in addMode: Limited to 4 modes only`), component sets (build, update in place,
-roster rebuild), instance slots, text/effect styles, and that a rejected upsert leaves nothing
+roster additions/retention and original-master promotion), instance slots, text/effect styles, and that a rejected upsert leaves nothing
 half-created. Run it after every `npm run build:bridge-plugin`.
 
 ### Manual checklist (throwaway file, non-Enterprise plan)

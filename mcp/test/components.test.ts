@@ -5,11 +5,23 @@ import { Bridge } from "../src/bridge.js";
 import { PluginClient } from "../src/client.js";
 import { BridgeError } from "../src/errors.js";
 import { silentLogger } from "../src/logger.js";
-import { getNodeTool, listComponentsTool, upsertComponentTool } from "../src/tools/components.js";
+import { getNodeTool, listComponentsTool, upsertComponentTool, upsertComponentSetTool } from "../src/tools/components.js";
 import type { MethodHandler } from "./helpers/plugin-connection.js";
 import { FakePlugin } from "./helpers/plugin-connection.js";
 
 const TOKEN = "test-token-0123456789";
+
+test('MCP refuses state updates on older plugins and exposes retained and promoted variant identities',async()=>{
+ let safe=false;const writes:string[]=[];
+ const client=new PluginClient({request:async(method:string)=>{
+  if(method==='get_plugin_capabilities')return {safeVariantUpdates:safe?1:0};
+  writes.push(method);return {set:{id:'set:1',created:false,variantCount:3,variants:[{id:'master:1',name:'State=Default'}],promotedComponentId:'master:1',retainedVariants:[{id:'old:1',name:'State=Hover'}]}};
+ }} as any);
+ const args={name:'Button',codeKey:'button',variants:[{props:{State:'Default'}}]};
+ await assert.rejects(upsertComponentSetTool.handler(client,args),/Reopen the updated/);assert.deepEqual(writes,[]);
+ safe=true;const result=await upsertComponentSetTool.handler(client,args);
+ assert.equal((result.set as any).promotedComponentId,'master:1');assert.equal((result.set as any).retainedVariants[0].id,'old:1');assert.deepEqual(writes,['upsert_component_set']);
+});
 
 test('component fill parsing preserves a variable when a literal fallback color is supplied',()=>{
  const input=z.object(upsertComponentTool.inputSchema).parse({name:'Bound preview',fill:{variable:'Color/Accent',color:'#4a55c9'},text:{characters:'Label',color:{variable:'Color/Ink 900',color:'#17181c'}},stroke:{color:{variable:'Color/Line',color:'#e0ddd7'}}});

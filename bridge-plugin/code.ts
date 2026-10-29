@@ -1197,6 +1197,7 @@ function arrangeVariants(
     child.x = columnX[col] ?? 0;
     child.y = rowY[row] ?? 0;
   }
+  set.resizeWithoutConstraints(Math.max(1,x-VARIANT_GAP),Math.max(1,y-VARIANT_GAP));
 }
 
 const VARIANT_GAP = 40;
@@ -1208,7 +1209,7 @@ async function upsertComponentSet(params: Record<string, unknown>): Promise<unkn
   if (!name) throw new Error("A component set name is required.");
 
   const variants = Array.isArray(input.variants) ? input.variants : [];
-  if (variants.length === 0) throw new Error("A component set needs at least one variant.");
+  if (variants.length === 0 || variants.length > 256) throw new Error("A component set needs 1–256 variants.");
 
   const propKeys = Object.keys(variants[0]?.props ?? {});
   if (propKeys.length === 0) {
@@ -1218,6 +1219,9 @@ async function upsertComponentSet(params: Record<string, unknown>): Promise<unkn
     const keys = Object.keys(variant?.props ?? {});
     if (keys.join("\n") !== propKeys.join("\n")) {
       throw new Error("Every variant must declare the same variant properties, in the same order.");
+    }
+    for(const [key,value] of Object.entries(variant.props)){
+      if(!key.trim()||key.length>100||/[,=\n]/.test(key)||!['string','number','boolean'].includes(typeof value)||(typeof value==='number'&&!Number.isFinite(value))||!String(value).trim()||String(value).length>100||/[,=\n]/.test(String(value)))throw new Error('Variant properties need bounded nonempty values without comma, equals or newline.');
     }
   }
 
@@ -1236,34 +1240,37 @@ async function upsertComponentSet(params: Record<string, unknown>): Promise<unkn
     ? (existing.children.filter((child) => child.type === "COMPONENT") as ComponentNode[])
     : [];
 
-  // A matching roster updates variants in place; a changed roster rebuilds
-  // the set (documented: instances of the old set detach).
-  const canUpdate =
-    existing !== null &&
-    existingVariants.length === names.length &&
-    names.every((variantName) => existingVariants.some((child) => child.name === variantName));
+  const baseMatches=!existing&&codeKey?parent.children.filter((child):child is ComponentNode=>child.type==='COMPONENT'&&codeKeyOf(child)===codeKey):[];
+  if(baseMatches.length>1)throw new Error('Multiple original masters share this codeKey; resolve the ambiguity before adding states.');
+  const base=baseMatches[0]??null;
+  const parseProps=(label:string):Record<string,string>=>Object.fromEntries(label.split(', ').map(part=>{const at=part.indexOf('=');return [part.slice(0,at),part.slice(at+1)];}));
+  if(existingVariants.some(child=>Object.keys(parseProps(child.name)).join('\n')!==propKeys.join('\n')))throw new Error('Changing a set’s variant property schema requires a separate migration. Existing variants were preserved.');
 
   const plans: { name: string; spec: PreparedSpec; component: ComponentNode | null }[] = [];
   for (const [index, variant] of variants.entries()) {
     const merged: ComponentSpecFields = { ...specFields(input), ...(variant?.spec ?? {}) };
-    const target = canUpdate ? (existingVariants.find((child) => child.name === names[index]) ?? null) : null;
+    const target = existingVariants.find((child) => child.name === names[index]) ?? (index===0?base:null);
     plans.push({ name: names[index], spec: await prepareSpec(merged, target?.layoutMode ?? "NONE"), component: target });
   }
 
   let set: ComponentSetNode;
   let created = false;
-  if (existing && canUpdate) {
-    set = existing;
-  } else {
-    if (existing) existing.remove();
-    const components: ComponentNode[] = [];
-    for (const plan of plans) {
-      const component = figma.createComponent();
-      component.name = plan.name;
-      parent.appendChild(component);
-      components.push(component);
-      plan.component = component;
+  const newComponents:ComponentNode[]=[];
+  try{
+    for(const plan of plans.filter(plan=>!plan.component)){
+      const component=figma.createComponent();newComponents.push(component);
+      component.name=plan.name;await applySpec(component,plan.spec);
+      if(input.description!==undefined)component.description=input.description;
+      plan.component=component;
     }
+  }catch(error){for(const component of newComponents)if(!component.removed)component.remove();throw error;}
+  if (existing) {
+    set = existing;
+    for(const component of newComponents)set.appendChild(component);
+  } else {
+    const components=plans.map(plan=>plan.component!);
+    for(const component of components)parent.appendChild(component);
+    if(base)base.name=plans[0].name;
     set = figma.combineAsVariants(components, parent as unknown as BaseNode & ChildrenMixin);
     set.name = name;
     created = true;
@@ -1274,14 +1281,16 @@ async function upsertComponentSet(params: Record<string, unknown>): Promise<unkn
   const variantPayloads: { id: string; name: string }[] = [];
   for (const plan of plans) {
     const component = plan.component as ComponentNode;
-    if (canUpdate) component.name = plan.name;
-    await applySpec(component, plan.spec);
+    component.name = plan.name;
+    if(!newComponents.includes(component))await applySpec(component, plan.spec);
+    if(codeKey)tagCodeKey(component,`${codeKey}::${plan.name}`);
     if(input.description!==undefined)component.description=input.description;
     variantPayloads.push({ id: component.id, name: component.name });
   }
 
   // A set the designer has switched to auto layout keeps its own arrangement.
-  if (set.layoutMode === "NONE") arrangeVariants(set, variants, variantLabel);
+  const retained=existingVariants.filter(child=>!names.includes(child.name));
+  if (set.layoutMode === "NONE") arrangeVariants(set,[...variants,...retained.map(child=>({props:parseProps(child.name)}))],variantLabel);
   if(input.description!==undefined)set.description=input.description;
   if(input.position){set.x=input.position.x;set.y=input.position.y;}
 
@@ -1291,8 +1300,11 @@ async function upsertComponentSet(params: Record<string, unknown>): Promise<unkn
       name: set.name,
       codeKey: codeKeyOf(set),
       created,
-      variantCount: variantPayloads.length,
+      variantCount: set.children.filter(child=>child.type==='COMPONENT').length,
+      requestedVariantCount:variantPayloads.length,
       variants: variantPayloads,
+      retainedVariants:retained.map(child=>({id:child.id,name:child.name})),
+      promotedComponentId:base?.id??null,
       parentId: parent.id,
     },
   };
@@ -1601,7 +1613,7 @@ async function handle(method: string, params: Record<string, unknown>): Promise<
     case "upsert_component":
       return upsertComponent(params);
     case "get_plugin_capabilities":
-      return {visualLayers:1,componentMetadata:1};
+      return {visualLayers:1,componentMetadata:1,safeVariantUpdates:1};
     case "upsert_component_set":
       return upsertComponentSet(params);
     case "upsert_text_style":
