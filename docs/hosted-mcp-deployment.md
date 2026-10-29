@@ -45,6 +45,37 @@ separately from its provider's API support.
 
 ## Live acceptance
 
+### Local preview through ngrok
+
+This path uses local D1 and KV only; it does not enable the deployed Worker.
+Use real Clerk credentials in `console/.dev.vars` and build the Console client
+and bridge plugin first. Keep credentials out of shell arguments and chat.
+
+1. Run `ngrok http http://127.0.0.1:8790 --inspect=false`. Note its HTTPS origin.
+   Request inspection must remain disabled because OAuth and plugin traffic
+   contains private data.
+2. From the repository root, run
+   `node scripts/prepare-hosted-preview.mjs https://YOUR-HOST.ngrok-free.app`.
+   It creates a git-ignored private config under `.elf/hosted-preview`, disables
+   the fake-user bypass and builds a plugin allowing only that exact origin.
+3. From `console`, run
+   `npx wrangler d1 migrations apply elf-hosted-preview --local --config ../.elf/hosted-preview/wrangler.json --persist-to ../.elf/hosted-preview/state`.
+4. From `console`, run
+   `npx wrangler dev --local --config ../.elf/hosted-preview/wrangler.json --persist-to ../.elf/hosted-preview/state --ip 127.0.0.1 --port 8790 --log-level error --show-interactive-dev-session=false`.
+5. Import `dist/bridge-plugin-hosted-preview/manifest.json` in Figma. Select
+   Hosted Elf and explicit plugin-only authorization. The ordinary public
+   manifest does not allow the ngrok preview origin.
+6. Add `https://YOUR-HOST.ngrok-free.app/mcp` in Claude's custom connectors.
+   Choose sign-in and **Register automatically** if asked for OAuth client
+   identification. This preview does not support the published-identity/CIMD
+   option. Enable the connector in the test conversation.
+
+Both ngrok and Wrangler must stay running. If the tunnel origin changes,
+regenerate the private config/plugin and reconnect the assistant. Never place
+the generated `.dev.vars`, local databases or OAuth state in source control.
+
+### Desktop and web checks
+
 In a supported desktop assistant, add the connector URL, sign in and explicitly
 approve the requesting client, redirect host and scopes. Repeat in one web
 assistant. Use accounts/files intended for testing.
