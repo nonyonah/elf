@@ -65,3 +65,54 @@ test('MCP extraction tools use the same project-scoped reviews without touching 
   const outside=await tools.get('prepare_design_system')!({path:'../system.md'});assert.equal(outside.isError,true);assert.equal(bridgeCalls,0);
  }finally{f.cleanup();}
 });
+
+test('interactive components without documented states ask for opt-in; static components stay reviewable',()=>{
+ const f=fixture();try{
+  const d:any=draft();d.components=[{name:'Button',documentation:'Runs an action.',sourceLine:7,specification:{layoutMode:'HORIZONTAL',gap:8}},{name:'Badge',documentation:'A static status label.',sourceLine:7,specification:{layoutMode:'HORIZONTAL'}}];
+  const result=validateDesignSystemDraft(readDesignSystemSource(f.root,'system.md'),d);
+  assert.equal(result.reviewReady,false);assert.equal(result.stateSuggestions.length,1);
+  assert.equal(result.stateSuggestions[0].component,'Button');assert.match(result.stateSuggestions[0].question,/Would you like state variants/);
+  assert.ok(result.stateSuggestions[0].recommendedStates.includes('Focus'));
+  assert.equal(d.components[0].specification.variants,undefined);assert.equal(result.canApply,false);
+ }finally{f.cleanup();}
+});
+test('state decisions require an explicit choice and reviewed variants; skip resolves without inventing states',()=>{
+ const f=fixture();try{
+  const source=readDesignSystemSource(f.root,'system.md'),d:any=draft();d.components[0].name='Button';
+  d.components[0].stateReview={decision:'skip'};
+  assert.equal(validateDesignSystemDraft(source,d).reviewReady,true);
+  d.components[0].stateReview={decision:'include'};
+  assert.equal(validateDesignSystemDraft(source,d).reviewReady,false);
+  d.components[0].specification.variants={'State=Default':{},'State=Hover':{}};
+  assert.equal(validateDesignSystemDraft(source,d).reviewReady,true);
+  d.components[0].stateReview={decision:'skip'};
+  assert.match(validateDesignSystemDraft(source,d).issues.join(' '),/Remove unapproved state variants/);
+  d.components[0].stateReview={decision:'approve_everything'};
+  assert.throws(()=>validateDesignSystemDraft(source,d));
+ }finally{f.cleanup();}
+});
+test('documented states avoid repeat prompts, but size variants and neighboring sections do not satisfy state review',()=>{
+ const f=fixture();try{
+  const md='# Controls\n## Button\nRuns an action.\n## Switch\nStates: Checked, Unchecked.\n';
+  writeFileSync(join(f.root,'system.md'),md);
+  const d:any=draft();d.components=[{name:'Button',documentation:'Runs an action.',sourceLine:2,specification:{layoutMode:'HORIZONTAL',variants:{Small:{},Large:{}}}},{name:'Switch',documentation:'States: Checked, Unchecked.',sourceLine:4,specification:{layoutMode:'HORIZONTAL',variants:{Checked:{},Unchecked:{}}}}];
+  const result=validateDesignSystemDraft(readDesignSystemSource(f.root,'system.md'),d);
+  assert.deepEqual(result.stateSuggestions.map(s=>s.component),['Button']);
+  // AI-created states without source evidence still need a user decision.
+  d.components[0].specification.variants={'State=Default':{},'State=Hover':{}};
+  assert.equal(validateDesignSystemDraft(readDesignSystemSource(f.root,'system.md'),d).stateSuggestions[0].resolved,false);
+ }finally{f.cleanup();}
+});
+test('custom interactive surfaces receive state suggestions, static cards and explicit noninteractive descriptions do not',()=>{
+ const f=fixture();try{
+  const d:any=draft();d.components=[
+   {name:'ProductCard',documentation:'Clickable surface that opens details.',sourceLine:7,specification:{layoutMode:'HORIZONTAL'}},
+   {name:'Card',documentation:'Static content container.',sourceLine:7,specification:{layoutMode:'HORIZONTAL'}},
+   {name:'Preview',documentation:'Not interactive.',sourceLine:7,specification:{layoutMode:'HORIZONTAL'}},
+   {name:'TextInput',documentation:'Enter text.',sourceLine:7,specification:{layoutMode:'HORIZONTAL'}},
+  ];
+  const result=validateDesignSystemDraft(readDesignSystemSource(f.root,'system.md'),d);
+  assert.deepEqual(result.stateSuggestions.map(s=>s.component),['ProductCard','TextInput']);
+  assert.ok(result.stateSuggestions[1].recommendedStates.includes('Error'));
+ }finally{f.cleanup();}
+});

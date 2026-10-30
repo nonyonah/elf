@@ -1,5 +1,32 @@
 # Markdown to a Figma design system
 
+## Missing interaction states
+
+During MCP extraction review, Elf detects likely interactive components from
+component names and documented behavior. Buttons, fields, selection controls,
+expandable controls and navigation receive appropriate state suggestions;
+custom clickable/selectable surfaces can receive suggestions too. Static
+containers, labels and illustrations do not receive blanket state variants.
+This is a review heuristic; the assistant must also consider component meaning.
+
+If the Markdown does not specify states, ask the user whether to add them or
+keep the component as documented. Group the affected components in one concise
+question, for example: “Button and TextInput have no state specifications.
+Would you like interaction states for them, or should I keep them as written?”
+Present appropriate suggestions per component, then review exact state visuals.
+Never silently invent states, colors, dimensions or prototype behavior.
+
+`validate_design_system` returns `stateSuggestions`. Pending decisions prevent
+`reviewReady`. After the user's explicit response, record optional
+`stateReview: {decision: "include" | "skip"}` on each affected draft component.
+Skip resolves the question without adding variants. Include requires state
+variants in the reviewed specification before extraction becomes review-ready.
+Documented state variants are preserved and do not trigger a redundant prompt.
+Size/style variants alone do not count as interaction states. The decision is
+part of the source-pinned draft; it is not permission to write to Figma. Normal
+explicit resource review and file authorization still apply. Raw MCP resource
+tools remain separate from this extraction review.
+
 ## Product scope and priority
 
 This is the final planned feature addition. Finish the current Settings polish

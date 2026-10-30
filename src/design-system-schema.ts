@@ -1,4 +1,5 @@
 import {z} from 'zod';
+import {componentStateSuggestions} from './design-system-states.js';
 const LIMIT = 128_000;
 
 const name = z.string().min(1).max(200).refine(value => value === value.trim() && !/[\u0000-\u001f]/.test(value), 'Names must be nonblank, without surrounding whitespace or control characters.');
@@ -15,6 +16,7 @@ export const designSystemDraftSchema = z.object({
   }).strict()).max(1000)}).strict()).max(30),
   components:z.array(z.object({name,documentation:note,sourceLine:line,
     specification:z.record(z.string(),z.unknown()),
+    stateReview:z.object({decision:z.enum(['include','skip'])}).strict().optional(),
   }).strict()).max(200),
   questions:z.array(note).max(100), assumptions:z.array(note).max(100), unsupported:z.array(note).max(100),
 }).strict();
@@ -26,6 +28,7 @@ export const extractionInstructions = [
   'Return only JSON with schema:1, name:string, documentation:string, collections:[{name,modes:string[],tokens:[{name,type:COLOR|FLOAT|STRING|BOOLEAN,values:{mode:value},documentation:string,sourceLine:number}]}], components:[{name,documentation,sourceLine,specification:object}], questions:string[], assumptions:string[], unsupported:string[].',
   'Token values are #RRGGBB/#RRGGBBAA colors, finite numbers, strings, booleans, or {alias:{collection,token}}. Supply a value for each declared mode. Preserve collection identity. Do not invent values, modes, token names, variants or missing behavior. List missing decisions in questions and omit incomplete resources.',
   'Components use Elf visual specifications: layoutMode HORIZONTAL/VERTICAL/NONE; size {width,height}; padding {all/top/right/bottom/left}; gap; cornerRadius; fill; stroke {color,weight}; text {characters,fontSize,color,fontFamily,fontStyle}; children instance references; variants mapping labels to overrides. Numeric visual values may be literal or token references; fills and text colors reference tokens. If appearance is unspecified use an empty specification and ask a question. Documentation is plain purpose/usage/behavior prose, separate from visual specifications.',
+  'Detect interactive components (buttons, inputs, selection controls, navigation and documented interactive surfaces) whose Markdown does not specify state variants. Ask whether the user wants appropriate states or wants to keep the component as documented. Group these questions for review. Never invent or create states silently. After an explicit answer record component.stateReview:{decision:"include"|"skip"}; include requires a separate review of explicit state visuals. Static components need no blanket state variants. Existing documented states must be preserved.',
   'sourceLine is the 1-based Markdown line containing evidence for that token/component. Use questions for unspecified units, modes, ambiguous references and component relationships. Do not convert rem/em into Figma pixels without a documented basis. Preserve supplied design guidance in documentation; identify unsupported details explicitly.',
 ].join('\n');
 
@@ -80,8 +83,10 @@ export function validateDesignSystemDraftData(source:DesignSystemSource,input:un
     try{validateComponent(component.specification,component.name);}catch(error){issues.push((error as Error).message);}
     if(!Object.keys(component.specification).length)issues.push(`${component.name}: visual specification is missing.`);
   }
+  const stateSuggestions=componentStateSuggestions(source.markdown,draft.components);
+  for(const suggestion of stateSuggestions)if(!suggestion.resolved)issues.push(`${suggestion.component}: ${suggestion.decision!=='pending'?suggestion.next:'Ask the user whether to include interaction states or keep the component as documented.'}`);
   if(!tokens.size&&!draft.components.length)issues.push('No design-system resources have been extracted.');
   issues.push(...draft.questions.map(question=>`Unresolved question: ${question}`));
-  return {draft,issues:[...new Set(issues)],reviewReady:issues.length===0,canApply:false as const,stage:'extraction-review' as const,
+  return {draft,stateSuggestions,issues:[...new Set(issues)],reviewReady:issues.length===0,canApply:false as const,stage:'extraction-review' as const,
     limitations:['Extraction review only: no local design files or Figma resources are created.','Token bindings, variants, existing Figma conflicts and resource dependencies require the forthcoming combined sync plan.']};
 }
