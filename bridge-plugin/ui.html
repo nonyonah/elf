@@ -414,7 +414,7 @@
           <h2 id="pair-heading">Pair this file</h2>
           <p class="sub">Request a pairing code in Elf or your connected assistant, then paste it here.</p>
           <label class="field-label" for="connection-kind">Connect through</label>
-          <select id="connection-kind"><option value="local">Local Elf · editor or npm</option><option value="hosted">Hosted Elf · desktop or web assistant</option></select>
+          <select id="connection-kind"><option value="local">Local Elf · editor or npm</option></select>
 
           <label class="field-label" for="code">Pairing code</label>
           <input
@@ -975,7 +975,7 @@ function pairingHmac(key, text) {
           return;
         }
 
-        if (modeUsed === "session" && state.session && state.attempts < MAX_ATTEMPTS) {
+        if (state.session && state.attempts < MAX_ATTEMPTS) {
           const delay = Math.min(500 * Math.pow(2, state.attempts), 8000);
           state.attempts += 1;
           setPhase("pairing");

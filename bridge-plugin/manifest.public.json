@@ -10,9 +10,8 @@
   ],
   "networkAccess": {
     "allowedDomains": [
-      "ws://localhost:8765",
-      "https://elf-console.nonyonah.workers.dev"
+      "ws://localhost:8765"
     ],
-    "reasoning": "Elf connects to your authenticated local bridge or the hosted Elf service you select. Hosted pairing uses a revocable file-scoped credential; account OAuth credentials are never sent to the plugin. Document connections and write plans require explicit approval."
+    "reasoning": "Elf connects to your authenticated local bridge. Pairing and document approval are required; Figma account credentials are never sent to the plugin."
   }
 }

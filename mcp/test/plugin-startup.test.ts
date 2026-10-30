@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 
 function ui() {
   const sockets: any[] = [];
-  class Socket {static OPEN = 1; readyState = 1; onmessage: any; onclose: any; sent: string[] = []; closed: any; constructor(_url: string) {sockets.push(this);} send(value: string) {this.sent.push(value);} close(code: number, reason: string) {this.closed = {code, reason};}}
+  class Socket {static OPEN = 1; readyState = 1; onmessage: any; onclose: any; sent: string[] = []; closed: any; url: string; constructor(_url: string) {this.url=_url;sockets.push(this);} send(value: string) {this.sent.push(value);} close(code: number, reason: string) {this.closed = {code, reason};}}
   const elements = new Map<string, any>();
   const messages: any[] = [];
   const timers = new Map<number, () => void>();
@@ -266,4 +266,27 @@ test('component documentation patches only Description and rejects concurrent ed
  assert.equal(plugin.messages.at(-1).ok,true);assert.equal(component.description,params.description);assert.equal(component.width,120);
  await plugin.figma.ui.onmessage({type:'request',channel,id:'doc-stale',method:'set_component_description',params:{...params,description:'Unreviewed replacement'}});
  assert.equal(plugin.messages.at(-1).ok,false);assert.equal(component.description,params.description);
+});
+
+
+test('a freshly code-paired plugin reconnects with its issued session after bridge restart',()=>{
+ const app=ui(),channel=app.messages[0].channel;
+ app.window.onmessage({data:{pluginMessage:{type:'context',channel,file:{name:'File',key:'file123456'},bridge:{host:'localhost:8765',session:''}}}});
+ app.document.getElementById('code').value='abcd-efgh-jkmn';app.elements.get('pair').listeners.click();
+ const first=app.sockets[0];assert.match(first.url,/code=/);
+ first.onmessage({data:JSON.stringify({type:'ready',session:'elfp_'+'A'.repeat(43)})});
+ first.onclose({code:1006,reason:'bridge restarted'});
+ const timers=[...app.timers.values()];assert.ok(timers.length);
+ timers.at(-1)!();
+ assert.equal(app.sockets.length,2);assert.match(app.sockets[1].url,/hint=/);
+ assert.doesNotMatch(app.sockets[1].url,/code=|elfp_/);
+});
+
+test('a refused pairing code never schedules automatic session authentication',()=>{
+ const app=ui(),channel=app.messages[0].channel;
+ app.window.onmessage({data:{pluginMessage:{type:'context',channel,file:{name:'File',key:'file123456'},bridge:{host:'localhost:8765',session:''}}}});
+ app.document.getElementById('code').value='abcd-efgh-jkmn';app.elements.get('pair').listeners.click();
+ const first=app.sockets[0];first.onclose({code:4001,reason:'invalid code'});
+ for(const timer of [...app.timers.values()])timer();
+ assert.equal(app.sockets.length,1);
 });
