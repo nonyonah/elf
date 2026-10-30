@@ -91,3 +91,26 @@ test("duplicate names collapse to a single comparison (last wins)", () => {
   assert.equal(result.valueMismatches[0].figmaValue, "2");
   assert.equal(result.missingInCode.length, 0);
 });
+
+
+test('CSS RGB numbers and percentages normalize to the same color as Figma channels',async()=>{
+ const {cssColorToHex,rgbToHex}=await import('../src/core/normalize.js');
+ assert.equal(cssColorToHex('rgb(111, 60, 250)'),'#6f3cfa');
+ assert.equal(cssColorToHex('rgba(111.00000098347664,60.00000022351742,250.00000029802322,1)'),'#6f3cfa');
+ assert.equal(cssColorToHex('rgb(100% 0% 50% / 50%)'),'#ff008080');
+ assert.equal(cssColorToHex('rgba(0, 128, 255, 0.5)'),'#0080ff80');
+ assert.equal(cssColorToHex('rgb(0 0 0)'),'#000000');
+ assert.equal(cssColorToHex('rgb(255 255 255)'),'#ffffff');
+ assert.equal(cssColorToHex('rgb(NaN 0 0)'),null);
+ assert.equal(cssColorToHex('rgba(0, 0, 0, nope)'),null);
+ const actual=rgbToHex(0.43529412150382996,0.23529411852359772,0.9803921580314636);
+ assert.equal(cssColorToHex('rgb(111 60 250)'),actual);
+});
+
+test('post-write color verification accepts Figma float precision but refuses a different paint',async()=>{
+ const {verifyComponentPatch}=await import('../src/verify-write.js');
+ const node={fills:[{color:{r:0.43529412150382996,g:0.23529411852359772,b:0.9803921580314636},opacity:1}]};
+ assert.doesNotThrow(()=>verifyComponentPatch({fill:{color:'#6f3cfa'}},node,[],[]));
+ assert.throws(()=>verifyComponentPatch({fill:{color:'#ffffff'}},node,[],[]),/could not be verified/);
+ assert.throws(()=>verifyComponentPatch({fill:{color:'#6f3cfa80'}},node,[],[]),/could not be verified/);
+});

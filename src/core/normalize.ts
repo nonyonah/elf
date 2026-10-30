@@ -58,9 +58,12 @@ export function cssColorToHex(input: string): string | null {
 
   if (fn.startsWith("rgb")) {
     if (args.length < 3) return null;
+    // CSS numeric channels use 0–255; percentages and Figma channels use 0–1.
     const channel = (i: number) =>
-      args[i].endsWith("%") ? (parseFloat(args[i]) / 100) * 2.55 : parseFloat(args[i]);
-    return rgbToHex(channel(0), channel(1), channel(2), alpha);
+      parseFloat(args[i]) / (args[i].endsWith("%") ? 100 : 255);
+    const channels = [channel(0), channel(1), channel(2)];
+    if (![...channels, alpha].every(Number.isFinite)) return null;
+    return rgbToHex(channels[0], channels[1], channels[2], alpha);
   }
 
   if (args.length < 3) return null;
