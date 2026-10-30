@@ -98,6 +98,8 @@ export interface PluginNodeFill {
 }
 
 export interface PluginNode {
+  /** Scene-node opacity, separate from paint opacity. Absent in older plugins. */
+  opacity?: number;
   id: string;
   name: string;
   type: string;

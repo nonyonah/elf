@@ -1479,6 +1479,8 @@ async function nodePayload(node: SceneNode, depth: number): Promise<Record<strin
     codeKey: codeKeyOf(node),
   };
 
+  if ("opacity" in node) payload.opacity = node.opacity;
+
   if ("x" in node) {
     payload.x = node.x;
     payload.y = node.y;

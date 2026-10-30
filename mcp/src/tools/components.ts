@@ -317,7 +317,7 @@ export const getNodeTool: ToolDefinition<{
   title: "Elf: read a node",
   description:
     "Read one node back: name, type, codeKey, layout (mode, padding, gap, corner radius), fills with " +
-    "their bound variables, and the raw `boundVariables` map. Use it to verify what a write actually did.",
+    "their bound variables, scene-node opacity (separate from paint opacity), and the raw `boundVariables` map. Use it to verify what a write actually did.",
   inputSchema: {
     nodeId: z.string().describe('Node id, e.g. "12:34" (returned by upsert_component).'),
     depth: z

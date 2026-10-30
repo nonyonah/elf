@@ -829,6 +829,19 @@ async function main() {
     return 'nested geometry, bindings, prose, position and owned-root replacement verified';
   });
 
+  await check('get_node reads nested scene opacity independently of paint opacity, including zero',async()=>{
+    const result=await callOk('upsert_component',{name:'Opacity readback',codeKey:'test/opacity-readback',layers:[
+      {type:'frame',name:'Faded surface',size:{width:120,height:40},opacity:0.4,fill:{color:'#6633ff',opacity:0.7}},
+      {type:'rectangle',name:'Hidden child',parent:0,size:{width:10,height:10},opacity:0,fill:{color:'#ffffff'}},
+    ]});
+    const read=await callOk('get_node',{nodeId:result.component.id,depth:2});
+    const frame=read.node.children[0],child=frame.children[0];
+    if(frame.opacity!==0.4||frame.fills[0].opacity!==0.7||child.opacity!==0)throw new Error('node opacity missing, conflated with paint, or zero lost');
+    const shallow=await callOk('get_node',{nodeId:frame.id,depth:0});
+    if(shallow.node.opacity!==0.4)throw new Error('depth-zero opacity missing');
+    return 'nested .4, paint .7, hidden zero and depth-zero read-back verified';
+  });
+
   await check('rich variant sets preserve identities and put usage prose on both the set and variants',async()=>{
     const input={name:'Rich toggle set',codeKey:'test/rich-toggle-set',description:'Immediate setting; label describes the on state.',position:{x:1200,y:400},layoutMode:'NONE',size:{width:36,height:20},layers:[{type:'ellipse',name:'Thumb',size:{width:16,height:16},fill:{color:'#ffffff'}}],variants:[{props:{Checked:'Off'}},{props:{Checked:'On'}}]};
     const first=await callOk('upsert_component_set',input),set=await figma.getNodeByIdAsync(first.set.id);
