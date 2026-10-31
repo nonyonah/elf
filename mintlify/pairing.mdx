@@ -3,18 +3,15 @@ title: "Connect Figma"
 description: "Pair the open document with your local Elf runtime."
 ---
 
-## Install Elf Bridge during beta
+## Install Elf Bridge from Figma
 
-Run this from a project where Node can resolve the beta package:
+1. Open [Figma Community](https://www.figma.com/community) and search for **Elf Bridge**.
+2. Open the official Elf Bridge listing from the Elf maintainer and choose **Open in…** or **Run**, as shown by Figma.
+3. Choose the file you want to connect and run the plugin. You can reopen it from Figma’s Plugins menu.
 
-```sh
-npm install --save-dev elf-tokens@beta
-node -p "require.resolve('elf-tokens/package.json')"
-```
+If the official listing is still awaiting approval, it will not appear publicly yet. Do not install an unrelated plugin with a similar name.
 
-In Figma Desktop choose **Plugins → Development → Import plugin from manifest**. Select `dist/bridge-plugin-public/manifest.json` inside that installed package directory. Select the file named `manifest.json`, not the source `manifest.public.json`.
-
-When the public Community listing is released, install Elf Bridge from that listing instead.
+You do not need to clone the repository or import a development manifest to use the published plugin.
 
 ## Pair and approve
 

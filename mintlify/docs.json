@@ -36,7 +36,7 @@
       {
         "group": "Coding assistants",
         "pages": [
-          "mcp",
+          "local-mcp",
           "markdown"
         ]
       },
