@@ -370,5 +370,6 @@
     "prepare-runtime": "node scripts/prepare-runtime.mjs",
     "vscode:prepublish": "npm run prepare-runtime && npm test"
   },
-  "icon": "media/elf-mascot.png"
+  "icon": "media/elf-mascot.png",
+  "homepage": "https://elf-docs.riftlabs.xyz"
 }

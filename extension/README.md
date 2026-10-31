@@ -49,7 +49,7 @@ Do not share pairing credentials, Settings session links, webhook URLs, or priva
 
 ## Documentation and support
 
-- [Documentation source](https://github.com/nonyonah/elf/tree/beta/local-rc/mintlify)
+- [Documentation](https://elf-docs.riftlabs.xyz)
 - [Report a bug](https://github.com/nonyonah/elf/issues) — include versions and redacted errors.
 - [Security and document authorization](https://github.com/nonyonah/elf/blob/beta/local-rc/docs/document-authorization.md)
 - [Help support this project](https://checkout.bachs.io/pay/pl_02b9f8010642)

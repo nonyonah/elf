@@ -34,7 +34,7 @@ AI descriptions require a compatible editor language model. Generated descriptio
 
 ## Documentation
 
-- [Public documentation source](https://github.com/nonyonah/elf/tree/beta/local-rc/mintlify) — Mintlify deployment pending.
+- [Documentation](https://elf-docs.riftlabs.xyz)
 - [Coding-assistant setup](docs/mcp-setup.md)
 - [Document authorization](docs/document-authorization.md)
 - [Component review](docs/component-review.md)
