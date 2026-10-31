@@ -49,6 +49,14 @@ The assistant cannot approve its own plan. Connection changes, expired plans, ch
 
 Hosted approval trusts the document reported by the open plugin; it does not independently verify the file through Figma REST. See [data and permissions](/privacy).
 
+## Troubleshooting authorization
+
+If the approval page is blank, close the old authorization tab and start a fresh connection from your assistant using `https://elf.riftlabs.xyz/mcp`. The Settings rendering fix is deployed. If an old page persists, reload it without the browser cache. Never share the authorization URL, pairing code, or cookies when reporting a problem.
+
+If **Finish connection** is disabled, keep Elf Bridge open in the intended file, select **Hosted Elf · web assistants**, and approve the assistant in the plugin. Pairing alone does not authorize it. If the code has expired or was already used, restart authorization from your assistant.
+
+Elf publishes the mascot in the MCP server’s icon metadata and as the Settings favicon. Some assistants do not display MCP icons or cache them; removing and re-adding the connector may refresh it. A missing icon does not indicate a failed connection.
+
 ## Validation status
 
-The live service passed OAuth/PKCE, SDK initialization/tool discovery, a read relay with a **simulated plugin**, write blocking without plan approval, and revocation checks. That protocol test did not modify a real Figma file. Real assistant/Figma approval remains an end-to-end user check; do not assume every assistant provider has been tested.
+The live service passed OAuth/PKCE, SDK initialization/tool discovery, mascot metadata and image checks, a read relay with a **simulated plugin**, write blocking without plan approval, and revocation checks. Settings and the authorization form were also verified to render in Chrome. That protocol test did not modify a real Figma file. Real assistant/Figma approval remains an end-to-end user check; do not assume every assistant provider has been tested.

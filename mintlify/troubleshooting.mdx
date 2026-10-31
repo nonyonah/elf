@@ -7,6 +7,14 @@ description: "Resolve common setup and sync problems."
 
 Use the latest code from the runtime connected to this project. Codes are single-use. Reopen the current public plugin build if it retains an old UI. Never paste pairing codes into public support threads.
 
+## Hosted MCP approval page is blank
+
+Close the old authorization tab and reconnect from your assistant using `https://elf.riftlabs.xyz/mcp`. The rendering fix is deployed; reload without the browser cache if necessary. See the [hosted connector walkthrough](/hosted-mcp) for plugin approval and finishing the connection. Share only redacted error text, never the authorization URL or pairing code.
+
+## Hosted MCP logo is missing
+
+Elf includes its mascot in MCP icon metadata, but display and caching depend on the assistant. Try removing and re-adding the connector. The logo is also the favicon on [Elf Settings](https://elf.riftlabs.xyz/settings).
+
 ## File does not match
 
 Check the configured Figma file URL and the document currently open in the plugin. File identity is the key, not the display name. Select the intended target explicitly.
