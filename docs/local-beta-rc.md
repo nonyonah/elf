@@ -151,3 +151,7 @@ Re-ran the isolated candidate: root tests 236/236, MCP tests 115/115, and root T
 The smoke runner now requires exit 1 plus the expected unconfigured-status message, verifies Settings/plugin assets, explicitly shuts down its authenticated detached bridge, and confirms TCP refusal. Its retry checks the port directly rather than treating a failed stop command as proof of shutdown. Process cleanup no longer returns success when its final PID probe still finds the child. Readiness detection includes stderr, where the bridge logger writes its shared-host message.
 
 The first follow-up smoke run correctly cleaned up both test runtimes but failed its readiness assertion because it watched stdout only; the corrected rerun passed every smoke check, including explicit bridge shutdown, TCP refusal, and temporary-directory cleanup. Cross-platform execution remains pending GitHub CI; package publication is not authorized by these checks.
+
+### GitHub CI attempt
+
+Draft PR https://github.com/nonyonah/elf/pull/1 triggered platform run 41194353411. GitHub marked every matrix job failed before execution: “The job was not started because your account is locked due to a billing issue.” No platform test failed on a runner; no cross-platform pass can be claimed. Resolve the repository owner's GitHub Actions billing/account restriction and rerun the workflow. Local follow-up results remain root 236/236, MCP 115/115, root typecheck clean, and corrected fresh-install smoke passed. Publication and merge remain pending.
