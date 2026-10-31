@@ -52,7 +52,7 @@ check("packaged Settings build manifest ships", existsSync(join(pkgRoot, "dist",
 { const help = run(installPath, [join(pkgRoot, "bin", "elf-tokens.js"), "--help"]);
   check("CLI --help prints usage", help.status === 0 && /elf-tokens \[options\]/.test(help.stdout), help.stderr.slice(0, 200)); }
 { const ext = run(installPath, [join(pkgRoot, "bin", "elf-tokens.js"), "extension"]);
-  check("extension discovery without marketplace claim", ext.status === 0 && /(Install from VSIX|native editor preview)/.test(ext.stdout), ext.stdout.slice(0, 120)); }
+  check("extension discovery points to official Marketplace listing", ext.status === 0 && ext.stdout.includes('https://marketplace.visualstudio.com/items?itemName=NonsoOnah.elf-design-system'), ext.stdout.slice(0, 120)); }
 
 const token = "smoke-" + Math.random().toString(16).slice(2);
 { const status = run(installPath, [join(pkgRoot, "bin", "elf-tokens.js"), "status"], 60000);

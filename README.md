@@ -21,7 +21,7 @@ Figma Desktop is required. Import `dist/bridge-plugin-public/manifest.json` from
 ## Workflows
 
 - **npm:** local onboarding, Settings, monitoring, reports, and reviewed sync.
-- **VS Code:** native Overview, Changes, Activity, and Manage views; the extension bundles the shared runtime. Run `npx elf-tokens@beta extension` for discovery instructions.
+- **VS Code:** [install Elf](https://marketplace.visualstudio.com/items?itemName=NonsoOnah.elf-design-system) for native Overview, Changes, Activity, and Manage views; the extension bundles the shared runtime. Run `npx elf-tokens@beta extension` for discovery instructions.
 - **Local MCP:** connect a supported desktop assistant using `npx -y elf-tokens@beta mcp --project /absolute/project/path`. Settings provides client configuration. There is no hosted MCP URL in this beta.
 
 ## What gets checked

@@ -12,7 +12,7 @@ macOS with Node 22 has local acceptance evidence. Windows/Linux support remains 
 
 ## Get started
 
-1. Install the official Elf extension, or install a maintainer-provided VSIX with **Extensions → … → Install from VSIX** while the Marketplace listing is pending.
+1. Install [Elf from the Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=NonsoOnah.elf-design-system) and choose the pre-release version. The extension ID is **NonsoOnah.elf-design-system**. You can also install a maintainer-provided VSIX with **Extensions → … → Install from VSIX**.
 2. Open your project and select the Elf activity-bar icon.
 3. Choose **Start** and complete project setup.
 4. In **Figma Desktop**, import Elf Bridge’s development `manifest.json` using **Plugins → Development → Import plugin from manifest**. See [plugin installation](https://elf-docs.riftlabs.xyz/pairing).
