@@ -21,6 +21,9 @@ import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { loadWatchEnv } from "../watch/src/bridge.js";
 import { dirname } from "node:path";
 import { loadRuntimeBridgeConfig } from "../mcp/src/config.js";
+import { BridgeClient } from '../mcp/src/client.js';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 import { postNotification } from "./notify.js";
 import { loadConfig } from "./config.js";
 import {
@@ -288,6 +291,21 @@ export async function createSettingsServer(
         res.writeHead(400, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ error: (error as Error).message }));
       }
+      return;
+    }
+
+    if (path === '/api/mcp-status' && req.method === 'GET') {
+      let client: BridgeClient | null = null;
+      try {
+        if (!process.env.ELF_MCP_TOKEN && !existsSync(join(homedir(), '.elf', 'bridge-secret'))) {
+          res.writeHead(200, {'Content-Type':'application/json'});res.end(JSON.stringify({connected:false,count:0,available:true}));return;
+        }
+        client = await BridgeClient.connect(loadRuntimeBridgeConfig());
+        const status = await client.call<{connected:boolean;count:number}>('__elf_mcp_status',{}, {timeoutMs:1000});
+        res.writeHead(200, {'Content-Type':'application/json'});res.end(JSON.stringify({...status,available:true}));
+      } catch {
+        res.writeHead(200, {'Content-Type':'application/json'});res.end(JSON.stringify({connected:false,count:0,available:false}));
+      } finally { await client?.close(); }
       return;
     }
 

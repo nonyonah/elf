@@ -18,6 +18,14 @@ with PKCE S256 and dynamic client registration. Client metadata document lookup
 is disabled in this preview. A consumer website's MCP support must be checked
 separately from its provider's API support.
 
+Authorization and resource-review links open the standalone `/settings` page,
+using the same stylesheet and controls as local Elf Settings. The Console
+dashboard is not part of this connection flow. Hosted Settings lists authorized
+MCP assistants, their most recent authenticated activity and Disconnect controls.
+Disconnect revokes the selected OAuth grant and cancels its client's queued work;
+in-flight work is marked uncertain rather than replayed. Local npm Settings
+separately shows initialized local MCP sessions through the shared bridge.
+
 ## Deploy a reviewed preview
 
 1. Inspect the complete deployment diff. Do not inadvertently publish unrelated

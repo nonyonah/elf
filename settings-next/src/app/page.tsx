@@ -11,6 +11,7 @@ import { Onboarding, type OnboardingStatus } from "@/components/onboarding";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
+import { McpConnections } from '@/components/mcp-connections';
 
 interface SlackInfo {
   connected: boolean;
@@ -316,6 +317,7 @@ export default function SettingsPage() {
   return (
     <main className="mx-auto w-full min-w-0 max-w-[420px] [overflow-wrap:anywhere] px-5 pb-6 pt-8">
       <div className="mb-1 flex items-center justify-between gap-3"><div className="flex items-center gap-3"><img src="/brand/elf-mascot.png" width={32} height={32} alt="" /><div><p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Elf</p><h1 className="text-[15px] font-medium leading-[1.55]">Settings</h1></div></div><Notifications activity={onboarding?.activity} projectKey={project?.configPath ?? onboarding?.root ?? ""} /></div>
+      <McpConnections />
       {project?.configPath ? (
         <p
           className="mb-5 truncate text-[11.5px] leading-[1.55] text-faint"

@@ -57,6 +57,41 @@ export function hostedRoutes() {
     for(const [k,v]of Object.entries(noStore))c.header(k,v);
     try{await next();}catch{return c.json({error:{message:'Review expired, changed, or unavailable. Start again in your assistant.'}},400);}
   });
+  app.get('/assistants',async c=>{
+    const oauth=c.env.OAUTH_PROVIDER;if(!oauth)throw new Error('OAuth unavailable');
+    const owner=getSession(c).userId,cursor=c.req.query('cursor');
+    if(cursor&&cursor.length>2000)throw new Error('Invalid cursor');
+    const grants=await oauth.listUserGrants(owner,{limit:50,...(cursor?{cursor}:{})});
+    const assistants=[];
+    for(const grant of grants.items){
+      const resource=`${origin(c.env)}/mcp`;
+      if(grant.expiresAt&&grant.expiresAt*1000<=now())continue;
+      if(grant.resource!==resource&&!(Array.isArray(grant.resource)&&grant.resource.includes(resource)))continue;
+      const client=await oauth.lookupClient(grant.clientId);
+      const activity=await c.env.DB.prepare('SELECT lastSeen FROM hosted_assistant_activity WHERE owner=? AND clientId=?').bind(owner,grant.clientId).first<{lastSeen:number}>();
+      assistants.push({id:grant.id,name:client?.clientName?.slice(0,200)||'MCP assistant',connected:true,connectedAt:grant.createdAt*1000,lastUsedAt:activity?.lastSeen??null});
+    }
+    return c.json({assistants,cursor:grants.cursor??null,connectorUrl:`${origin(c.env)}/mcp`});
+  });
+  app.post('/assistants/:id/disconnect',async c=>{
+    const oauth=c.env.OAUTH_PROVIDER;if(!oauth)throw new Error('OAuth unavailable');
+    const owner=getSession(c).userId,id=c.req.param('id');
+    // Find the grant under this owner before touching its client or pending work.
+    let cursor:string|undefined,found:{id:string;clientId:string}|undefined;
+    for(let page=0;page<5&&!found;page++){
+      const grants=await oauth.listUserGrants(owner,{limit:50,...(cursor?{cursor}:{})});
+      found=grants.items.find(g=>g.id===id);cursor=grants.cursor;
+      if(!cursor)break;
+    }
+    if(!found)throw new Error('Assistant not found');
+    await oauth.revokeGrant(found.id,owner);
+    await c.env.DB.batch([
+      c.env.DB.prepare("UPDATE hosted_operations SET state=CASE WHEN state='running' THEN 'unknown' ELSE 'cancelled' END WHERE owner=? AND clientId=? AND state IN ('running','queued')").bind(owner,found.clientId),
+      c.env.DB.prepare("UPDATE hosted_plans SET state='stale' WHERE owner=? AND clientId=? AND state IN ('review','approved','applying')").bind(owner,found.clientId),
+      c.env.DB.prepare('DELETE FROM hosted_assistant_activity WHERE owner=? AND clientId=?').bind(owner,found.clientId),
+    ]);
+    return c.json({ok:true});
+  });
   app.get('/connections/:id',async c=>{
     const row=await connection(c.env,getSession(c).userId,c.req.param('id'));
     return c.json({...row,authorization:'plugin',connected:!!row.heartbeat&&row.heartbeat>now()-15000});

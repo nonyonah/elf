@@ -17,6 +17,7 @@ export default defineConfig({
     },
   },
   build: {
+    rollupOptions: {input:{console:fileURLToPath(new URL('./client/index.html',import.meta.url)),settings:fileURLToPath(new URL('./client/settings.html',import.meta.url))}},
     outDir: "../dist/client",
     emptyOutDir: true,
   },

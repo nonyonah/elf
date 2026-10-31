@@ -14,7 +14,12 @@ import { ActivityScreen } from "@/screens/activity";
 import { OverviewScreen } from "@/screens/overview";
 import { ProjectScreen } from "@/screens/project";
 import { SettingsScreen } from "@/screens/settings";
-import { HostedReviewScreen, isHostedReview } from '@/screens/hosted-review';
+import { isHostedReview } from '@/screens/hosted-review';
+
+function HostedSettingsRedirect() {
+  React.useEffect(()=>{location.replace('/settings'+location.search);},[]);
+  return <p role="status">Opening Elf Settings…</p>;
+}
 
 function Console({
   devMode = false,
@@ -77,11 +82,12 @@ export function App(): React.ReactElement {
   const { getToken, isLoaded, isSignedIn } = useAuth();
   const api = React.useMemo(() => createApi(() => getToken()), [getToken]);
 
+  if (isHostedReview()) return <HostedSettingsRedirect />;
   if (!isLoaded) return <SplashScreen />;
 
   return (
     <ApiProvider client={api}>
-      {isSignedIn ? (isHostedReview() ? <HostedReviewScreen /> : <Console />) : <LandingScreen />}
+      {isSignedIn ? <Console /> : <LandingScreen />}
     </ApiProvider>
   );
 }
@@ -91,7 +97,7 @@ export function DevApp(): React.ReactElement {
   const api = React.useMemo(() => createApi(async () => null), []);
   return (
     <ApiProvider client={api}>
-      {isHostedReview() ? <HostedReviewScreen /> : <Console devMode />}
+      {isHostedReview() ? <HostedSettingsRedirect /> : <Console devMode />}
     </ApiProvider>
   );
 }

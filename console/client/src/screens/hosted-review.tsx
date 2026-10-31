@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { useApi } from '@/lib/api-context';
-import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
+import { Button } from '../../../../settings-next/src/components/ui/button';
+import { Card } from '../../../../settings-next/src/components/ui/card';
 
 interface ConnectionReview {id:string;fileKey:string;fileName:string;generation:string|null;approvedGeneration:string|null;connected:boolean;}
 interface PlanReview {id:string;fileKey:string;fileName:string;generation:string;hash:string;operations:{method:string;params:Record<string,unknown>}[];state:string;expires:number;sourceHash:string|null;}
@@ -12,7 +12,7 @@ export function isHostedReview() {
   return ['elf_authorize','elf_connection','elf_plan'].some(key=>query.has(key));
 }
 
-export function HostedReviewScreen() {
+export function HostedReviewScreen({embedded=false}:{embedded?:boolean}={}) {
   const api=useApi(),query=React.useMemo(()=>new URLSearchParams(location.search),[]);
   const [connection,setConnection]=React.useState<ConnectionReview|null>(null);
   const [plan,setPlan]=React.useState<PlanReview|null>(null);
@@ -35,8 +35,8 @@ export function HostedReviewScreen() {
     // The server validates the registered exact redirect URI before returning this URL.
     location.assign(result.redirectTo);
   };
-  return <main className="mx-auto flex min-h-screen w-full max-w-2xl flex-col justify-center gap-5 px-5 py-10">
-    <a className="w-fit font-heading text-lg font-semibold" href="/">elf</a>
+  return <section className={embedded?'mb-5':'mx-auto flex min-h-screen w-full max-w-2xl flex-col justify-center gap-5 px-5 py-10'}>
+    {!embedded&&<a className="w-fit font-heading text-lg font-semibold" href="/settings">Elf Settings</a>}
     <Card className="gap-5 overflow-hidden p-6">
       <header><h1 className="font-heading text-xl font-semibold">{authorize?'Connect your assistant':planId?'Review Figma changes':'Approve this Figma connection'}</h1>
         <p className="mt-2 text-sm text-muted-foreground">Review access and changes before continuing.</p></header>
@@ -65,5 +65,5 @@ export function HostedReviewScreen() {
         <Button disabled={busy||plan.state!=='review'||plan.expires<Date.now()||!!message} onClick={()=>act(async()=>{await api.post(`/hosted/plans/${plan.id}/approve`,{hash:plan.hash,generation:plan.generation});setMessage('Plan approved. Return to your assistant to apply these exact changes.');})}>Approve these changes</Button>
       </>}
     </Card>
-  </main>;
+  </section>;
 }

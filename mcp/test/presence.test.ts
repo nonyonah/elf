@@ -30,6 +30,7 @@ test('only initialized MCP sessions contribute presence; closing one cannot remo
  try{
   assert.equal(count(),undefined);
   await connect();await connect();
+  assert.deepEqual(await ordinary.call('__elf_mcp_status'),{connected:true,count:2});
   await ordinary.close();assert.equal(count(),2);
   await clients[0].close();await waitFor(()=>count()===1);
   await clients[1].close();await waitFor(()=>count()===0);

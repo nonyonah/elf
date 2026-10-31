@@ -1725,7 +1725,7 @@ figma.ui.onmessage = async (message: UiMessage) => {
     if (message.type === 'open-hosted-approval') {
       const id = String(message.connectionId ?? '');
       if (!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(id)) throw new Error('Invalid connection.');
-      figma.openExternal('https://elf-console.nonyonah.workers.dev/?elf_connection=' + id);
+      figma.openExternal('https://elf-console.nonyonah.workers.dev/settings?elf_connection=' + id);
       return;
     }
 

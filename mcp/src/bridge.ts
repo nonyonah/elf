@@ -536,6 +536,7 @@ export class Bridge {
         if (message.params?.connected !== true) throw new Error('MCP presence requires an initialized client. Close its controller to unregister.');
         this.mcpClients.add(socket); this.emitMcpPresence(); result = {ok:true};
       }
+      else if (message.method === '__elf_mcp_status') result = {connected:this.mcpClients.size>0,count:this.mcpClients.size};
       else if (message.method === '__elf_document_pending') result = this.documentApproval ? {file: {key: this.documentApproval.file.key, name: this.documentApproval.file.name}, ticket: this.documentApproval.ticket, expiresAt: this.documentApproval.expiresAt} : null;
       else if (message.method === '__elf_document_approve') {
         const pending = this.documentApproval;
