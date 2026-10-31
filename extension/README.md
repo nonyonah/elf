@@ -1,6 +1,6 @@
 # Elf — design-system drift and sync
 
-Keep your project and Figma design system connected from a native VS Code sidebar. Elf helps you inspect drift, review supported changes, and monitor your design system while you work.
+Keep your project and Figma design system connected from a native editor sidebar. Elf helps you inspect drift, review supported changes, and monitor your design system while you work.
 
 ## Beta requirements
 
@@ -20,6 +20,12 @@ macOS with Node 22 has local acceptance evidence. Windows/Linux support remains 
 6. Run a check and inspect the changes before enabling automatic sync.
 
 Keep Elf Bridge open: saved pairing does not make a closed Figma plugin run in the background.
+
+## Cursor and compatible editors
+
+In Cursor or another compatible VS Code-based desktop editor, install the official Elf VSIX with **Extensions → … → Install from VSIX**, reload if prompted, then open Elf in a trusted local project. The Microsoft Marketplace listing does not mean Elf is available in every editor’s registry. Verify the publisher when using another registry.
+
+The editor must support the VS Code APIs required by this extension (declared minimum 1.95). AI features additionally require compatible editor language-model APIs. Cursor and other forks have not received the same live acceptance testing as VS Code; report compatibility issues with your editor/version. See [editor setup](https://elf-docs.riftlabs.xyz/vscode).
 
 ## What you can do
 
