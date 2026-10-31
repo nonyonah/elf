@@ -12,7 +12,9 @@ const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 const stripes = (text) => (text.match(/pairing|Settings|Open the Elf/g) ?? []).slice(0, 3).join(" | ");
 
 const repo = process.cwd();
-check("pack artifact present", existsSync(join(repo, "elf-tokens-1.0.0.tgz")));
+const packageVersion = JSON.parse(readFileSync(join(repo, "package.json"), "utf8")).version;
+const artifactName = `elf-tokens-${packageVersion}.tgz`;
+check("pack artifact present", existsSync(join(repo, artifactName)));
 
 const root = mkdtempSync(join(tmpdir(), "elf-beta-smoke-"));
 const project = join(root, "project");
@@ -32,7 +34,7 @@ const npm = win ? "npm.cmd" : "npm";
 
 { const init = spawnSync(npm, ["init", "-y"], { cwd: installPath, env, encoding: "utf8", timeout: 60000, shell: win });
   check(`npm init (exit ${init.status})`, init.status === 0, String(init.stderr ?? "").slice(0, 200)); }
-{ const install = spawnSync(npm, ["install", join(repo, "elf-tokens-1.0.0.tgz"), "--no-audit", "--no-fund"], { cwd: installPath, env, encoding: "utf8", timeout: 300000, shell: win });
+{ const install = spawnSync(npm, ["install", join(repo, artifactName), "--no-audit", "--no-fund"], { cwd: installPath, env, encoding: "utf8", timeout: 300000, shell: win });
   check(`npm install packed tarball (exit ${install.status})`, install.status === 0, String(install.stderr ?? "").slice(0, 200)); }
 
 const pkgRoot = join(installPath, "node_modules", "elf-tokens");

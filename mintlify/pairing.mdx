@@ -1,0 +1,29 @@
+---
+title: "Connect Figma"
+description: "Pair the open document with your local Elf runtime."
+---
+
+## Install Elf Bridge during beta
+
+Run this from a project where Node can resolve the beta package:
+
+```sh
+npm install --save-dev elf-tokens@beta
+node -p "require.resolve('elf-tokens/package.json')"
+```
+
+In Figma Desktop choose **Plugins → Development → Import plugin from manifest**. Select `dist/bridge-plugin-public/manifest.json` inside that installed package directory. Select the file named `manifest.json`, not the source `manifest.public.json`.
+
+When the public Community listing is released, install Elf Bridge from that listing instead.
+
+## Pair and approve
+
+Run `npx elf-tokens@beta start`, open the intended Figma file, and open Elf Bridge. Enter the current terminal pairing code. If it expires, request a new code in Elf and use it once.
+
+The Figma file key must match the configured target. The file name may be anything, including Untitled. For a new design system, choose a blank file explicitly; for an existing system, inspect before proposing edits.
+
+Connecting the bridge and approving a document are separate steps. Strict verification checks account access. Plugin-only approval trusts the currently open plugin document without independent REST verification. Reconnection can require fresh approval even when pairing is saved.
+
+## Keep it connected
+
+The plugin must remain open to execute operations. Saved pairing does not make a closed Figma plugin run in the background. The MCP status row indicates initialized coding-assistant sessions; it does not authorize writes.

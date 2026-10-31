@@ -1,0 +1,21 @@
+---
+title: "Markdown to Figma"
+description: "Build a reviewed design system with your coding assistant."
+---
+
+This workflow is provided through the local MCP. Start with a Markdown design-system document in the project and an approved Figma target.
+
+Ask your assistant to:
+
+1. Read the Markdown and inspect the target file.
+2. Use `prepare_design_system` to prepare the design-system draft.
+3. Clarify collections, modes, scope, aliases, and missing visual details.
+4. Identify interactive components that lack documented states and ask whether to include proposed states or keep them without those variants.
+5. Present the concrete variable, component, and documentation plan for review.
+6. Apply only the approved plan and read back the result.
+
+A Markdown heading or prose description is not an exact visual specification. Missing dimensions, spacing, bindings, and variants require review. States must not be invented silently.
+
+Choose a blank file for a new system or explicitly select an existing file for modifications. The Markdown’s title need not match the Figma file name. Inspect existing resources before updating them; do not assume matching names authorize replacement.
+
+Component usage documentation and visual specifications serve different purposes. Review both. Supported generated variants are not automatically prototype interactions.

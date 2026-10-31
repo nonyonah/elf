@@ -1,0 +1,66 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "mint",
+  "name": "Elf",
+  "colors": {
+    "primary": "#6F3CFA",
+    "light": "#9670FF",
+    "dark": "#5426CE"
+  },
+  "logo": {
+    "light": "/images/elf-mascot.png",
+    "dark": "/images/elf-mascot.png"
+  },
+  "favicon": "/images/elf-mascot.png",
+  "navigation": {
+    "groups": [
+      {
+        "group": "Start here",
+        "pages": [
+          "introduction",
+          "quickstart",
+          "pairing",
+          "vscode"
+        ]
+      },
+      {
+        "group": "Your design system",
+        "pages": [
+          "drift",
+          "sync",
+          "imports",
+          "slack",
+          "lifecycle"
+        ]
+      },
+      {
+        "group": "Coding assistants",
+        "pages": [
+          "mcp",
+          "markdown"
+        ]
+      },
+      {
+        "group": "Reference",
+        "pages": [
+          "troubleshooting",
+          "privacy",
+          "releases"
+        ]
+      }
+    ]
+  },
+  "navbar": {
+    "links": [
+      {
+        "label": "GitHub",
+        "href": "https://github.com/nonyonah/elf"
+      }
+    ]
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/nonyonah/elf"
+    }
+  }
+}

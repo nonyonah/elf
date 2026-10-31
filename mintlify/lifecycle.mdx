@@ -1,0 +1,12 @@
+---
+title: "Divergence and deprecations"
+description: "Keep intentional differences explicit."
+---
+
+Record intentional differences through Elf’s supported configuration/review workflow rather than changing baselines to hide drift. Accepted differences apply to the reviewed resource/value pair; new differences remain detectable, and expiry restores reporting.
+
+Mark deprecated tokens/components explicitly. A resource still used in code is different from one ready for removal. Deprecated resources are retained without automatic writes when the sync planner requires manual review.
+
+An overdue deprecation can become drift. Removing its code use can make a retained Figma resource a removal candidate; Elf does not silently delete it.
+
+Keep these decisions version-controlled with the project and review them during design-system maintenance.

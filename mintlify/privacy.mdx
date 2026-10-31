@@ -1,0 +1,22 @@
+---
+title: "Data and permissions"
+description: "Understand the boundaries of Elf\u2019s local workflow."
+---
+
+## Local project data
+
+Elf reads configured/discovered design-token and component sources and stores local project configuration, manifests, reports, and review state. Pairing credentials are sensitive; do not commit local `.elf` state, tokens, private Settings links, or webhook URLs.
+
+## Figma
+
+The paired plugin reads and modifies the approved open document for requested operations. Strict verification uses the connected Figma account through the existing hosted OAuth connection service. Plugin-only approval trusts the open document without independent REST verification.
+
+## Slack and AI
+
+When Slack notifications are enabled, notification content is sent to Slack. Editor-generated descriptions use the selected editor language-model provider, and MCP prompts/results are handled by your assistant provider. Review those providers’ data policies before sharing private design or source content.
+
+## Access and support
+
+Disconnect accounts from Elf’s connection controls and revoke provider access through the provider when appropriate. Stop local runtimes when you are finished. For deletion or security questions, contact the maintainer through the [GitHub project](https://github.com/nonyonah/elf); avoid posting sensitive material in public issues.
+
+This page describes product data flows. It does not claim that all traffic stays on your machine or replace provider terms. A maintainer-reviewed privacy policy and support contact should accompany public app submissions.

@@ -1,7 +1,7 @@
 {
   "name": "elf-tokens",
-  "version": "1.0.0",
-  "description": "Compare Figma design tokens against the tokens in your codebase and surface drift as a PR comment.",
+  "version": "1.0.0-beta.1",
+  "description": "Monitor design-system drift between code and Figma, review token and component sync, and connect local coding assistants.",
   "type": "module",
   "license": "MIT",
   "repository": {
