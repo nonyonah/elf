@@ -35,6 +35,7 @@ export async function hostedMcp(request: Request, env: Env, owner: string, scope
       manageUrl:`${origin(env)}/settings?elf_connection=${row.id}`})),next:'Pair Elf Bridge in the intended file and approve the exact document in Elf Settings.'};
   });
   tool('get_figma_pairing_code','Create a single-use pairing code for a Figma file. Open Elf Bridge and choose Hosted Elf. Pairing does not approve writes.',{url:z.string().url()},async args=>{
+    if(owner.startsWith('plugin_'))throw new Error('This assistant is scoped to its approved file. Connect again from your assistant to authorize another file.');
     const url=new URL(String(args.url));
     if(url.protocol!=='https:'||!['www.figma.com','figma.com'].includes(url.hostname)||url.username||url.password||url.port)throw new Error('Use a Figma design file URL');
     const key=/^\/(?:design|file)\/([A-Za-z0-9_-]{10,100})(?:\/|$)/.exec(url.pathname)?.[1];

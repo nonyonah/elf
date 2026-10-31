@@ -1,5 +1,8 @@
 {
   "layoutMode": "HORIZONTAL",
-  "size": { "width": 80, "height": 1 },
-  "fill": "semantic.color.text"
+  "size": {
+    "width": 80,
+    "height": 1
+  },
+  "fill": "color-primary-500"
 }

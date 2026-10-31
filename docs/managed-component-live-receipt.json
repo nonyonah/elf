@@ -1,0 +1,44 @@
+{
+  "scope": "User-approved isolated component acceptance",
+  "individualSelectionExcludedUnselectedCard": true,
+  "sourceOnlyEditOutOfDateDelta": 1,
+  "stalePlanRejectedBeforeWrite": true,
+  "individualUpdateWidth": 128,
+  "watcher": {
+    "passed": true,
+    "results": [
+      {
+        "width": 144,
+        "nodeId": "10:1523",
+        "verified": true
+      },
+      {
+        "width": 120,
+        "nodeId": "10:1523",
+        "verified": true
+      }
+    ]
+  },
+  "final": {
+    "passed": true,
+    "nodeId": "10:1523",
+    "width": 120,
+    "height": 40,
+    "description": "Runs one immediate acceptance-test action.",
+    "topLevelComponents": 25,
+    "collections": 5,
+    "variables": 31,
+    "unselectedCardCreated": false,
+    "automaticSyncPaused": true
+  },
+  "rootRegressionTests": {
+    "passed": 227,
+    "failed": 0
+  },
+  "fixCommit": "4e8c835",
+  "limits": [
+    "213 pre-existing unrelated Figma-only entries remain reported; global drift is not clean.",
+    "Full-page scans made review planning take roughly 23\u201359 seconds.",
+    "This was macOS acceptance, not fresh-machine cross-platform coverage."
+  ]
+}

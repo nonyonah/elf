@@ -37,7 +37,6 @@ import {
   SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
-  SidebarGroupLabel,
   SidebarHeader,
   SidebarInset,
   SidebarMenu,
@@ -68,15 +67,10 @@ function WorkspaceSwitcher({
 }: {
   workspace: OverviewResponse["workspace"];
 }): React.ReactElement {
-  const initial = workspace.name.trim()[0]?.toUpperCase() ?? "W";
-
   return (
     <Menu>
-      <MenuTrigger className="mt-1 flex h-7 w-full min-w-0 items-center gap-1.5 rounded-lg px-1.5 text-left outline-none hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-sidebar-ring">
-        <span className="flex size-[18px] shrink-0 items-center justify-center rounded-[5px] bg-card font-medium text-[10px] text-foreground">
-          {initial}
-        </span>
-        <span className="min-w-0 flex-1 truncate font-medium text-[13px] text-foreground">
+      <MenuTrigger className="flex h-7 min-w-0 flex-1 items-center gap-1.5 rounded-lg px-1.5 text-left outline-none hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-sidebar-ring">
+        <span className="min-w-0 truncate font-medium text-[13px] text-foreground">
           {workspace.name}
         </span>
         <ChevronDownIcon className="size-3.5 shrink-0 text-muted-foreground" />
@@ -336,19 +330,20 @@ export function AppShell({
           className="static! h-full! min-w-0 overflow-hidden border-r-0! [&_[data-slot=sidebar-gap]]:hidden group-data-[side=left]:border-r-0! group-data-[state=collapsed]:w-0"
           collapsible="offcanvas"
         >
-          <SidebarHeader className="gap-0 px-3 pt-2 pb-1">
-            <a
-              aria-label="elf console"
-              className="flex h-11 w-fit items-center"
-              href="#/"
-            >
-              <BrandMark />
-            </a>
-            <WorkspaceSwitcher workspace={overview.workspace} />
+          <SidebarHeader className="px-3 pt-2 pb-1">
+            <div className="flex h-8 min-w-0 items-center gap-1.5">
+              <a
+                aria-label="elf console"
+                className="flex size-6 shrink-0 items-center justify-center"
+                href="#/"
+              >
+                <BrandMark />
+              </a>
+              <WorkspaceSwitcher workspace={overview.workspace} />
+            </div>
           </SidebarHeader>
-        <SidebarContent className="pt-3">
+        <SidebarContent className="pt-1">
           <SidebarGroup className="p-0 px-3">
-            <SidebarGroupLabel>Workspace</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
                 <SidebarMenuItem>
@@ -447,7 +442,7 @@ export function AppShell({
         </SidebarFooter>
         </Sidebar>
         <SidebarInset className="min-h-0 min-w-0 flex-1 bg-transparent p-2 md:pl-0">
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[12px] bg-card shadow-shell">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[12px] bg-card">
           <header className="relative z-20 flex h-12 shrink-0 items-center gap-2 border-b border-border-soft bg-card px-3">
             <SidebarTrigger />
             <Separator className="me-1 data-[orientation=vertical]:h-4" orientation="vertical" />

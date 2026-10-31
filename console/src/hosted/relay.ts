@@ -55,7 +55,8 @@ export async function connectPlugin(env: Env, input: {code?: string; fileKey: st
     env.DB.prepare("UPDATE hosted_operations SET state=CASE WHEN state='running' THEN 'unknown' ELSE 'cancelled' END WHERE connectionId=? AND state IN ('running','queued')").bind(row.id),
     env.DB.prepare("UPDATE hosted_plans SET state='stale' WHERE connectionId=? AND state IN ('review','approved','applying')").bind(row.id),
   ]);
-  return { connectionId: row.id, generation, session, approvalUrl: `${env.CONSOLE_ORIGIN}/settings?elf_connection=${row.id}`, authorization: 'plugin' };
+  const consent=await env.DB.prepare('SELECT clientName,redirectHost,scopes FROM hosted_plugin_consents WHERE owner=? AND connectionId=?').bind(row.owner,row.id).first<{clientName:string;redirectHost:string;scopes:string}>();
+  return { assistant:consent?{...consent,scopes:JSON.parse(consent.scopes)}:null, connectionId: row.id, generation, session, approvalUrl: `${env.CONSOLE_ORIGIN}/settings?elf_connection=${row.id}`, authorization: 'plugin' };
 }
 export async function disconnect(env: Env, owner: string, id: string) {
   await connection(env, owner, id);

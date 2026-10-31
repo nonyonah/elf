@@ -1,4 +1,5 @@
 import { localOAuth } from "./local-oauth.js";
+import { pluginAuthorizationRoutes, requireHostedBrowser } from './hosted/plugin-auth.js';
 import { hostedFetch } from './hosted/oauth.js';
 import { hostedRoutes, pluginRoutes } from './hosted/routes.js';
 import { cleanupHosted } from './hosted/cleanup.js';
@@ -26,6 +27,9 @@ export function createApp(options: { sessionResolver?: SessionResolver } = {}) {
 
   app.route("/api/local-connect", localOAuth());
   app.route('/api/hosted-bridge', pluginRoutes());
+  app.route('/api/hosted-auth', pluginAuthorizationRoutes());
+  app.use('/api/hosted/*', options.sessionResolver ? requireSession(options.sessionResolver) : requireHostedBrowser);
+  app.route('/api/hosted', hostedRoutes());
 
   // Slack's OAuth callback — public by design. It trusts only the signed,
   // expiring state minted by the authenticated install endpoint.
@@ -54,7 +58,6 @@ export function createApp(options: { sessionResolver?: SessionResolver } = {}) {
   app.route("/api/v1", apiV1());
 
   app.use("/api/*", requireSession(options.sessionResolver));
-  app.route('/api/hosted', hostedRoutes());
 
   // Dashboard API (workspace-scoped) — registered after the gate, so every
   // route below is Clerk-protected.

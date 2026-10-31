@@ -1,0 +1,1191 @@
+{
+  "schema": 1,
+  "targetFileKey": "eu8zGUOsrdyXXQqvJeyl1E",
+  "sourceHash": "04a30b14e179be2162d97bf4cb7269daf546301d297bc84f2ed70264b4bb629f",
+  "stage": "16 state sets created and read back; prototype transitions not wired",
+  "sets": [
+    {
+      "name": "Button",
+      "id": "3:388",
+      "codeKey": "rift-labs/markdown/button",
+      "created": true,
+      "variantCount": 48,
+      "requestedVariantCount": 48,
+      "variants": [
+        {
+          "id": "2:2",
+          "name": "Style=Primary, Size=Default, State=Default"
+        },
+        {
+          "id": "3:168",
+          "name": "Style=Primary, Size=Default, State=Hover"
+        },
+        {
+          "id": "3:173",
+          "name": "Style=Primary, Size=Default, State=Pressed"
+        },
+        {
+          "id": "3:178",
+          "name": "Style=Primary, Size=Default, State=Focus"
+        },
+        {
+          "id": "3:183",
+          "name": "Style=Primary, Size=Default, State=Disabled"
+        },
+        {
+          "id": "3:187",
+          "name": "Style=Primary, Size=Default, State=Loading"
+        },
+        {
+          "id": "3:192",
+          "name": "Style=Primary, Size=Small, State=Default"
+        },
+        {
+          "id": "3:196",
+          "name": "Style=Primary, Size=Small, State=Hover"
+        },
+        {
+          "id": "3:201",
+          "name": "Style=Primary, Size=Small, State=Pressed"
+        },
+        {
+          "id": "3:206",
+          "name": "Style=Primary, Size=Small, State=Focus"
+        },
+        {
+          "id": "3:211",
+          "name": "Style=Primary, Size=Small, State=Disabled"
+        },
+        {
+          "id": "3:215",
+          "name": "Style=Primary, Size=Small, State=Loading"
+        },
+        {
+          "id": "3:220",
+          "name": "Style=Secondary, Size=Default, State=Default"
+        },
+        {
+          "id": "3:224",
+          "name": "Style=Secondary, Size=Default, State=Hover"
+        },
+        {
+          "id": "3:229",
+          "name": "Style=Secondary, Size=Default, State=Pressed"
+        },
+        {
+          "id": "3:234",
+          "name": "Style=Secondary, Size=Default, State=Focus"
+        },
+        {
+          "id": "3:239",
+          "name": "Style=Secondary, Size=Default, State=Disabled"
+        },
+        {
+          "id": "3:243",
+          "name": "Style=Secondary, Size=Default, State=Loading"
+        },
+        {
+          "id": "3:248",
+          "name": "Style=Secondary, Size=Small, State=Default"
+        },
+        {
+          "id": "3:252",
+          "name": "Style=Secondary, Size=Small, State=Hover"
+        },
+        {
+          "id": "3:257",
+          "name": "Style=Secondary, Size=Small, State=Pressed"
+        },
+        {
+          "id": "3:262",
+          "name": "Style=Secondary, Size=Small, State=Focus"
+        },
+        {
+          "id": "3:267",
+          "name": "Style=Secondary, Size=Small, State=Disabled"
+        },
+        {
+          "id": "3:271",
+          "name": "Style=Secondary, Size=Small, State=Loading"
+        },
+        {
+          "id": "3:276",
+          "name": "Style=Ghost, Size=Default, State=Default"
+        },
+        {
+          "id": "3:280",
+          "name": "Style=Ghost, Size=Default, State=Hover"
+        },
+        {
+          "id": "3:285",
+          "name": "Style=Ghost, Size=Default, State=Pressed"
+        },
+        {
+          "id": "3:290",
+          "name": "Style=Ghost, Size=Default, State=Focus"
+        },
+        {
+          "id": "3:295",
+          "name": "Style=Ghost, Size=Default, State=Disabled"
+        },
+        {
+          "id": "3:299",
+          "name": "Style=Ghost, Size=Default, State=Loading"
+        },
+        {
+          "id": "3:304",
+          "name": "Style=Ghost, Size=Small, State=Default"
+        },
+        {
+          "id": "3:308",
+          "name": "Style=Ghost, Size=Small, State=Hover"
+        },
+        {
+          "id": "3:313",
+          "name": "Style=Ghost, Size=Small, State=Pressed"
+        },
+        {
+          "id": "3:318",
+          "name": "Style=Ghost, Size=Small, State=Focus"
+        },
+        {
+          "id": "3:323",
+          "name": "Style=Ghost, Size=Small, State=Disabled"
+        },
+        {
+          "id": "3:327",
+          "name": "Style=Ghost, Size=Small, State=Loading"
+        },
+        {
+          "id": "3:332",
+          "name": "Style=Destructive, Size=Default, State=Default"
+        },
+        {
+          "id": "3:336",
+          "name": "Style=Destructive, Size=Default, State=Hover"
+        },
+        {
+          "id": "3:341",
+          "name": "Style=Destructive, Size=Default, State=Pressed"
+        },
+        {
+          "id": "3:346",
+          "name": "Style=Destructive, Size=Default, State=Focus"
+        },
+        {
+          "id": "3:351",
+          "name": "Style=Destructive, Size=Default, State=Disabled"
+        },
+        {
+          "id": "3:355",
+          "name": "Style=Destructive, Size=Default, State=Loading"
+        },
+        {
+          "id": "3:360",
+          "name": "Style=Destructive, Size=Small, State=Default"
+        },
+        {
+          "id": "3:364",
+          "name": "Style=Destructive, Size=Small, State=Hover"
+        },
+        {
+          "id": "3:369",
+          "name": "Style=Destructive, Size=Small, State=Pressed"
+        },
+        {
+          "id": "3:374",
+          "name": "Style=Destructive, Size=Small, State=Focus"
+        },
+        {
+          "id": "3:379",
+          "name": "Style=Destructive, Size=Small, State=Disabled"
+        },
+        {
+          "id": "3:383",
+          "name": "Style=Destructive, Size=Small, State=Loading"
+        }
+      ],
+      "retainedVariants": [],
+      "promotedComponentId": "2:2",
+      "parentId": "0:1",
+      "expectedSourceId": "2:2"
+    },
+    {
+      "name": "Input",
+      "id": "3:456",
+      "codeKey": "rift-labs/markdown/input",
+      "created": true,
+      "variantCount": 12,
+      "requestedVariantCount": 12,
+      "variants": [
+        {
+          "id": "2:4",
+          "name": "Kind=Search, State=Default"
+        },
+        {
+          "id": "3:392",
+          "name": "Kind=Search, State=Filled"
+        },
+        {
+          "id": "3:398",
+          "name": "Kind=Search, State=Hover"
+        },
+        {
+          "id": "3:404",
+          "name": "Kind=Search, State=Focus"
+        },
+        {
+          "id": "3:411",
+          "name": "Kind=Search, State=Error"
+        },
+        {
+          "id": "3:418",
+          "name": "Kind=Search, State=Disabled"
+        },
+        {
+          "id": "3:424",
+          "name": "Kind=Text, State=Default"
+        },
+        {
+          "id": "3:429",
+          "name": "Kind=Text, State=Filled"
+        },
+        {
+          "id": "3:434",
+          "name": "Kind=Text, State=Hover"
+        },
+        {
+          "id": "3:439",
+          "name": "Kind=Text, State=Focus"
+        },
+        {
+          "id": "3:445",
+          "name": "Kind=Text, State=Error"
+        },
+        {
+          "id": "3:451",
+          "name": "Kind=Text, State=Disabled"
+        }
+      ],
+      "retainedVariants": [],
+      "promotedComponentId": "2:4",
+      "parentId": "0:1",
+      "expectedSourceId": "2:4"
+    },
+    {
+      "name": "Nav item",
+      "id": "3:504",
+      "codeKey": "rift-labs/markdown/nav-item",
+      "created": true,
+      "variantCount": 8,
+      "requestedVariantCount": 8,
+      "variants": [
+        {
+          "id": "2:9",
+          "name": "Selected=True, State=Default"
+        },
+        {
+          "id": "3:462",
+          "name": "Selected=True, State=Hover"
+        },
+        {
+          "id": "3:469",
+          "name": "Selected=True, State=Focus"
+        },
+        {
+          "id": "3:476",
+          "name": "Selected=True, State=Disabled"
+        },
+        {
+          "id": "3:482",
+          "name": "Selected=False, State=Default"
+        },
+        {
+          "id": "3:487",
+          "name": "Selected=False, State=Hover"
+        },
+        {
+          "id": "3:493",
+          "name": "Selected=False, State=Focus"
+        },
+        {
+          "id": "3:499",
+          "name": "Selected=False, State=Disabled"
+        }
+      ],
+      "retainedVariants": [],
+      "promotedComponentId": "2:9",
+      "parentId": "0:1",
+      "expectedSourceId": "2:9"
+    },
+    {
+      "name": "List row",
+      "id": "3:561",
+      "codeKey": "rift-labs/markdown/list-row",
+      "created": true,
+      "variantCount": 8,
+      "requestedVariantCount": 8,
+      "variants": [
+        {
+          "id": "2:13",
+          "name": "Read=Unread, State=Default"
+        },
+        {
+          "id": "3:510",
+          "name": "Read=Unread, State=Hover"
+        },
+        {
+          "id": "3:518",
+          "name": "Read=Unread, State=Pressed"
+        },
+        {
+          "id": "3:526",
+          "name": "Read=Unread, State=Focus"
+        },
+        {
+          "id": "3:534",
+          "name": "Read=Read, State=Default"
+        },
+        {
+          "id": "3:540",
+          "name": "Read=Read, State=Hover"
+        },
+        {
+          "id": "3:547",
+          "name": "Read=Read, State=Pressed"
+        },
+        {
+          "id": "3:554",
+          "name": "Read=Read, State=Focus"
+        }
+      ],
+      "retainedVariants": [],
+      "promotedComponentId": "2:13",
+      "parentId": "0:1",
+      "expectedSourceId": "2:13"
+    },
+    {
+      "name": "Table",
+      "id": "3:726",
+      "codeKey": "rift-labs/markdown/table",
+      "created": true,
+      "variantCount": 8,
+      "requestedVariantCount": 8,
+      "variants": [
+        {
+          "id": "2:32",
+          "name": "Density=Comfortable, State=Default"
+        },
+        {
+          "id": "3:568",
+          "name": "Density=Comfortable, State=Selected"
+        },
+        {
+          "id": "3:598",
+          "name": "Density=Comfortable, State=Sorted"
+        },
+        {
+          "id": "3:625",
+          "name": "Density=Comfortable, State=Empty"
+        },
+        {
+          "id": "3:634",
+          "name": "Density=Compact, State=Default"
+        },
+        {
+          "id": "3:660",
+          "name": "Density=Compact, State=Selected"
+        },
+        {
+          "id": "3:690",
+          "name": "Density=Compact, State=Sorted"
+        },
+        {
+          "id": "3:717",
+          "name": "Density=Compact, State=Empty"
+        }
+      ],
+      "retainedVariants": [],
+      "promotedComponentId": "2:32",
+      "parentId": "0:1",
+      "expectedSourceId": "2:32"
+    },
+    {
+      "name": "Dropdown",
+      "id": "3:823",
+      "codeKey": "rift-labs/markdown/dropdown",
+      "created": true,
+      "variantCount": 10,
+      "requestedVariantCount": 10,
+      "variants": [
+        {
+          "id": "2:56",
+          "name": "Kind=Menu, State=Open"
+        },
+        {
+          "id": "3:752",
+          "name": "Kind=Menu, State=Highlighted"
+        },
+        {
+          "id": "3:761",
+          "name": "Kind=Menu, State=Focus"
+        },
+        {
+          "id": "3:771",
+          "name": "Kind=Menu, State=DisabledItem"
+        },
+        {
+          "id": "3:779",
+          "name": "Kind=Menu, State=Destructive"
+        },
+        {
+          "id": "3:788",
+          "name": "Kind=Select, State=Closed"
+        },
+        {
+          "id": "3:794",
+          "name": "Kind=Select, State=Open"
+        },
+        {
+          "id": "3:804",
+          "name": "Kind=Select, State=Focus"
+        },
+        {
+          "id": "3:811",
+          "name": "Kind=Select, State=Disabled"
+        },
+        {
+          "id": "3:817",
+          "name": "Kind=Select, State=Selected"
+        }
+      ],
+      "retainedVariants": [],
+      "promotedComponentId": "2:56",
+      "parentId": "0:1",
+      "expectedSourceId": "2:56"
+    },
+    {
+      "name": "Card",
+      "id": "3:859",
+      "codeKey": "rift-labs/markdown/card",
+      "created": true,
+      "variantCount": 6,
+      "requestedVariantCount": 6,
+      "variants": [
+        {
+          "id": "2:62",
+          "name": "Kind=Default, State=Default"
+        },
+        {
+          "id": "3:831",
+          "name": "Kind=Interactive, State=Default"
+        },
+        {
+          "id": "3:836",
+          "name": "Kind=Interactive, State=Hover"
+        },
+        {
+          "id": "3:842",
+          "name": "Kind=Interactive, State=Pressed"
+        },
+        {
+          "id": "3:848",
+          "name": "Kind=Interactive, State=Focus"
+        },
+        {
+          "id": "3:854",
+          "name": "Kind=Stat, State=Default"
+        }
+      ],
+      "retainedVariants": [],
+      "promotedComponentId": "2:62",
+      "parentId": "0:1",
+      "expectedSourceId": "2:62"
+    },
+    {
+      "name": "Tabs",
+      "id": "3:1037",
+      "codeKey": "rift-labs/markdown/tabs",
+      "created": true,
+      "variantCount": 24,
+      "requestedVariantCount": 24,
+      "variants": [
+        {
+          "id": "2:65",
+          "name": "Style=Primary, Active=Overview, State=Default"
+        },
+        {
+          "id": "3:864",
+          "name": "Style=Primary, Active=Overview, State=Hover"
+        },
+        {
+          "id": "3:872",
+          "name": "Style=Primary, Active=Overview, State=Focus"
+        },
+        {
+          "id": "3:880",
+          "name": "Style=Primary, Active=Overview, State=Disabled"
+        },
+        {
+          "id": "3:887",
+          "name": "Style=Primary, Active=Activity, State=Default"
+        },
+        {
+          "id": "3:894",
+          "name": "Style=Primary, Active=Activity, State=Hover"
+        },
+        {
+          "id": "3:902",
+          "name": "Style=Primary, Active=Activity, State=Focus"
+        },
+        {
+          "id": "3:910",
+          "name": "Style=Primary, Active=Activity, State=Disabled"
+        },
+        {
+          "id": "3:917",
+          "name": "Style=Primary, Active=Settings, State=Default"
+        },
+        {
+          "id": "3:924",
+          "name": "Style=Primary, Active=Settings, State=Hover"
+        },
+        {
+          "id": "3:932",
+          "name": "Style=Primary, Active=Settings, State=Focus"
+        },
+        {
+          "id": "3:940",
+          "name": "Style=Primary, Active=Settings, State=Disabled"
+        },
+        {
+          "id": "3:947",
+          "name": "Style=Secondary, Active=Overview, State=Default"
+        },
+        {
+          "id": "3:954",
+          "name": "Style=Secondary, Active=Overview, State=Hover"
+        },
+        {
+          "id": "3:962",
+          "name": "Style=Secondary, Active=Overview, State=Focus"
+        },
+        {
+          "id": "3:970",
+          "name": "Style=Secondary, Active=Overview, State=Disabled"
+        },
+        {
+          "id": "3:977",
+          "name": "Style=Secondary, Active=Activity, State=Default"
+        },
+        {
+          "id": "3:984",
+          "name": "Style=Secondary, Active=Activity, State=Hover"
+        },
+        {
+          "id": "3:992",
+          "name": "Style=Secondary, Active=Activity, State=Focus"
+        },
+        {
+          "id": "3:1000",
+          "name": "Style=Secondary, Active=Activity, State=Disabled"
+        },
+        {
+          "id": "3:1007",
+          "name": "Style=Secondary, Active=Settings, State=Default"
+        },
+        {
+          "id": "3:1014",
+          "name": "Style=Secondary, Active=Settings, State=Hover"
+        },
+        {
+          "id": "3:1022",
+          "name": "Style=Secondary, Active=Settings, State=Focus"
+        },
+        {
+          "id": "3:1030",
+          "name": "Style=Secondary, Active=Settings, State=Disabled"
+        }
+      ],
+      "retainedVariants": [],
+      "promotedComponentId": "2:65",
+      "parentId": "0:1",
+      "expectedSourceId": "2:65"
+    },
+    {
+      "name": "Switch",
+      "id": "3:1090",
+      "codeKey": "rift-labs/markdown/switch",
+      "created": true,
+      "variantCount": 8,
+      "requestedVariantCount": 8,
+      "variants": [
+        {
+          "id": "2:70",
+          "name": "Checked=On, State=Default"
+        },
+        {
+          "id": "3:1044",
+          "name": "Checked=On, State=Hover"
+        },
+        {
+          "id": "3:1051",
+          "name": "Checked=On, State=Focus"
+        },
+        {
+          "id": "3:1058",
+          "name": "Checked=On, State=Disabled"
+        },
+        {
+          "id": "3:1064",
+          "name": "Checked=Off, State=Default"
+        },
+        {
+          "id": "3:1070",
+          "name": "Checked=Off, State=Hover"
+        },
+        {
+          "id": "3:1077",
+          "name": "Checked=Off, State=Focus"
+        },
+        {
+          "id": "3:1084",
+          "name": "Checked=Off, State=Disabled"
+        }
+      ],
+      "retainedVariants": [],
+      "promotedComponentId": "2:70",
+      "parentId": "0:1",
+      "expectedSourceId": "2:70"
+    },
+    {
+      "name": "Checkbox & radio",
+      "id": "3:1212",
+      "codeKey": "rift-labs/markdown/checkbox-radio",
+      "created": true,
+      "variantCount": 20,
+      "requestedVariantCount": 20,
+      "variants": [
+        {
+          "id": "2:74",
+          "name": "Control=Checkbox, Value=Checked, State=Default"
+        },
+        {
+          "id": "3:1096",
+          "name": "Control=Checkbox, Value=Checked, State=Hover"
+        },
+        {
+          "id": "3:1103",
+          "name": "Control=Checkbox, Value=Checked, State=Focus"
+        },
+        {
+          "id": "3:1110",
+          "name": "Control=Checkbox, Value=Checked, State=Disabled"
+        },
+        {
+          "id": "3:1116",
+          "name": "Control=Checkbox, Value=Unchecked, State=Default"
+        },
+        {
+          "id": "3:1121",
+          "name": "Control=Checkbox, Value=Unchecked, State=Hover"
+        },
+        {
+          "id": "3:1127",
+          "name": "Control=Checkbox, Value=Unchecked, State=Focus"
+        },
+        {
+          "id": "3:1133",
+          "name": "Control=Checkbox, Value=Unchecked, State=Disabled"
+        },
+        {
+          "id": "3:1138",
+          "name": "Control=Checkbox, Value=Indeterminate, State=Default"
+        },
+        {
+          "id": "3:1144",
+          "name": "Control=Checkbox, Value=Indeterminate, State=Hover"
+        },
+        {
+          "id": "3:1151",
+          "name": "Control=Checkbox, Value=Indeterminate, State=Focus"
+        },
+        {
+          "id": "3:1158",
+          "name": "Control=Checkbox, Value=Indeterminate, State=Disabled"
+        },
+        {
+          "id": "3:1164",
+          "name": "Control=Radio, Value=Selected, State=Default"
+        },
+        {
+          "id": "3:1170",
+          "name": "Control=Radio, Value=Selected, State=Hover"
+        },
+        {
+          "id": "3:1177",
+          "name": "Control=Radio, Value=Selected, State=Focus"
+        },
+        {
+          "id": "3:1184",
+          "name": "Control=Radio, Value=Selected, State=Disabled"
+        },
+        {
+          "id": "3:1190",
+          "name": "Control=Radio, Value=Unselected, State=Default"
+        },
+        {
+          "id": "3:1195",
+          "name": "Control=Radio, Value=Unselected, State=Hover"
+        },
+        {
+          "id": "3:1201",
+          "name": "Control=Radio, Value=Unselected, State=Focus"
+        },
+        {
+          "id": "3:1207",
+          "name": "Control=Radio, Value=Unselected, State=Disabled"
+        }
+      ],
+      "retainedVariants": [],
+      "promotedComponentId": "2:74",
+      "parentId": "0:1",
+      "expectedSourceId": "2:74"
+    },
+    {
+      "name": "Accordion",
+      "id": "3:1263",
+      "codeKey": "rift-labs/markdown/accordion",
+      "created": true,
+      "variantCount": 8,
+      "requestedVariantCount": 8,
+      "variants": [
+        {
+          "id": "2:81",
+          "name": "Expanded=True, State=Default"
+        },
+        {
+          "id": "3:1218",
+          "name": "Expanded=True, State=Hover"
+        },
+        {
+          "id": "3:1226",
+          "name": "Expanded=True, State=Focus"
+        },
+        {
+          "id": "3:1234",
+          "name": "Expanded=True, State=Disabled"
+        },
+        {
+          "id": "3:1241",
+          "name": "Expanded=False, State=Default"
+        },
+        {
+          "id": "3:1246",
+          "name": "Expanded=False, State=Hover"
+        },
+        {
+          "id": "3:1252",
+          "name": "Expanded=False, State=Focus"
+        },
+        {
+          "id": "3:1258",
+          "name": "Expanded=False, State=Disabled"
+        }
+      ],
+      "retainedVariants": [],
+      "promotedComponentId": "2:81",
+      "parentId": "0:1",
+      "expectedSourceId": "2:81"
+    },
+    {
+      "name": "Amount input",
+      "id": "3:1306",
+      "codeKey": "rift-labs/markdown/amount-input",
+      "created": true,
+      "variantCount": 6,
+      "requestedVariantCount": 6,
+      "variants": [
+        {
+          "id": "2:96",
+          "name": "State=Filled"
+        },
+        {
+          "id": "3:1270",
+          "name": "State=Empty"
+        },
+        {
+          "id": "3:1277",
+          "name": "State=Hover"
+        },
+        {
+          "id": "3:1284",
+          "name": "State=Focus"
+        },
+        {
+          "id": "3:1292",
+          "name": "State=Error"
+        },
+        {
+          "id": "3:1299",
+          "name": "State=Disabled"
+        }
+      ],
+      "retainedVariants": [],
+      "promotedComponentId": "2:96",
+      "parentId": "0:1",
+      "expectedSourceId": "2:96"
+    },
+    {
+      "name": "Command palette",
+      "id": "3:1347",
+      "codeKey": "rift-labs/markdown/command-palette",
+      "created": true,
+      "variantCount": 4,
+      "requestedVariantCount": 4,
+      "variants": [
+        {
+          "id": "2:108",
+          "name": "State=Default"
+        },
+        {
+          "id": "3:1313",
+          "name": "State=Filtered"
+        },
+        {
+          "id": "3:1325",
+          "name": "State=NoResults"
+        },
+        {
+          "id": "3:1333",
+          "name": "State=Focus"
+        }
+      ],
+      "retainedVariants": [],
+      "promotedComponentId": "2:108",
+      "parentId": "0:1",
+      "expectedSourceId": "2:108"
+    },
+    {
+      "name": "Pagination",
+      "id": "3:1446",
+      "codeKey": "rift-labs/markdown/pagination",
+      "created": true,
+      "variantCount": 9,
+      "requestedVariantCount": 9,
+      "variants": [
+        {
+          "id": "2:124",
+          "name": "Position=First, State=Default"
+        },
+        {
+          "id": "3:1360",
+          "name": "Position=First, State=Hover"
+        },
+        {
+          "id": "3:1371",
+          "name": "Position=First, State=Focus"
+        },
+        {
+          "id": "3:1382",
+          "name": "Position=Middle, State=Default"
+        },
+        {
+          "id": "3:1392",
+          "name": "Position=Middle, State=Hover"
+        },
+        {
+          "id": "3:1403",
+          "name": "Position=Middle, State=Focus"
+        },
+        {
+          "id": "3:1414",
+          "name": "Position=Last, State=Default"
+        },
+        {
+          "id": "3:1424",
+          "name": "Position=Last, State=Hover"
+        },
+        {
+          "id": "3:1435",
+          "name": "Position=Last, State=Focus"
+        }
+      ],
+      "retainedVariants": [],
+      "promotedComponentId": "2:124",
+      "parentId": "0:1",
+      "expectedSourceId": "2:124"
+    },
+    {
+      "name": "Toast",
+      "id": "3:1466",
+      "codeKey": "rift-labs/markdown/toast",
+      "created": true,
+      "variantCount": 3,
+      "requestedVariantCount": 3,
+      "variants": [
+        {
+          "id": "2:93",
+          "name": "Tone=Success"
+        },
+        {
+          "id": "3:1456",
+          "name": "Tone=Error"
+        },
+        {
+          "id": "3:1461",
+          "name": "Tone=Info"
+        }
+      ],
+      "retainedVariants": [],
+      "promotedComponentId": "2:93",
+      "parentId": "0:1",
+      "expectedSourceId": "2:93"
+    },
+    {
+      "name": "Alert / banner",
+      "id": "3:1483",
+      "codeKey": "rift-labs/markdown/alert-banner",
+      "created": true,
+      "variantCount": 3,
+      "requestedVariantCount": 3,
+      "variants": [
+        {
+          "id": "2:104",
+          "name": "Tone=Warning"
+        },
+        {
+          "id": "3:1471",
+          "name": "Tone=Info"
+        },
+        {
+          "id": "3:1477",
+          "name": "Tone=Danger"
+        }
+      ],
+      "retainedVariants": [],
+      "promotedComponentId": "2:104",
+      "parentId": "0:1",
+      "expectedSourceId": "2:104"
+    }
+  ],
+  "verification": [
+    {
+      "name": "Button",
+      "id": "3:388",
+      "count": 48,
+      "descriptionMatches": true,
+      "sourceIdPreserved": true,
+      "bounds": {
+        "x": 3000,
+        "y": 0,
+        "width": 2168,
+        "height": 248
+      }
+    },
+    {
+      "name": "Input",
+      "id": "3:456",
+      "count": 12,
+      "descriptionMatches": true,
+      "sourceIdPreserved": true,
+      "bounds": {
+        "x": 9000,
+        "y": 0,
+        "width": 1880,
+        "height": 168
+      }
+    },
+    {
+      "name": "Nav item",
+      "id": "3:504",
+      "count": 8,
+      "descriptionMatches": true,
+      "sourceIdPreserved": true,
+      "bounds": {
+        "x": 15000,
+        "y": 0,
+        "width": 1080,
+        "height": 112
+      }
+    },
+    {
+      "name": "List row",
+      "id": "3:561",
+      "count": 8,
+      "descriptionMatches": true,
+      "sourceIdPreserved": true,
+      "bounds": {
+        "x": 3000,
+        "y": 4200,
+        "width": 1720,
+        "height": 168
+      }
+    },
+    {
+      "name": "Table",
+      "id": "3:726",
+      "count": 8,
+      "descriptionMatches": true,
+      "sourceIdPreserved": true,
+      "bounds": {
+        "x": 9000,
+        "y": 4200,
+        "width": 2680,
+        "height": 352
+      }
+    },
+    {
+      "name": "Dropdown",
+      "id": "3:823",
+      "count": 10,
+      "descriptionMatches": true,
+      "sourceIdPreserved": true,
+      "bounds": {
+        "x": 15000,
+        "y": 4200,
+        "width": 2104,
+        "height": 320
+      }
+    },
+    {
+      "name": "Card",
+      "id": "3:859",
+      "count": 6,
+      "descriptionMatches": true,
+      "sourceIdPreserved": true,
+      "bounds": {
+        "x": 3000,
+        "y": 8400,
+        "width": 1400,
+        "height": 560
+      }
+    },
+    {
+      "name": "Tabs",
+      "id": "3:1037",
+      "count": 24,
+      "descriptionMatches": true,
+      "sourceIdPreserved": true,
+      "bounds": {
+        "x": 9000,
+        "y": 8400,
+        "width": 4280,
+        "height": 112
+      }
+    },
+    {
+      "name": "Switch",
+      "id": "3:1090",
+      "count": 8,
+      "descriptionMatches": true,
+      "sourceIdPreserved": true,
+      "bounds": {
+        "x": 15000,
+        "y": 8400,
+        "width": 1080,
+        "height": 104
+      }
+    },
+    {
+      "name": "Checkbox & radio",
+      "id": "3:1212",
+      "count": 20,
+      "descriptionMatches": true,
+      "sourceIdPreserved": true,
+      "bounds": {
+        "x": 3000,
+        "y": 12600,
+        "width": 4360,
+        "height": 104
+      }
+    },
+    {
+      "name": "Accordion",
+      "id": "3:1263",
+      "count": 8,
+      "descriptionMatches": true,
+      "sourceIdPreserved": true,
+      "bounds": {
+        "x": 9000,
+        "y": 12600,
+        "width": 1720,
+        "height": 192
+      }
+    },
+    {
+      "name": "Amount input",
+      "id": "3:1306",
+      "count": 6,
+      "descriptionMatches": true,
+      "sourceIdPreserved": true,
+      "bounds": {
+        "x": 15000,
+        "y": 12600,
+        "width": 320,
+        "height": 584
+      }
+    },
+    {
+      "name": "Command palette",
+      "id": "3:1347",
+      "count": 4,
+      "descriptionMatches": true,
+      "sourceIdPreserved": true,
+      "bounds": {
+        "x": 3000,
+        "y": 16800,
+        "width": 480,
+        "height": 1400
+      }
+    },
+    {
+      "name": "Pagination",
+      "id": "3:1446",
+      "count": 9,
+      "descriptionMatches": true,
+      "sourceIdPreserved": true,
+      "bounds": {
+        "x": 9000,
+        "y": 16800,
+        "width": 1064,
+        "height": 176
+      }
+    },
+    {
+      "name": "Toast",
+      "id": "3:1466",
+      "count": 3,
+      "descriptionMatches": true,
+      "sourceIdPreserved": true,
+      "bounds": {
+        "x": 15000,
+        "y": 16800,
+        "width": 360,
+        "height": 272
+      }
+    },
+    {
+      "name": "Alert / banner",
+      "id": "3:1483",
+      "count": 3,
+      "descriptionMatches": true,
+      "sourceIdPreserved": true,
+      "bounds": {
+        "x": 3000,
+        "y": 21000,
+        "width": 400,
+        "height": 320
+      }
+    }
+  ],
+  "staticComponents": [
+    "Badge & counter",
+    "Empty state",
+    "Chart (area)",
+    "Dialog",
+    "Avatar",
+    "Skeleton",
+    "Tooltip"
+  ]
+}

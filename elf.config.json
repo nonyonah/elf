@@ -1,20 +1,17 @@
 {
   "figma": {
-    "fileKey": "DMsbPpe8Q76MJDT3Ocfyun",
+    "fileKey": "nMkJyanPcxDg6MZpfTwseE",
     "apiTokenEnv": "FIGMA_API_TOKEN",
-    "source": "auto",
-    "teamId": ""
+    "source": "bridge",
+    "teamId": "",
+    "authorization": "plugin"
   },
   "codebase": {
-    "source": "auto",
-    "path": "./tailwind.config.js"
+    "source": "css",
+    "path": "fixtures/tokens.css"
   },
   "modeName": null,
   "nameMapping": {},
-  "notify": {
-    "webhookEnv": "SLACK_WEBHOOK_URL",
-    "format": "slack"
-  },
   "webhook": {
     "endpoint": "https://elf-tokens-bridge.nonyonah.workers.dev",
     "eventTypes": [
@@ -23,5 +20,19 @@
       "FILE_VARIABLES_REMOVE"
     ],
     "passcodeEnv": "FIGMA_WEBHOOK_PASSCODE"
+  },
+  "notify": {
+    "webhookEnv": "SLACK_WEBHOOK_URL",
+    "format": "slack",
+    "onlyOnChange": true
+  },
+  "runtime": {
+    "autoSync": true,
+    "projectConfigured": true,
+    "setupComplete": true
+  },
+  "components": {
+    "path": "batch/test/fixtures/components",
+    "manifest": "elf.manifest.json"
   }
 }

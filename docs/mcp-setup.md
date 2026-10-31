@@ -1,5 +1,15 @@
 # Coding assistants
 
+Elf's release path is a local MCP server installed with the npm package and an
+open Elf Bridge plugin in Figma. A desktop MCP client can launch it without an
+IDE or extension. There is no hosted MCP URL or Elf account sign-in required
+for local transport. Figma account OAuth, when selected for strict verification,
+is a separate permission flow. Plugin-only approval is also supported.
+
+The commands below describe the candidate package interface; clean installation
+and external-client acceptance must pass before advertising a public release.
+Hosted MCP and web-only connector setup are deferred.
+
 For drift monitoring, complete local project setup with `elf` first. Keep the Figma plugin open.
 Settings → Coding assistants provides configuration for the installed Elf
 launcher and selected project. Those snippets contain no credentials. Restart

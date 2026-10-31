@@ -411,7 +411,7 @@ The data it reads comes from the `drift-data` branch, refreshed daily by `.githu
 
 ## Write into Figma from your AI client (local MCP)
 
-The CLI reads. The MCP server in [`mcp/`](mcp/) **writes** — variables and basic components, driven from Cursor, Claude Desktop, or the **web** versions of Claude and Grok (free plans supported, via the Streamable HTTP transport + a tunnel), all through the Figma **Plugin API**, so it works on free/Professional Figma plans (the REST Variables API is Enterprise-only and is never called).
+The local MCP server in [`mcp/`](mcp/) reads and writes variables and supported components through Elf Bridge and the Figma Plugin API. Install it through the npm package and configure a desktop MCP client; an IDE or extension is optional. Keep Elf Bridge open in the target file. Hosted MCP and web-only connectors are deferred. See [local setup](docs/mcp-setup.md) and the [release checklist](docs/production-readiness.md) for supported scope and outstanding acceptance checks.
 
 ```
 MCP client ──stdio──► mcp/ server ──ws://127.0.0.1:8765──► bridge-plugin UI ──postMessage──► Plugin API

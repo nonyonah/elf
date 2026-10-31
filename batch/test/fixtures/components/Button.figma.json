@@ -1,13 +1,36 @@
 {
   "layoutMode": "HORIZONTAL",
-  "gap": "space.2",
-  "padding": { "all": "space.4" },
-  "cornerRadius": "radius.md",
-  "fill": "color.primary.500",
-  "text": { "characters": "Continue", "fontSize": "fontSize.body" },
-  "children": [{ "type": "instance", "component": "Icon.tsx#Icon" }],
+  "size": {
+    "width": 0,
+    "height": 0
+  },
+  "padding": {
+    "all": "spacing-4"
+  },
+  "gap": "spacing-2",
+  "cornerRadius": "spacing-2",
+  "fill": "color-primary-500",
+  "text": {
+    "characters": "Continue",
+    "fontSize": 0,
+    "color": "color-neutral-0",
+    "fontFamily": "",
+    "fontStyle": ""
+  },
+  "children": [
+    {
+      "type": "instance",
+      "component": "Icon.tsx#Icon"
+    }
+  ],
   "variants": {
-    "size=sm, intent=primary": { "padding": { "all": "space.2" } },
-    "size=md, intent=secondary": { "fill": "color.surface.base" }
+    "size=sm, intent=primary": {
+      "padding": {
+        "all": "spacing-2"
+      }
+    },
+    "size=md, intent=secondary": {
+      "fill": "color-neutral-0"
+    }
   }
 }

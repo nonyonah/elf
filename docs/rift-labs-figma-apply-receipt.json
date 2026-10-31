@@ -1,0 +1,366 @@
+{
+  "schema": 1,
+  "targetFileKey": "eu8zGUOsrdyXXQqvJeyl1E",
+  "source": "docs/DESIGN_SYSTEM.md",
+  "sourceHash": "04a30b14e179be2162d97bf4cb7269daf546301d297bc84f2ed70264b4bb629f",
+  "proposalHash": "65ac913e99dad604872513ba6cd6d472797a301945381de4c6254d20e90d4278",
+  "stage": "23 default masters created; full variant roster and documentation/presentation page pending",
+  "verification": "Read back all 23 masters through MCP. Confirmed descriptions, positions, sizes, child counts and text containment; inspected variable bindings. No screenshot review performed.",
+  "components": [
+    {
+      "id": "2:2",
+      "name": "Button",
+      "codeKey": "rift-labs/markdown/button",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "size": {
+        "width": 108,
+        "height": 32
+      },
+      "description": "The single mechanism for triggering an action. Weight (primary \u2192 destructive) signals how much attention the action deserves.",
+      "childCount": 1
+    },
+    {
+      "id": "2:4",
+      "name": "Input",
+      "codeKey": "rift-labs/markdown/input",
+      "position": {
+        "x": 800,
+        "y": 0
+      },
+      "size": {
+        "width": 280,
+        "height": 36
+      },
+      "description": "Text entry and search. Search fields in persistent chrome show a keyboard shortcut hint; form fields inside a flow do not.",
+      "childCount": 2
+    },
+    {
+      "id": "2:7",
+      "name": "Badge & counter",
+      "codeKey": "rift-labs/markdown/badge-counter",
+      "position": {
+        "x": 1600,
+        "y": 0
+      },
+      "size": {
+        "width": 72,
+        "height": 24
+      },
+      "description": "Counters show an unseen total in navigation; dots show state on a row; tag badges label a category.",
+      "childCount": 1
+    },
+    {
+      "id": "2:13",
+      "name": "List row",
+      "codeKey": "rift-labs/markdown/list-row",
+      "position": {
+        "x": 800,
+        "y": 600
+      },
+      "size": {
+        "width": 400,
+        "height": 64
+      },
+      "description": "Any scannable list \u2014 inbox, transactions, notifications \u2014 where someone compares many items at a glance.",
+      "childCount": 4
+    },
+    {
+      "id": "2:18",
+      "name": "Empty state",
+      "codeKey": "rift-labs/markdown/empty-state",
+      "position": {
+        "x": 1600,
+        "y": 600
+      },
+      "size": {
+        "width": 400,
+        "height": 180
+      },
+      "description": "Replaces a bare blank screen when a list has zero items \u2014 first run, cleared, or blocked.",
+      "childCount": 3
+    },
+    {
+      "id": "2:32",
+      "name": "Table",
+      "codeKey": "rift-labs/markdown/table",
+      "position": {
+        "x": 800,
+        "y": 1200
+      },
+      "size": {
+        "width": 640,
+        "height": 156
+      },
+      "description": "For rows with three or more comparable attributes \u2014 use the List row component instead when a row only really has a title and one piece of metadata.",
+      "childCount": 23
+    },
+    {
+      "id": "2:56",
+      "name": "Dropdown",
+      "codeKey": "rift-labs/markdown/dropdown",
+      "position": {
+        "x": 1600,
+        "y": 1200
+      },
+      "size": {
+        "width": 208,
+        "height": 140
+      },
+      "description": "Covers two Base UI primitives: a Menu for a set of actions attached to a trigger, and a Select for choosing one value from a fixed list.",
+      "childCount": 5
+    },
+    {
+      "id": "2:62",
+      "name": "Card",
+      "codeKey": "rift-labs/markdown/card",
+      "position": {
+        "x": 0,
+        "y": 1800
+      },
+      "size": {
+        "width": 320,
+        "height": 160
+      },
+      "description": "A bordered container for related content. Three uses: a plain grouping surface, a clickable summary, and a single-stat headline.",
+      "childCount": 2
+    },
+    {
+      "id": "2:65",
+      "name": "Tabs",
+      "codeKey": "rift-labs/markdown/tabs",
+      "position": {
+        "x": 800,
+        "y": 1800
+      },
+      "size": {
+        "width": 320,
+        "height": 36
+      },
+      "description": "Two designs: primary tabs switch between full page-level views; secondary tabs switch a scoped region without changing the page.",
+      "childCount": 4
+    },
+    {
+      "id": "2:70",
+      "name": "Switch",
+      "codeKey": "rift-labs/markdown/switch",
+      "position": {
+        "x": 1600,
+        "y": 1800
+      },
+      "size": {
+        "width": 240,
+        "height": 32
+      },
+      "description": "An immediate, self-contained on/off setting \u2014 it takes effect the moment it's toggled, with no separate save step.",
+      "childCount": 3
+    },
+    {
+      "id": "2:74",
+      "name": "Checkbox & radio",
+      "codeKey": "rift-labs/markdown/checkbox-radio",
+      "position": {
+        "x": 0,
+        "y": 2400
+      },
+      "size": {
+        "width": 260,
+        "height": 32
+      },
+      "description": "Checkbox for zero-to-many selections; radio for exactly one choice from a small, fully visible set of options.",
+      "childCount": 6
+    },
+    {
+      "id": "2:81",
+      "name": "Accordion",
+      "codeKey": "rift-labs/markdown/accordion",
+      "position": {
+        "x": 800,
+        "y": 2400
+      },
+      "size": {
+        "width": 400,
+        "height": 112
+      },
+      "description": "Progressive disclosure for secondary content the person doesn't need immediately \u2014 never the primary content on a screen.",
+      "childCount": 4
+    },
+    {
+      "id": "2:86",
+      "name": "Dialog",
+      "codeKey": "rift-labs/markdown/dialog",
+      "position": {
+        "x": 1600,
+        "y": 2400
+      },
+      "size": {
+        "width": 400,
+        "height": 212
+      },
+      "description": "An interruption reserved for decisions that need a deliberate, in-the-moment answer \u2014 most often the confirming step a destructive Button already promises.",
+      "childCount": 6
+    },
+    {
+      "id": "2:93",
+      "name": "Toast",
+      "codeKey": "rift-labs/markdown/toast",
+      "position": {
+        "x": 0,
+        "y": 3000
+      },
+      "size": {
+        "width": 360,
+        "height": 64
+      },
+      "description": "A brief, self-dismissing confirmation for something that already happened \u2014 a payout landing, an invoice getting paid.",
+      "childCount": 2
+    },
+    {
+      "id": "2:96",
+      "name": "Amount input",
+      "codeKey": "rift-labs/markdown/amount-input",
+      "position": {
+        "x": 800,
+        "y": 3000
+      },
+      "size": {
+        "width": 320,
+        "height": 64
+      },
+      "description": "Money entry, specifically \u2014 distinct from the plain text Input because precision, asset, and available balance all have to be visible at once.",
+      "childCount": 4
+    },
+    {
+      "id": "2:101",
+      "name": "Avatar",
+      "codeKey": "rift-labs/markdown/avatar",
+      "position": {
+        "x": 1600,
+        "y": 3000
+      },
+      "size": {
+        "width": 32,
+        "height": 32
+      },
+      "description": "Represents a person or business \u2014 a client, a team member, a merchant \u2014 anywhere the product needs a face rather than just a name.",
+      "childCount": 2
+    },
+    {
+      "id": "2:104",
+      "name": "Alert / banner",
+      "codeKey": "rift-labs/markdown/alert-banner",
+      "position": {
+        "x": 0,
+        "y": 3600
+      },
+      "size": {
+        "width": 400,
+        "height": 80
+      },
+      "description": "Page-level, persistent messaging \u2014 the pattern already used for the notes throughout this document. Different from a Toast because it doesn't go away on its own.",
+      "childCount": 3
+    },
+    {
+      "id": "2:108",
+      "name": "Command palette",
+      "codeKey": "rift-labs/markdown/command-palette",
+      "position": {
+        "x": 800,
+        "y": 3600
+      },
+      "size": {
+        "width": 480,
+        "height": 320
+      },
+      "description": "What the \u2318K hint on the persistent Search field actually opens \u2014 search and act on anything in the product without leaving the keyboard.",
+      "childCount": 10
+    },
+    {
+      "id": "2:119",
+      "name": "Skeleton",
+      "codeKey": "rift-labs/markdown/skeleton",
+      "position": {
+        "x": 1600,
+        "y": 3600
+      },
+      "size": {
+        "width": 400,
+        "height": 64
+      },
+      "description": "A placeholder shaped exactly like the content it stands in for, while a balance, list, or chart is still loading.",
+      "childCount": 2
+    },
+    {
+      "id": "2:122",
+      "name": "Tooltip",
+      "codeKey": "rift-labs/markdown/tooltip",
+      "position": {
+        "x": 0,
+        "y": 4200
+      },
+      "size": {
+        "width": 72,
+        "height": 24
+      },
+      "description": "Required on every icon-only Button, per that component's own accessibility note \u2014 this is the piece that actually delivers it.",
+      "childCount": 1
+    },
+    {
+      "id": "2:124",
+      "name": "Pagination",
+      "codeKey": "rift-labs/markdown/pagination",
+      "position": {
+        "x": 800,
+        "y": 4200
+      },
+      "size": {
+        "width": 328,
+        "height": 32
+      },
+      "description": "Pairs with the Table component once a list is long enough to split across pages.",
+      "childCount": 7
+    },
+    {
+      "id": "2:22",
+      "name": "Chart (area)",
+      "codeKey": "rift-labs/markdown/chart-area",
+      "position": {
+        "x": 0,
+        "y": 1200
+      },
+      "size": {
+        "width": 400,
+        "height": 240
+      },
+      "description": "The only chart type in this system for now. Reserved for a value trending over time \u2014 balance, volume, activity \u2014 where the filled region is what communicates magnitude, not for comparing unrelated categories.",
+      "childCount": 9
+    },
+    {
+      "id": "2:9",
+      "name": "Nav item",
+      "codeKey": "rift-labs/markdown/nav-item",
+      "position": {
+        "x": 0,
+        "y": 600
+      },
+      "size": {
+        "width": 240,
+        "height": 36
+      },
+      "description": "Primary navigation inside a workspace. Icon and label always travel together \u2014 never icon-only in this context.",
+      "childCount": 3
+    }
+  ],
+  "projectMonitoringChanged": false,
+  "verifiedCorrections": [
+    "Chart area stroke weight is 0; trend line remains 2px.",
+    "Nav item uses the approved active background fill.",
+    "Chart and nav color-variable bindings restored and retained."
+  ],
+  "bindingVerification": {
+    "components": 23,
+    "missingExpectedColorBindings": 0
+  }
+}

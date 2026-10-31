@@ -1,5 +1,11 @@
 # Hosted Elf MCP with Elf Bridge
 
+> Deferred as of 30 October 2026. The release path is local npm MCP plus
+> Elf Bridge. Hosted authorization is unfinished and has not passed acceptance.
+> Keep the hosted service disabled; instructions below are development notes,
+> not public installation guidance.
+
+
 ## Agreed direction
 
 Keep Elf Bridge as the Figma execution path. Do not make Figma's official MCP
@@ -21,7 +27,7 @@ a transport change. Local WebSocket pairing remains available.
 
 ## Intended user flow
 
-1. Add the hosted Elf MCP URL in a compatible assistant and sign in to Elf.
+1. Add the hosted Elf MCP URL in a compatible assistant. Settings opens without an Elf sign-in.
 2. Supply the Figma file URL and open that file in Figma.
 3. Open Elf Bridge, choose the hosted connection, and pair it using a short-lived,
    single-use code obtained through the authenticated Elf connection flow.
@@ -56,8 +62,10 @@ Hosted code is in `console/src/hosted`, with browser review in
 library; protected API requests derive ownership from its validated props.
 The hosted tools accept Markdown content, share extraction/token validation,
 and validate resource operations against the existing local MCP schemas.
-Humans approve the exact document and operation plan through Clerk-protected
-browser routes; model tokens cannot approve their own writes.
+Humans approve the requesting assistant and exact document in Elf Bridge.
+A private, file-scoped Settings browser session approves operation plans;
+model tokens cannot approve their own access or writes. Plugin approval trusts
+the open document without independently verifying a Figma account.
 
 Plans pin a connection generation and current-page/variable/style snapshot.
 The plugin rechecks the snapshot before every write and returns a new snapshot

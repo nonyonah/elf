@@ -1,0 +1,5744 @@
+{
+  "schema": 1,
+  "targetFileKey": "eu8zGUOsrdyXXQqvJeyl1E",
+  "nodes": [
+    {
+      "id": "2:2",
+      "name": "Button",
+      "type": "COMPONENT",
+      "codeKey": "rift-labs/markdown/button",
+      "x": 0,
+      "y": 0,
+      "width": 108,
+      "height": 32,
+      "layoutMode": "NONE",
+      "itemSpacing": 0,
+      "paddingTop": 0,
+      "paddingRight": 0,
+      "paddingBottom": 0,
+      "paddingLeft": 0,
+      "cornerRadius": 4,
+      "description": "The single mechanism for triggering an action. Weight (primary → destructive) signals how much attention the action deserves.",
+      "effects": [],
+      "variantProperties": null,
+      "fills": [
+        {
+          "type": "SOLID",
+          "color": {
+            "r": 0.29019609093666077,
+            "g": 0.3333333432674408,
+            "b": 0.7882353067398071
+          },
+          "opacity": 1,
+          "boundVariable": {
+            "id": "VariableID:1:10",
+            "name": "Accent"
+          }
+        }
+      ],
+      "strokes": [],
+      "strokeWeight": 1,
+      "strokeAlign": "INSIDE",
+      "boundVariables": {
+        "topLeftRadius": {
+          "id": "VariableID:1:31",
+          "name": "Radius/control"
+        },
+        "topRightRadius": {
+          "id": "VariableID:1:31",
+          "name": "Radius/control"
+        },
+        "bottomLeftRadius": {
+          "id": "VariableID:1:31",
+          "name": "Radius/control"
+        },
+        "bottomRightRadius": {
+          "id": "VariableID:1:31",
+          "name": "Radius/control"
+        }
+      },
+      "children": [
+        {
+          "id": "2:3",
+          "name": "Create issue",
+          "type": "TEXT",
+          "codeKey": null,
+          "x": 12,
+          "y": 7,
+          "width": 84,
+          "height": 17,
+          "characters": "Create issue",
+          "fontSize": 14,
+          "fontName": {
+            "family": "Inter",
+            "style": "Medium",
+            "variationSettings": {
+              "slnt": 0,
+              "wght": 500
+            }
+          },
+          "lineHeight": {
+            "unit": "AUTO"
+          },
+          "letterSpacing": {
+            "unit": "PERCENT",
+            "value": 0
+          },
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.9803921580314636,
+                "g": 0.9764705896377563,
+                "b": 0.9686274528503418
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:8",
+                "name": "Paper 000"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "OUTSIDE",
+          "boundVariables": {}
+        }
+      ]
+    },
+    {
+      "id": "2:4",
+      "name": "Input",
+      "type": "COMPONENT",
+      "codeKey": "rift-labs/markdown/input",
+      "x": 800,
+      "y": 0,
+      "width": 280,
+      "height": 36,
+      "layoutMode": "NONE",
+      "itemSpacing": 0,
+      "paddingTop": 0,
+      "paddingRight": 0,
+      "paddingBottom": 0,
+      "paddingLeft": 0,
+      "cornerRadius": 6,
+      "description": "Text entry and search. Search fields in persistent chrome show a keyboard shortcut hint; form fields inside a flow do not.",
+      "effects": [],
+      "variantProperties": null,
+      "fills": [
+        {
+          "type": "SOLID",
+          "color": {
+            "r": 0.9803921580314636,
+            "g": 0.9764705896377563,
+            "b": 0.9686274528503418
+          },
+          "opacity": 1,
+          "boundVariable": {
+            "id": "VariableID:1:8",
+            "name": "Paper 000"
+          }
+        }
+      ],
+      "strokes": [
+        {
+          "type": "SOLID",
+          "color": {
+            "r": 0.8784313797950745,
+            "g": 0.8666666746139526,
+            "b": 0.843137264251709
+          },
+          "opacity": 1,
+          "boundVariable": {
+            "id": "VariableID:1:9",
+            "name": "Line"
+          }
+        }
+      ],
+      "strokeWeight": 1,
+      "strokeAlign": "INSIDE",
+      "boundVariables": {
+        "topLeftRadius": {
+          "id": "VariableID:1:32",
+          "name": "Radius/container"
+        },
+        "topRightRadius": {
+          "id": "VariableID:1:32",
+          "name": "Radius/container"
+        },
+        "bottomLeftRadius": {
+          "id": "VariableID:1:32",
+          "name": "Radius/container"
+        },
+        "bottomRightRadius": {
+          "id": "VariableID:1:32",
+          "name": "Radius/container"
+        }
+      },
+      "children": [
+        {
+          "id": "2:5",
+          "name": "Search issues",
+          "type": "TEXT",
+          "codeKey": null,
+          "x": 12,
+          "y": 9,
+          "width": 92,
+          "height": 17,
+          "characters": "Search issues",
+          "fontSize": 14,
+          "fontName": {
+            "family": "Inter",
+            "style": "Regular",
+            "variationSettings": {
+              "slnt": 0,
+              "wght": 400
+            }
+          },
+          "lineHeight": {
+            "unit": "AUTO"
+          },
+          "letterSpacing": {
+            "unit": "PERCENT",
+            "value": 0
+          },
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.41960784792900085,
+                "g": 0.4274509847164154,
+                "b": 0.4470588266849518
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:7",
+                "name": "Ink 500"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "OUTSIDE",
+          "boundVariables": {}
+        },
+        {
+          "id": "2:6",
+          "name": "⌘K",
+          "type": "TEXT",
+          "codeKey": null,
+          "x": 244,
+          "y": 10,
+          "width": 20,
+          "height": 15,
+          "characters": "⌘K",
+          "fontSize": 12,
+          "fontName": {
+            "family": "Inter",
+            "style": "Regular",
+            "variationSettings": {
+              "slnt": 0,
+              "wght": 400
+            }
+          },
+          "lineHeight": {
+            "unit": "AUTO"
+          },
+          "letterSpacing": {
+            "unit": "PERCENT",
+            "value": 0
+          },
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.41960784792900085,
+                "g": 0.4274509847164154,
+                "b": 0.4470588266849518
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:7",
+                "name": "Ink 500"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "OUTSIDE",
+          "boundVariables": {}
+        }
+      ]
+    },
+    {
+      "id": "2:7",
+      "name": "Badge & counter",
+      "type": "COMPONENT",
+      "codeKey": "rift-labs/markdown/badge-counter",
+      "x": 1600,
+      "y": 0,
+      "width": 72,
+      "height": 24,
+      "layoutMode": "NONE",
+      "itemSpacing": 0,
+      "paddingTop": 0,
+      "paddingRight": 0,
+      "paddingBottom": 0,
+      "paddingLeft": 0,
+      "cornerRadius": 4,
+      "description": "Counters show an unseen total in navigation; dots show state on a row; tag badges label a category.",
+      "effects": [],
+      "variantProperties": null,
+      "fills": [
+        {
+          "type": "SOLID",
+          "color": {
+            "r": 0.9803921580314636,
+            "g": 0.9764705896377563,
+            "b": 0.9686274528503418
+          },
+          "opacity": 1,
+          "boundVariable": {
+            "id": "VariableID:1:8",
+            "name": "Paper 000"
+          }
+        }
+      ],
+      "strokes": [
+        {
+          "type": "SOLID",
+          "color": {
+            "r": 0.8784313797950745,
+            "g": 0.8666666746139526,
+            "b": 0.843137264251709
+          },
+          "opacity": 1,
+          "boundVariable": {
+            "id": "VariableID:1:9",
+            "name": "Line"
+          }
+        }
+      ],
+      "strokeWeight": 1,
+      "strokeAlign": "INSIDE",
+      "boundVariables": {
+        "topLeftRadius": {
+          "id": "VariableID:1:31",
+          "name": "Radius/control"
+        },
+        "topRightRadius": {
+          "id": "VariableID:1:31",
+          "name": "Radius/control"
+        },
+        "bottomLeftRadius": {
+          "id": "VariableID:1:31",
+          "name": "Radius/control"
+        },
+        "bottomRightRadius": {
+          "id": "VariableID:1:31",
+          "name": "Radius/control"
+        }
+      },
+      "children": [
+        {
+          "id": "2:8",
+          "name": "Hedwig",
+          "type": "TEXT",
+          "codeKey": null,
+          "x": 8,
+          "y": 4,
+          "width": 44,
+          "height": 15,
+          "characters": "Hedwig",
+          "fontSize": 12,
+          "fontName": {
+            "family": "Inter",
+            "style": "Regular",
+            "variationSettings": {
+              "slnt": 0,
+              "wght": 400
+            }
+          },
+          "lineHeight": {
+            "unit": "AUTO"
+          },
+          "letterSpacing": {
+            "unit": "PERCENT",
+            "value": 0
+          },
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.09019608050584793,
+                "g": 0.0941176488995552,
+                "b": 0.10980392247438431
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:5",
+                "name": "Ink 900"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "OUTSIDE",
+          "boundVariables": {}
+        }
+      ]
+    },
+    {
+      "id": "2:13",
+      "name": "List row",
+      "type": "COMPONENT",
+      "codeKey": "rift-labs/markdown/list-row",
+      "x": 800,
+      "y": 600,
+      "width": 400,
+      "height": 64,
+      "layoutMode": "NONE",
+      "itemSpacing": 0,
+      "paddingTop": 0,
+      "paddingRight": 0,
+      "paddingBottom": 0,
+      "paddingLeft": 0,
+      "cornerRadius": 0,
+      "description": "Any scannable list — inbox, transactions, notifications — where someone compares many items at a glance.",
+      "effects": [],
+      "variantProperties": null,
+      "fills": [
+        {
+          "type": "SOLID",
+          "color": {
+            "r": 0.9803921580314636,
+            "g": 0.9764705896377563,
+            "b": 0.9686274528503418
+          },
+          "opacity": 1,
+          "boundVariable": {
+            "id": "VariableID:1:8",
+            "name": "Paper 000"
+          }
+        }
+      ],
+      "strokes": [],
+      "strokeWeight": 1,
+      "strokeAlign": "INSIDE",
+      "boundVariables": {},
+      "children": [
+        {
+          "id": "2:14",
+          "name": "Unread",
+          "type": "ELLIPSE",
+          "codeKey": null,
+          "x": 8,
+          "y": 18,
+          "width": 6,
+          "height": 6,
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.29019609093666077,
+                "g": 0.3333333432674408,
+                "b": 0.7882353067398071
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:10",
+                "name": "Accent"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "INSIDE",
+          "boundVariables": {}
+        },
+        {
+          "id": "2:15",
+          "name": "Payout received",
+          "type": "TEXT",
+          "codeKey": null,
+          "x": 24,
+          "y": 10,
+          "width": 108,
+          "height": 17,
+          "characters": "Payout received",
+          "fontSize": 14,
+          "fontName": {
+            "family": "Inter",
+            "style": "Medium",
+            "variationSettings": {
+              "slnt": 0,
+              "wght": 500
+            }
+          },
+          "lineHeight": {
+            "unit": "AUTO"
+          },
+          "letterSpacing": {
+            "unit": "PERCENT",
+            "value": 0
+          },
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.09019608050584793,
+                "g": 0.0941176488995552,
+                "b": 0.10980392247438431
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:5",
+                "name": "Ink 900"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "OUTSIDE",
+          "boundVariables": {}
+        },
+        {
+          "id": "2:16",
+          "name": "$420.00 USDC landed in your Hedwig balance",
+          "type": "TEXT",
+          "codeKey": null,
+          "x": 24,
+          "y": 34,
+          "width": 320,
+          "height": 18,
+          "characters": "$420.00 USDC landed in your Hedwig balance",
+          "fontSize": 12,
+          "fontName": {
+            "family": "Inter",
+            "style": "Regular",
+            "variationSettings": {
+              "slnt": 0,
+              "wght": 400
+            }
+          },
+          "lineHeight": {
+            "unit": "AUTO"
+          },
+          "letterSpacing": {
+            "unit": "PERCENT",
+            "value": 0
+          },
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.41960784792900085,
+                "g": 0.4274509847164154,
+                "b": 0.4470588266849518
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:7",
+                "name": "Ink 500"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "OUTSIDE",
+          "boundVariables": {}
+        },
+        {
+          "id": "2:17",
+          "name": "2m",
+          "type": "TEXT",
+          "codeKey": null,
+          "x": 364,
+          "y": 12,
+          "width": 18,
+          "height": 15,
+          "characters": "2m",
+          "fontSize": 12,
+          "fontName": {
+            "family": "Inter",
+            "style": "Regular",
+            "variationSettings": {
+              "slnt": 0,
+              "wght": 400
+            }
+          },
+          "lineHeight": {
+            "unit": "AUTO"
+          },
+          "letterSpacing": {
+            "unit": "PERCENT",
+            "value": 0
+          },
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.41960784792900085,
+                "g": 0.4274509847164154,
+                "b": 0.4470588266849518
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:7",
+                "name": "Ink 500"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "OUTSIDE",
+          "boundVariables": {}
+        }
+      ]
+    },
+    {
+      "id": "2:18",
+      "name": "Empty state",
+      "type": "COMPONENT",
+      "codeKey": "rift-labs/markdown/empty-state",
+      "x": 1600,
+      "y": 600,
+      "width": 400,
+      "height": 180,
+      "layoutMode": "NONE",
+      "itemSpacing": 0,
+      "paddingTop": 0,
+      "paddingRight": 0,
+      "paddingBottom": 0,
+      "paddingLeft": 0,
+      "cornerRadius": 0,
+      "description": "Replaces a bare blank screen when a list has zero items — first run, cleared, or blocked.",
+      "effects": [],
+      "variantProperties": null,
+      "fills": [
+        {
+          "type": "SOLID",
+          "color": {
+            "r": 0.9803921580314636,
+            "g": 0.9764705896377563,
+            "b": 0.9686274528503418
+          },
+          "opacity": 1,
+          "boundVariable": {
+            "id": "VariableID:1:8",
+            "name": "Paper 000"
+          }
+        }
+      ],
+      "strokes": [],
+      "strokeWeight": 1,
+      "strokeAlign": "INSIDE",
+      "boundVariables": {},
+      "children": [
+        {
+          "id": "2:19",
+          "name": "Decorative status",
+          "type": "ELLIPSE",
+          "codeKey": null,
+          "x": 184,
+          "y": 24,
+          "width": 32,
+          "height": 32,
+          "effects": [],
+          "fills": [],
+          "strokes": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.8784313797950745,
+                "g": 0.8666666746139526,
+                "b": 0.843137264251709
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:9",
+                "name": "Line"
+              }
+            }
+          ],
+          "strokeWeight": 1,
+          "strokeAlign": "INSIDE",
+          "boundVariables": {}
+        },
+        {
+          "id": "2:20",
+          "name": "You're all caught up",
+          "type": "TEXT",
+          "codeKey": null,
+          "x": 104,
+          "y": 76,
+          "width": 150,
+          "height": 19,
+          "characters": "You're all caught up",
+          "fontSize": 16,
+          "fontName": {
+            "family": "Inter",
+            "style": "Medium",
+            "variationSettings": {
+              "slnt": 0,
+              "wght": 500
+            }
+          },
+          "lineHeight": {
+            "unit": "AUTO"
+          },
+          "letterSpacing": {
+            "unit": "PERCENT",
+            "value": 0
+          },
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.09019608050584793,
+                "g": 0.0941176488995552,
+                "b": 0.10980392247438431
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:5",
+                "name": "Ink 900"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "OUTSIDE",
+          "boundVariables": {}
+        },
+        {
+          "id": "2:21",
+          "name": "New activity will show up here.",
+          "type": "TEXT",
+          "codeKey": null,
+          "x": 100,
+          "y": 104,
+          "width": 176,
+          "height": 15,
+          "characters": "New activity will show up here.",
+          "fontSize": 12,
+          "fontName": {
+            "family": "Inter",
+            "style": "Regular",
+            "variationSettings": {
+              "slnt": 0,
+              "wght": 400
+            }
+          },
+          "lineHeight": {
+            "unit": "AUTO"
+          },
+          "letterSpacing": {
+            "unit": "PERCENT",
+            "value": 0
+          },
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.41960784792900085,
+                "g": 0.4274509847164154,
+                "b": 0.4470588266849518
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:7",
+                "name": "Ink 500"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "OUTSIDE",
+          "boundVariables": {}
+        }
+      ]
+    },
+    {
+      "id": "2:32",
+      "name": "Table",
+      "type": "COMPONENT",
+      "codeKey": "rift-labs/markdown/table",
+      "x": 800,
+      "y": 1200,
+      "width": 640,
+      "height": 156,
+      "layoutMode": "NONE",
+      "itemSpacing": 0,
+      "paddingTop": 0,
+      "paddingRight": 0,
+      "paddingBottom": 0,
+      "paddingLeft": 0,
+      "cornerRadius": 0,
+      "description": "For rows with three or more comparable attributes — use the List row component instead when a row only really has a title and one piece of metadata.",
+      "effects": [],
+      "variantProperties": null,
+      "fills": [
+        {
+          "type": "SOLID",
+          "color": {
+            "r": 0.9803921580314636,
+            "g": 0.9764705896377563,
+            "b": 0.9686274528503418
+          },
+          "opacity": 1,
+          "boundVariable": {
+            "id": "VariableID:1:8",
+            "name": "Paper 000"
+          }
+        }
+      ],
+      "strokes": [
+        {
+          "type": "SOLID",
+          "color": {
+            "r": 0.8784313797950745,
+            "g": 0.8666666746139526,
+            "b": 0.843137264251709
+          },
+          "opacity": 1,
+          "boundVariable": {
+            "id": "VariableID:1:9",
+            "name": "Line"
+          }
+        }
+      ],
+      "strokeWeight": 1,
+      "strokeAlign": "INSIDE",
+      "boundVariables": {},
+      "children": [
+        {
+          "id": "2:33",
+          "name": "Header",
+          "type": "RECTANGLE",
+          "codeKey": null,
+          "x": 0,
+          "y": 0,
+          "width": 640,
+          "height": 36,
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.8784313797950745,
+                "g": 0.8666666746139526,
+                "b": 0.843137264251709
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:9",
+                "name": "Line"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "INSIDE",
+          "boundVariables": {}
+        },
+        {
+          "id": "2:34",
+          "name": "Invoice",
+          "type": "TEXT",
+          "codeKey": null,
+          "x": 12,
+          "y": 9,
+          "width": 41,
+          "height": 15,
+          "characters": "Invoice",
+          "fontSize": 12,
+          "fontName": {
+            "family": "Inter",
+            "style": "Medium",
+            "variationSettings": {
+              "slnt": 0,
+              "wght": 500
+            }
+          },
+          "lineHeight": {
+            "unit": "AUTO"
+          },
+          "letterSpacing": {
+            "unit": "PERCENT",
+            "value": 0
+          },
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.09019608050584793,
+                "g": 0.0941176488995552,
+                "b": 0.10980392247438431
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:5",
+                "name": "Ink 900"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "OUTSIDE",
+          "boundVariables": {}
+        },
+        {
+          "id": "2:35",
+          "name": "Status",
+          "type": "TEXT",
+          "codeKey": null,
+          "x": 292,
+          "y": 9,
+          "width": 38,
+          "height": 15,
+          "characters": "Status",
+          "fontSize": 12,
+          "fontName": {
+            "family": "Inter",
+            "style": "Medium",
+            "variationSettings": {
+              "slnt": 0,
+              "wght": 500
+            }
+          },
+          "lineHeight": {
+            "unit": "AUTO"
+          },
+          "letterSpacing": {
+            "unit": "PERCENT",
+            "value": 0
+          },
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.09019608050584793,
+                "g": 0.0941176488995552,
+                "b": 0.10980392247438431
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:5",
+                "name": "Ink 900"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "OUTSIDE",
+          "boundVariables": {}
+        },
+        {
+          "id": "2:36",
+          "name": "Amount",
+          "type": "TEXT",
+          "codeKey": null,
+          "x": 414,
+          "y": 9,
+          "width": 112,
+          "height": 20,
+          "characters": "Amount",
+          "fontSize": 12,
+          "fontName": {
+            "family": "Inter",
+            "style": "Medium",
+            "variationSettings": {
+              "slnt": 0,
+              "wght": 500
+            }
+          },
+          "lineHeight": {
+            "unit": "AUTO"
+          },
+          "letterSpacing": {
+            "unit": "PERCENT",
+            "value": 0
+          },
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.09019608050584793,
+                "g": 0.0941176488995552,
+                "b": 0.10980392247438431
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:5",
+                "name": "Ink 900"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "OUTSIDE",
+          "boundVariables": {}
+        },
+        {
+          "id": "2:37",
+          "name": "Date",
+          "type": "TEXT",
+          "codeKey": null,
+          "x": 552,
+          "y": 9,
+          "width": 76,
+          "height": 20,
+          "characters": "Date",
+          "fontSize": 12,
+          "fontName": {
+            "family": "Inter",
+            "style": "Medium",
+            "variationSettings": {
+              "slnt": 0,
+              "wght": 500
+            }
+          },
+          "lineHeight": {
+            "unit": "AUTO"
+          },
+          "letterSpacing": {
+            "unit": "PERCENT",
+            "value": 0
+          },
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.09019608050584793,
+                "g": 0.0941176488995552,
+                "b": 0.10980392247438431
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:5",
+                "name": "Ink 900"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "OUTSIDE",
+          "boundVariables": {}
+        },
+        {
+          "id": "2:38",
+          "name": "#0192 — Acme Co.",
+          "type": "TEXT",
+          "codeKey": null,
+          "x": 12,
+          "y": 48,
+          "width": 109,
+          "height": 15,
+          "characters": "#0192 — Acme Co.",
+          "fontSize": 12,
+          "fontName": {
+            "family": "Inter",
+            "style": "Regular",
+            "variationSettings": {
+              "slnt": 0,
+              "wght": 400
+            }
+          },
+          "lineHeight": {
+            "unit": "AUTO"
+          },
+          "letterSpacing": {
+            "unit": "PERCENT",
+            "value": 0
+          },
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.09019608050584793,
+                "g": 0.0941176488995552,
+                "b": 0.10980392247438431
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:5",
+                "name": "Ink 900"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "OUTSIDE",
+          "boundVariables": {}
+        },
+        {
+          "id": "2:39",
+          "name": "Paid indicator",
+          "type": "ELLIPSE",
+          "codeKey": null,
+          "x": 280,
+          "y": 52,
+          "width": 6,
+          "height": 6,
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.2078431397676468,
+                "g": 0.4588235318660736,
+                "b": 0.30588236451148987
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:13",
+                "name": "Signal/green"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "INSIDE",
+          "boundVariables": {}
+        },
+        {
+          "id": "2:40",
+          "name": "Paid",
+          "type": "TEXT",
+          "codeKey": null,
+          "x": 292,
+          "y": 48,
+          "width": 25,
+          "height": 15,
+          "characters": "Paid",
+          "fontSize": 12,
+          "fontName": {
+            "family": "Inter",
+            "style": "Regular",
+            "variationSettings": {
+              "slnt": 0,
+              "wght": 400
+            }
+          },
+          "lineHeight": {
+            "unit": "AUTO"
+          },
+          "letterSpacing": {
+            "unit": "PERCENT",
+            "value": 0
+          },
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.09019608050584793,
+                "g": 0.0941176488995552,
+                "b": 0.10980392247438431
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:5",
+                "name": "Ink 900"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "OUTSIDE",
+          "boundVariables": {}
+        },
+        {
+          "id": "2:41",
+          "name": "$1,204.50",
+          "type": "TEXT",
+          "codeKey": null,
+          "x": 414,
+          "y": 48,
+          "width": 112,
+          "height": 20,
+          "characters": "$1,204.50",
+          "fontSize": 13,
+          "fontName": {
+            "family": "JetBrains Mono",
+            "style": "Regular",
+            "variationSettings": {
+              "wght": 400
+            }
+          },
+          "lineHeight": {
+            "unit": "AUTO"
+          },
+          "letterSpacing": {
+            "unit": "PERCENT",
+            "value": 0
+          },
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.09019608050584793,
+                "g": 0.0941176488995552,
+                "b": 0.10980392247438431
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:5",
+                "name": "Ink 900"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "OUTSIDE",
+          "boundVariables": {}
+        },
+        {
+          "id": "2:42",
+          "name": "Sep 12",
+          "type": "TEXT",
+          "codeKey": null,
+          "x": 552,
+          "y": 48,
+          "width": 76,
+          "height": 20,
+          "characters": "Sep 12",
+          "fontSize": 12,
+          "fontName": {
+            "family": "Inter",
+            "style": "Regular",
+            "variationSettings": {
+              "slnt": 0,
+              "wght": 400
+            }
+          },
+          "lineHeight": {
+            "unit": "AUTO"
+          },
+          "letterSpacing": {
+            "unit": "PERCENT",
+            "value": 0
+          },
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.41960784792900085,
+                "g": 0.4274509847164154,
+                "b": 0.4470588266849518
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:7",
+                "name": "Ink 500"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "OUTSIDE",
+          "boundVariables": {}
+        },
+        {
+          "id": "2:43",
+          "name": "Separator",
+          "type": "RECTANGLE",
+          "codeKey": null,
+          "x": 0,
+          "y": 75,
+          "width": 640,
+          "height": 1,
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.8784313797950745,
+                "g": 0.8666666746139526,
+                "b": 0.843137264251709
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:9",
+                "name": "Line"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "INSIDE",
+          "boundVariables": {}
+        },
+        {
+          "id": "2:44",
+          "name": "#0193 — Northwind",
+          "type": "TEXT",
+          "codeKey": null,
+          "x": 12,
+          "y": 88,
+          "width": 115,
+          "height": 15,
+          "characters": "#0193 — Northwind",
+          "fontSize": 12,
+          "fontName": {
+            "family": "Inter",
+            "style": "Regular",
+            "variationSettings": {
+              "slnt": 0,
+              "wght": 400
+            }
+          },
+          "lineHeight": {
+            "unit": "AUTO"
+          },
+          "letterSpacing": {
+            "unit": "PERCENT",
+            "value": 0
+          },
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.09019608050584793,
+                "g": 0.0941176488995552,
+                "b": 0.10980392247438431
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:5",
+                "name": "Ink 900"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "OUTSIDE",
+          "boundVariables": {}
+        },
+        {
+          "id": "2:45",
+          "name": "Pending indicator",
+          "type": "ELLIPSE",
+          "codeKey": null,
+          "x": 280,
+          "y": 92,
+          "width": 6,
+          "height": 6,
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.6784313917160034,
+                "g": 0.49803921580314636,
+                "b": 0.13333334028720856
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:11",
+                "name": "Signal/amber"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "INSIDE",
+          "boundVariables": {}
+        },
+        {
+          "id": "2:46",
+          "name": "Pending",
+          "type": "TEXT",
+          "codeKey": null,
+          "x": 292,
+          "y": 88,
+          "width": 47,
+          "height": 15,
+          "characters": "Pending",
+          "fontSize": 12,
+          "fontName": {
+            "family": "Inter",
+            "style": "Regular",
+            "variationSettings": {
+              "slnt": 0,
+              "wght": 400
+            }
+          },
+          "lineHeight": {
+            "unit": "AUTO"
+          },
+          "letterSpacing": {
+            "unit": "PERCENT",
+            "value": 0
+          },
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.09019608050584793,
+                "g": 0.0941176488995552,
+                "b": 0.10980392247438431
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:5",
+                "name": "Ink 900"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "OUTSIDE",
+          "boundVariables": {}
+        },
+        {
+          "id": "2:47",
+          "name": "$420.00",
+          "type": "TEXT",
+          "codeKey": null,
+          "x": 414,
+          "y": 88,
+          "width": 112,
+          "height": 20,
+          "characters": "$420.00",
+          "fontSize": 13,
+          "fontName": {
+            "family": "JetBrains Mono",
+            "style": "Regular",
+            "variationSettings": {
+              "wght": 400
+            }
+          },
+          "lineHeight": {
+            "unit": "AUTO"
+          },
+          "letterSpacing": {
+            "unit": "PERCENT",
+            "value": 0
+          },
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.09019608050584793,
+                "g": 0.0941176488995552,
+                "b": 0.10980392247438431
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:5",
+                "name": "Ink 900"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "OUTSIDE",
+          "boundVariables": {}
+        },
+        {
+          "id": "2:48",
+          "name": "Sep 15",
+          "type": "TEXT",
+          "codeKey": null,
+          "x": 552,
+          "y": 88,
+          "width": 76,
+          "height": 20,
+          "characters": "Sep 15",
+          "fontSize": 12,
+          "fontName": {
+            "family": "Inter",
+            "style": "Regular",
+            "variationSettings": {
+              "slnt": 0,
+              "wght": 400
+            }
+          },
+          "lineHeight": {
+            "unit": "AUTO"
+          },
+          "letterSpacing": {
+            "unit": "PERCENT",
+            "value": 0
+          },
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.41960784792900085,
+                "g": 0.4274509847164154,
+                "b": 0.4470588266849518
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:7",
+                "name": "Ink 500"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "OUTSIDE",
+          "boundVariables": {}
+        },
+        {
+          "id": "2:49",
+          "name": "Separator",
+          "type": "RECTANGLE",
+          "codeKey": null,
+          "x": 0,
+          "y": 115,
+          "width": 640,
+          "height": 1,
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.8784313797950745,
+                "g": 0.8666666746139526,
+                "b": 0.843137264251709
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:9",
+                "name": "Line"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "INSIDE",
+          "boundVariables": {}
+        },
+        {
+          "id": "2:50",
+          "name": "#0194 — Loom Ltd.",
+          "type": "TEXT",
+          "codeKey": null,
+          "x": 12,
+          "y": 128,
+          "width": 111,
+          "height": 15,
+          "characters": "#0194 — Loom Ltd.",
+          "fontSize": 12,
+          "fontName": {
+            "family": "Inter",
+            "style": "Regular",
+            "variationSettings": {
+              "slnt": 0,
+              "wght": 400
+            }
+          },
+          "lineHeight": {
+            "unit": "AUTO"
+          },
+          "letterSpacing": {
+            "unit": "PERCENT",
+            "value": 0
+          },
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.09019608050584793,
+                "g": 0.0941176488995552,
+                "b": 0.10980392247438431
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:5",
+                "name": "Ink 900"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "OUTSIDE",
+          "boundVariables": {}
+        },
+        {
+          "id": "2:51",
+          "name": "Overdue indicator",
+          "type": "ELLIPSE",
+          "codeKey": null,
+          "x": 280,
+          "y": 132,
+          "width": 6,
+          "height": 6,
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.6901960968971252,
+                "g": 0.250980406999588,
+                "b": 0.18431372940540314
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:12",
+                "name": "Signal/red"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "INSIDE",
+          "boundVariables": {}
+        },
+        {
+          "id": "2:52",
+          "name": "Overdue",
+          "type": "TEXT",
+          "codeKey": null,
+          "x": 292,
+          "y": 128,
+          "width": 49,
+          "height": 15,
+          "characters": "Overdue",
+          "fontSize": 12,
+          "fontName": {
+            "family": "Inter",
+            "style": "Regular",
+            "variationSettings": {
+              "slnt": 0,
+              "wght": 400
+            }
+          },
+          "lineHeight": {
+            "unit": "AUTO"
+          },
+          "letterSpacing": {
+            "unit": "PERCENT",
+            "value": 0
+          },
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.09019608050584793,
+                "g": 0.0941176488995552,
+                "b": 0.10980392247438431
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:5",
+                "name": "Ink 900"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "OUTSIDE",
+          "boundVariables": {}
+        },
+        {
+          "id": "2:53",
+          "name": "$88.00",
+          "type": "TEXT",
+          "codeKey": null,
+          "x": 414,
+          "y": 128,
+          "width": 112,
+          "height": 20,
+          "characters": "$88.00",
+          "fontSize": 13,
+          "fontName": {
+            "family": "JetBrains Mono",
+            "style": "Regular",
+            "variationSettings": {
+              "wght": 400
+            }
+          },
+          "lineHeight": {
+            "unit": "AUTO"
+          },
+          "letterSpacing": {
+            "unit": "PERCENT",
+            "value": 0
+          },
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.09019608050584793,
+                "g": 0.0941176488995552,
+                "b": 0.10980392247438431
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:5",
+                "name": "Ink 900"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "OUTSIDE",
+          "boundVariables": {}
+        },
+        {
+          "id": "2:54",
+          "name": "Aug 30",
+          "type": "TEXT",
+          "codeKey": null,
+          "x": 552,
+          "y": 128,
+          "width": 76,
+          "height": 20,
+          "characters": "Aug 30",
+          "fontSize": 12,
+          "fontName": {
+            "family": "Inter",
+            "style": "Regular",
+            "variationSettings": {
+              "slnt": 0,
+              "wght": 400
+            }
+          },
+          "lineHeight": {
+            "unit": "AUTO"
+          },
+          "letterSpacing": {
+            "unit": "PERCENT",
+            "value": 0
+          },
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.41960784792900085,
+                "g": 0.4274509847164154,
+                "b": 0.4470588266849518
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:7",
+                "name": "Ink 500"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "OUTSIDE",
+          "boundVariables": {}
+        },
+        {
+          "id": "2:55",
+          "name": "Separator",
+          "type": "RECTANGLE",
+          "codeKey": null,
+          "x": 0,
+          "y": 155,
+          "width": 640,
+          "height": 1,
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.8784313797950745,
+                "g": 0.8666666746139526,
+                "b": 0.843137264251709
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:9",
+                "name": "Line"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "INSIDE",
+          "boundVariables": {}
+        }
+      ]
+    },
+    {
+      "id": "2:56",
+      "name": "Dropdown",
+      "type": "COMPONENT",
+      "codeKey": "rift-labs/markdown/dropdown",
+      "x": 1600,
+      "y": 1200,
+      "width": 208,
+      "height": 140,
+      "layoutMode": "NONE",
+      "itemSpacing": 0,
+      "paddingTop": 0,
+      "paddingRight": 0,
+      "paddingBottom": 0,
+      "paddingLeft": 0,
+      "cornerRadius": 6,
+      "description": "Covers two Base UI primitives: a Menu for a set of actions attached to a trigger, and a Select for choosing one value from a fixed list.",
+      "effects": [],
+      "variantProperties": null,
+      "fills": [
+        {
+          "type": "SOLID",
+          "color": {
+            "r": 0.9803921580314636,
+            "g": 0.9764705896377563,
+            "b": 0.9686274528503418
+          },
+          "opacity": 1,
+          "boundVariable": {
+            "id": "VariableID:1:8",
+            "name": "Paper 000"
+          }
+        }
+      ],
+      "strokes": [
+        {
+          "type": "SOLID",
+          "color": {
+            "r": 0.8784313797950745,
+            "g": 0.8666666746139526,
+            "b": 0.843137264251709
+          },
+          "opacity": 1,
+          "boundVariable": {
+            "id": "VariableID:1:9",
+            "name": "Line"
+          }
+        }
+      ],
+      "strokeWeight": 1,
+      "strokeAlign": "INSIDE",
+      "boundVariables": {
+        "topLeftRadius": {
+          "id": "VariableID:1:32",
+          "name": "Radius/container"
+        },
+        "topRightRadius": {
+          "id": "VariableID:1:32",
+          "name": "Radius/container"
+        },
+        "bottomLeftRadius": {
+          "id": "VariableID:1:32",
+          "name": "Radius/container"
+        },
+        "bottomRightRadius": {
+          "id": "VariableID:1:32",
+          "name": "Radius/container"
+        }
+      },
+      "children": [
+        {
+          "id": "2:57",
+          "name": "Rename",
+          "type": "TEXT",
+          "codeKey": null,
+          "x": 12,
+          "y": 12,
+          "width": 54,
+          "height": 17,
+          "characters": "Rename",
+          "fontSize": 14,
+          "fontName": {
+            "family": "Inter",
+            "style": "Regular",
+            "variationSettings": {
+              "slnt": 0,
+              "wght": 400
+            }
+          },
+          "lineHeight": {
+            "unit": "AUTO"
+          },
+          "letterSpacing": {
+            "unit": "PERCENT",
+            "value": 0
+          },
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.09019608050584793,
+                "g": 0.0941176488995552,
+                "b": 0.10980392247438431
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:5",
+                "name": "Ink 900"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "OUTSIDE",
+          "boundVariables": {}
+        },
+        {
+          "id": "2:58",
+          "name": "Duplicate",
+          "type": "TEXT",
+          "codeKey": null,
+          "x": 12,
+          "y": 44,
+          "width": 63,
+          "height": 17,
+          "characters": "Duplicate",
+          "fontSize": 14,
+          "fontName": {
+            "family": "Inter",
+            "style": "Regular",
+            "variationSettings": {
+              "slnt": 0,
+              "wght": 400
+            }
+          },
+          "lineHeight": {
+            "unit": "AUTO"
+          },
+          "letterSpacing": {
+            "unit": "PERCENT",
+            "value": 0
+          },
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.09019608050584793,
+                "g": 0.0941176488995552,
+                "b": 0.10980392247438431
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:5",
+                "name": "Ink 900"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "OUTSIDE",
+          "boundVariables": {}
+        },
+        {
+          "id": "2:59",
+          "name": "Move to project",
+          "type": "TEXT",
+          "codeKey": null,
+          "x": 12,
+          "y": 76,
+          "width": 104,
+          "height": 17,
+          "characters": "Move to project",
+          "fontSize": 14,
+          "fontName": {
+            "family": "Inter",
+            "style": "Regular",
+            "variationSettings": {
+              "slnt": 0,
+              "wght": 400
+            }
+          },
+          "lineHeight": {
+            "unit": "AUTO"
+          },
+          "letterSpacing": {
+            "unit": "PERCENT",
+            "value": 0
+          },
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.09019608050584793,
+                "g": 0.0941176488995552,
+                "b": 0.10980392247438431
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:5",
+                "name": "Ink 900"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "OUTSIDE",
+          "boundVariables": {}
+        },
+        {
+          "id": "2:60",
+          "name": "Delete",
+          "type": "TEXT",
+          "codeKey": null,
+          "x": 12,
+          "y": 108,
+          "width": 43,
+          "height": 17,
+          "characters": "Delete",
+          "fontSize": 14,
+          "fontName": {
+            "family": "Inter",
+            "style": "Regular",
+            "variationSettings": {
+              "slnt": 0,
+              "wght": 400
+            }
+          },
+          "lineHeight": {
+            "unit": "AUTO"
+          },
+          "letterSpacing": {
+            "unit": "PERCENT",
+            "value": 0
+          },
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.6901960968971252,
+                "g": 0.250980406999588,
+                "b": 0.18431372940540314
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:12",
+                "name": "Signal/red"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "OUTSIDE",
+          "boundVariables": {}
+        },
+        {
+          "id": "2:61",
+          "name": "Separator",
+          "type": "RECTANGLE",
+          "codeKey": null,
+          "x": 8,
+          "y": 100,
+          "width": 192,
+          "height": 1,
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.8784313797950745,
+                "g": 0.8666666746139526,
+                "b": 0.843137264251709
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:9",
+                "name": "Line"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "INSIDE",
+          "boundVariables": {}
+        }
+      ]
+    },
+    {
+      "id": "2:62",
+      "name": "Card",
+      "type": "COMPONENT",
+      "codeKey": "rift-labs/markdown/card",
+      "x": 0,
+      "y": 1800,
+      "width": 320,
+      "height": 160,
+      "layoutMode": "NONE",
+      "itemSpacing": 0,
+      "paddingTop": 0,
+      "paddingRight": 0,
+      "paddingBottom": 0,
+      "paddingLeft": 0,
+      "cornerRadius": 6,
+      "description": "A bordered container for related content. Three uses: a plain grouping surface, a clickable summary, and a single-stat headline.",
+      "effects": [],
+      "variantProperties": null,
+      "fills": [
+        {
+          "type": "SOLID",
+          "color": {
+            "r": 0.9803921580314636,
+            "g": 0.9764705896377563,
+            "b": 0.9686274528503418
+          },
+          "opacity": 1,
+          "boundVariable": {
+            "id": "VariableID:1:8",
+            "name": "Paper 000"
+          }
+        }
+      ],
+      "strokes": [
+        {
+          "type": "SOLID",
+          "color": {
+            "r": 0.8784313797950745,
+            "g": 0.8666666746139526,
+            "b": 0.843137264251709
+          },
+          "opacity": 1,
+          "boundVariable": {
+            "id": "VariableID:1:9",
+            "name": "Line"
+          }
+        }
+      ],
+      "strokeWeight": 1,
+      "strokeAlign": "INSIDE",
+      "boundVariables": {
+        "topLeftRadius": {
+          "id": "VariableID:1:32",
+          "name": "Radius/container"
+        },
+        "topRightRadius": {
+          "id": "VariableID:1:32",
+          "name": "Radius/container"
+        },
+        "bottomLeftRadius": {
+          "id": "VariableID:1:32",
+          "name": "Radius/container"
+        },
+        "bottomRightRadius": {
+          "id": "VariableID:1:32",
+          "name": "Radius/container"
+        }
+      },
+      "children": [
+        {
+          "id": "2:63",
+          "name": "Payout schedule",
+          "type": "TEXT",
+          "codeKey": null,
+          "x": 16,
+          "y": 16,
+          "width": 127,
+          "height": 19,
+          "characters": "Payout schedule",
+          "fontSize": 16,
+          "fontName": {
+            "family": "Inter",
+            "style": "Medium",
+            "variationSettings": {
+              "slnt": 0,
+              "wght": 500
+            }
+          },
+          "lineHeight": {
+            "unit": "AUTO"
+          },
+          "letterSpacing": {
+            "unit": "PERCENT",
+            "value": 0
+          },
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.09019608050584793,
+                "g": 0.0941176488995552,
+                "b": 0.10980392247438431
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:5",
+                "name": "Ink 900"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "OUTSIDE",
+          "boundVariables": {}
+        },
+        {
+          "id": "2:64",
+          "name": "Runs every Friday at 9:00 AM.",
+          "type": "TEXT",
+          "codeKey": null,
+          "x": 16,
+          "y": 52,
+          "width": 199,
+          "height": 17,
+          "characters": "Runs every Friday at 9:00 AM.",
+          "fontSize": 14,
+          "fontName": {
+            "family": "Inter",
+            "style": "Regular",
+            "variationSettings": {
+              "slnt": 0,
+              "wght": 400
+            }
+          },
+          "lineHeight": {
+            "unit": "AUTO"
+          },
+          "letterSpacing": {
+            "unit": "PERCENT",
+            "value": 0
+          },
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.41960784792900085,
+                "g": 0.4274509847164154,
+                "b": 0.4470588266849518
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:7",
+                "name": "Ink 500"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "OUTSIDE",
+          "boundVariables": {}
+        }
+      ]
+    },
+    {
+      "id": "2:65",
+      "name": "Tabs",
+      "type": "COMPONENT",
+      "codeKey": "rift-labs/markdown/tabs",
+      "x": 800,
+      "y": 1800,
+      "width": 320,
+      "height": 36,
+      "layoutMode": "NONE",
+      "itemSpacing": 0,
+      "paddingTop": 0,
+      "paddingRight": 0,
+      "paddingBottom": 0,
+      "paddingLeft": 0,
+      "cornerRadius": 0,
+      "description": "Two designs: primary tabs switch between full page-level views; secondary tabs switch a scoped region without changing the page.",
+      "effects": [],
+      "variantProperties": null,
+      "fills": [
+        {
+          "type": "SOLID",
+          "color": {
+            "r": 0.9803921580314636,
+            "g": 0.9764705896377563,
+            "b": 0.9686274528503418
+          },
+          "opacity": 1,
+          "boundVariable": {
+            "id": "VariableID:1:8",
+            "name": "Paper 000"
+          }
+        }
+      ],
+      "strokes": [],
+      "strokeWeight": 1,
+      "strokeAlign": "INSIDE",
+      "boundVariables": {},
+      "children": [
+        {
+          "id": "2:66",
+          "name": "Overview",
+          "type": "TEXT",
+          "codeKey": null,
+          "x": 12,
+          "y": 8,
+          "width": 64,
+          "height": 17,
+          "characters": "Overview",
+          "fontSize": 14,
+          "fontName": {
+            "family": "Inter",
+            "style": "Medium",
+            "variationSettings": {
+              "slnt": 0,
+              "wght": 500
+            }
+          },
+          "lineHeight": {
+            "unit": "AUTO"
+          },
+          "letterSpacing": {
+            "unit": "PERCENT",
+            "value": 0
+          },
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.29019609093666077,
+                "g": 0.3333333432674408,
+                "b": 0.7882353067398071
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:10",
+                "name": "Accent"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "OUTSIDE",
+          "boundVariables": {}
+        },
+        {
+          "id": "2:67",
+          "name": "Activity",
+          "type": "TEXT",
+          "codeKey": null,
+          "x": 112,
+          "y": 8,
+          "width": 50,
+          "height": 17,
+          "characters": "Activity",
+          "fontSize": 14,
+          "fontName": {
+            "family": "Inter",
+            "style": "Regular",
+            "variationSettings": {
+              "slnt": 0,
+              "wght": 400
+            }
+          },
+          "lineHeight": {
+            "unit": "AUTO"
+          },
+          "letterSpacing": {
+            "unit": "PERCENT",
+            "value": 0
+          },
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.41960784792900085,
+                "g": 0.4274509847164154,
+                "b": 0.4470588266849518
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:7",
+                "name": "Ink 500"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "OUTSIDE",
+          "boundVariables": {}
+        },
+        {
+          "id": "2:68",
+          "name": "Settings",
+          "type": "TEXT",
+          "codeKey": null,
+          "x": 204,
+          "y": 8,
+          "width": 55,
+          "height": 17,
+          "characters": "Settings",
+          "fontSize": 14,
+          "fontName": {
+            "family": "Inter",
+            "style": "Regular",
+            "variationSettings": {
+              "slnt": 0,
+              "wght": 400
+            }
+          },
+          "lineHeight": {
+            "unit": "AUTO"
+          },
+          "letterSpacing": {
+            "unit": "PERCENT",
+            "value": 0
+          },
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.41960784792900085,
+                "g": 0.4274509847164154,
+                "b": 0.4470588266849518
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:7",
+                "name": "Ink 500"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "OUTSIDE",
+          "boundVariables": {}
+        },
+        {
+          "id": "2:69",
+          "name": "Active underline",
+          "type": "RECTANGLE",
+          "codeKey": null,
+          "x": 8,
+          "y": 34,
+          "width": 88,
+          "height": 2,
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.29019609093666077,
+                "g": 0.3333333432674408,
+                "b": 0.7882353067398071
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:10",
+                "name": "Accent"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "INSIDE",
+          "boundVariables": {}
+        }
+      ]
+    },
+    {
+      "id": "2:70",
+      "name": "Switch",
+      "type": "COMPONENT",
+      "codeKey": "rift-labs/markdown/switch",
+      "x": 1600,
+      "y": 1800,
+      "width": 240,
+      "height": 32,
+      "layoutMode": "NONE",
+      "itemSpacing": 0,
+      "paddingTop": 0,
+      "paddingRight": 0,
+      "paddingBottom": 0,
+      "paddingLeft": 0,
+      "cornerRadius": 0,
+      "description": "An immediate, self-contained on/off setting — it takes effect the moment it's toggled, with no separate save step.",
+      "effects": [],
+      "variantProperties": null,
+      "fills": [
+        {
+          "type": "SOLID",
+          "color": {
+            "r": 0.9803921580314636,
+            "g": 0.9764705896377563,
+            "b": 0.9686274528503418
+          },
+          "opacity": 1,
+          "boundVariable": {
+            "id": "VariableID:1:8",
+            "name": "Paper 000"
+          }
+        }
+      ],
+      "strokes": [],
+      "strokeWeight": 1,
+      "strokeAlign": "INSIDE",
+      "boundVariables": {},
+      "children": [
+        {
+          "id": "2:71",
+          "name": "Track",
+          "type": "RECTANGLE",
+          "codeKey": null,
+          "x": 0,
+          "y": 6,
+          "width": 36,
+          "height": 20,
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.29019609093666077,
+                "g": 0.3333333432674408,
+                "b": 0.7882353067398071
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:10",
+                "name": "Accent"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "INSIDE",
+          "boundVariables": {}
+        },
+        {
+          "id": "2:72",
+          "name": "Thumb",
+          "type": "ELLIPSE",
+          "codeKey": null,
+          "x": 18,
+          "y": 8,
+          "width": 16,
+          "height": 16,
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.9803921580314636,
+                "g": 0.9764705896377563,
+                "b": 0.9686274528503418
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:8",
+                "name": "Paper 000"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "INSIDE",
+          "boundVariables": {}
+        },
+        {
+          "id": "2:73",
+          "name": "Email receipts on",
+          "type": "TEXT",
+          "codeKey": null,
+          "x": 44,
+          "y": 7,
+          "width": 113,
+          "height": 17,
+          "characters": "Email receipts on",
+          "fontSize": 14,
+          "fontName": {
+            "family": "Inter",
+            "style": "Regular",
+            "variationSettings": {
+              "slnt": 0,
+              "wght": 400
+            }
+          },
+          "lineHeight": {
+            "unit": "AUTO"
+          },
+          "letterSpacing": {
+            "unit": "PERCENT",
+            "value": 0
+          },
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.09019608050584793,
+                "g": 0.0941176488995552,
+                "b": 0.10980392247438431
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:5",
+                "name": "Ink 900"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "OUTSIDE",
+          "boundVariables": {}
+        }
+      ]
+    },
+    {
+      "id": "2:74",
+      "name": "Checkbox & radio",
+      "type": "COMPONENT",
+      "codeKey": "rift-labs/markdown/checkbox-radio",
+      "x": 0,
+      "y": 2400,
+      "width": 260,
+      "height": 32,
+      "layoutMode": "NONE",
+      "itemSpacing": 0,
+      "paddingTop": 0,
+      "paddingRight": 0,
+      "paddingBottom": 0,
+      "paddingLeft": 0,
+      "cornerRadius": 0,
+      "description": "Checkbox for zero-to-many selections; radio for exactly one choice from a small, fully visible set of options.",
+      "effects": [],
+      "variantProperties": null,
+      "fills": [
+        {
+          "type": "SOLID",
+          "color": {
+            "r": 0.9803921580314636,
+            "g": 0.9764705896377563,
+            "b": 0.9686274528503418
+          },
+          "opacity": 1,
+          "boundVariable": {
+            "id": "VariableID:1:8",
+            "name": "Paper 000"
+          }
+        }
+      ],
+      "strokes": [],
+      "strokeWeight": 1,
+      "strokeAlign": "INSIDE",
+      "boundVariables": {},
+      "children": [
+        {
+          "id": "2:75",
+          "name": "Checkbox",
+          "type": "RECTANGLE",
+          "codeKey": null,
+          "x": 4,
+          "y": 8,
+          "width": 16,
+          "height": 16,
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.29019609093666077,
+                "g": 0.3333333432674408,
+                "b": 0.7882353067398071
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:10",
+                "name": "Accent"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "INSIDE",
+          "boundVariables": {}
+        },
+        {
+          "id": "2:76",
+          "name": "Checked",
+          "type": "VECTOR",
+          "codeKey": null,
+          "x": 7,
+          "y": 12,
+          "width": 10,
+          "height": 8,
+          "vectorPaths": [
+            {
+              "windingRule": "NONZERO",
+              "data": "M 0 4 L 4 8 L 10 0"
+            }
+          ],
+          "effects": [],
+          "fills": [],
+          "strokes": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.9803921580314636,
+                "g": 0.9764705896377563,
+                "b": 0.9686274528503418
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:8",
+                "name": "Paper 000"
+              }
+            }
+          ],
+          "strokeWeight": 2,
+          "strokeAlign": "INSIDE",
+          "boundVariables": {}
+        },
+        {
+          "id": "2:77",
+          "name": "Row selected",
+          "type": "TEXT",
+          "codeKey": null,
+          "x": 28,
+          "y": 7,
+          "width": 89,
+          "height": 17,
+          "characters": "Row selected",
+          "fontSize": 14,
+          "fontName": {
+            "family": "Inter",
+            "style": "Regular",
+            "variationSettings": {
+              "slnt": 0,
+              "wght": 400
+            }
+          },
+          "lineHeight": {
+            "unit": "AUTO"
+          },
+          "letterSpacing": {
+            "unit": "PERCENT",
+            "value": 0
+          },
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.09019608050584793,
+                "g": 0.0941176488995552,
+                "b": 0.10980392247438431
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:5",
+                "name": "Ink 900"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "OUTSIDE",
+          "boundVariables": {}
+        },
+        {
+          "id": "2:78",
+          "name": "Radio",
+          "type": "ELLIPSE",
+          "codeKey": null,
+          "x": 176,
+          "y": 8,
+          "width": 16,
+          "height": 16,
+          "effects": [],
+          "fills": [],
+          "strokes": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.29019609093666077,
+                "g": 0.3333333432674408,
+                "b": 0.7882353067398071
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:10",
+                "name": "Accent"
+              }
+            }
+          ],
+          "strokeWeight": 1,
+          "strokeAlign": "INSIDE",
+          "boundVariables": {}
+        },
+        {
+          "id": "2:79",
+          "name": "Selected",
+          "type": "ELLIPSE",
+          "codeKey": null,
+          "x": 180,
+          "y": 12,
+          "width": 8,
+          "height": 8,
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.29019609093666077,
+                "g": 0.3333333432674408,
+                "b": 0.7882353067398071
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:10",
+                "name": "Accent"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "INSIDE",
+          "boundVariables": {}
+        },
+        {
+          "id": "2:80",
+          "name": "Weekly",
+          "type": "TEXT",
+          "codeKey": null,
+          "x": 200,
+          "y": 7,
+          "width": 48,
+          "height": 17,
+          "characters": "Weekly",
+          "fontSize": 14,
+          "fontName": {
+            "family": "Inter",
+            "style": "Regular",
+            "variationSettings": {
+              "slnt": 0,
+              "wght": 400
+            }
+          },
+          "lineHeight": {
+            "unit": "AUTO"
+          },
+          "letterSpacing": {
+            "unit": "PERCENT",
+            "value": 0
+          },
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.09019608050584793,
+                "g": 0.0941176488995552,
+                "b": 0.10980392247438431
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:5",
+                "name": "Ink 900"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "OUTSIDE",
+          "boundVariables": {}
+        }
+      ]
+    },
+    {
+      "id": "2:81",
+      "name": "Accordion",
+      "type": "COMPONENT",
+      "codeKey": "rift-labs/markdown/accordion",
+      "x": 800,
+      "y": 2400,
+      "width": 400,
+      "height": 112,
+      "layoutMode": "NONE",
+      "itemSpacing": 0,
+      "paddingTop": 0,
+      "paddingRight": 0,
+      "paddingBottom": 0,
+      "paddingLeft": 0,
+      "cornerRadius": 0,
+      "description": "Progressive disclosure for secondary content the person doesn't need immediately — never the primary content on a screen.",
+      "effects": [],
+      "variantProperties": null,
+      "fills": [
+        {
+          "type": "SOLID",
+          "color": {
+            "r": 0.9803921580314636,
+            "g": 0.9764705896377563,
+            "b": 0.9686274528503418
+          },
+          "opacity": 1,
+          "boundVariable": {
+            "id": "VariableID:1:8",
+            "name": "Paper 000"
+          }
+        }
+      ],
+      "strokes": [],
+      "strokeWeight": 1,
+      "strokeAlign": "INSIDE",
+      "boundVariables": {},
+      "children": [
+        {
+          "id": "2:82",
+          "name": "How do payouts settle?",
+          "type": "TEXT",
+          "codeKey": null,
+          "x": 16,
+          "y": 12,
+          "width": 158,
+          "height": 17,
+          "characters": "How do payouts settle?",
+          "fontSize": 14,
+          "fontName": {
+            "family": "Inter",
+            "style": "Medium",
+            "variationSettings": {
+              "slnt": 0,
+              "wght": 500
+            }
+          },
+          "lineHeight": {
+            "unit": "AUTO"
+          },
+          "letterSpacing": {
+            "unit": "PERCENT",
+            "value": 0
+          },
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.09019608050584793,
+                "g": 0.0941176488995552,
+                "b": 0.10980392247438431
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:5",
+                "name": "Ink 900"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "OUTSIDE",
+          "boundVariables": {}
+        },
+        {
+          "id": "2:83",
+          "name": "−",
+          "type": "TEXT",
+          "codeKey": null,
+          "x": 372,
+          "y": 10,
+          "width": 11,
+          "height": 19,
+          "characters": "−",
+          "fontSize": 16,
+          "fontName": {
+            "family": "Inter",
+            "style": "Regular",
+            "variationSettings": {
+              "slnt": 0,
+              "wght": 400
+            }
+          },
+          "lineHeight": {
+            "unit": "AUTO"
+          },
+          "letterSpacing": {
+            "unit": "PERCENT",
+            "value": 0
+          },
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.41960784792900085,
+                "g": 0.4274509847164154,
+                "b": 0.4470588266849518
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:7",
+                "name": "Ink 500"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "OUTSIDE",
+          "boundVariables": {}
+        },
+        {
+          "id": "2:84",
+          "name": "Payouts settle on-chain within a few minutes of being sent.",
+          "type": "TEXT",
+          "codeKey": null,
+          "x": 16,
+          "y": 52,
+          "width": 368,
+          "height": 20,
+          "characters": "Payouts settle on-chain within a few minutes of being sent.",
+          "fontSize": 14,
+          "fontName": {
+            "family": "Inter",
+            "style": "Regular",
+            "variationSettings": {
+              "slnt": 0,
+              "wght": 400
+            }
+          },
+          "lineHeight": {
+            "unit": "AUTO"
+          },
+          "letterSpacing": {
+            "unit": "PERCENT",
+            "value": 0
+          },
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.41960784792900085,
+                "g": 0.4274509847164154,
+                "b": 0.4470588266849518
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:7",
+                "name": "Ink 500"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "OUTSIDE",
+          "boundVariables": {}
+        },
+        {
+          "id": "2:85",
+          "name": "Separator",
+          "type": "RECTANGLE",
+          "codeKey": null,
+          "x": 0,
+          "y": 111,
+          "width": 400,
+          "height": 1,
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.8784313797950745,
+                "g": 0.8666666746139526,
+                "b": 0.843137264251709
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:9",
+                "name": "Line"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "INSIDE",
+          "boundVariables": {}
+        }
+      ]
+    },
+    {
+      "id": "2:86",
+      "name": "Dialog",
+      "type": "COMPONENT",
+      "codeKey": "rift-labs/markdown/dialog",
+      "x": 1600,
+      "y": 2400,
+      "width": 400,
+      "height": 212,
+      "layoutMode": "NONE",
+      "itemSpacing": 0,
+      "paddingTop": 0,
+      "paddingRight": 0,
+      "paddingBottom": 0,
+      "paddingLeft": 0,
+      "cornerRadius": 6,
+      "description": "An interruption reserved for decisions that need a deliberate, in-the-moment answer — most often the confirming step a destructive Button already promises.",
+      "effects": [],
+      "variantProperties": null,
+      "fills": [
+        {
+          "type": "SOLID",
+          "color": {
+            "r": 0.9803921580314636,
+            "g": 0.9764705896377563,
+            "b": 0.9686274528503418
+          },
+          "opacity": 1,
+          "boundVariable": {
+            "id": "VariableID:1:8",
+            "name": "Paper 000"
+          }
+        }
+      ],
+      "strokes": [
+        {
+          "type": "SOLID",
+          "color": {
+            "r": 0.8784313797950745,
+            "g": 0.8666666746139526,
+            "b": 0.843137264251709
+          },
+          "opacity": 1,
+          "boundVariable": {
+            "id": "VariableID:1:9",
+            "name": "Line"
+          }
+        }
+      ],
+      "strokeWeight": 1,
+      "strokeAlign": "INSIDE",
+      "boundVariables": {
+        "topLeftRadius": {
+          "id": "VariableID:1:32",
+          "name": "Radius/container"
+        },
+        "topRightRadius": {
+          "id": "VariableID:1:32",
+          "name": "Radius/container"
+        },
+        "bottomLeftRadius": {
+          "id": "VariableID:1:32",
+          "name": "Radius/container"
+        },
+        "bottomRightRadius": {
+          "id": "VariableID:1:32",
+          "name": "Radius/container"
+        }
+      },
+      "children": [
+        {
+          "id": "2:87",
+          "name": "Delete workspace?",
+          "type": "TEXT",
+          "codeKey": null,
+          "x": 24,
+          "y": 24,
+          "width": 183,
+          "height": 24,
+          "characters": "Delete workspace?",
+          "fontSize": 20,
+          "fontName": {
+            "family": "Inter",
+            "style": "Medium",
+            "variationSettings": {
+              "slnt": 0,
+              "wght": 500
+            }
+          },
+          "lineHeight": {
+            "unit": "AUTO"
+          },
+          "letterSpacing": {
+            "unit": "PERCENT",
+            "value": 0
+          },
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.09019608050584793,
+                "g": 0.0941176488995552,
+                "b": 0.10980392247438431
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:5",
+                "name": "Ink 900"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "OUTSIDE",
+          "boundVariables": {}
+        },
+        {
+          "id": "2:88",
+          "name": "This removes all projects and can't be undone.",
+          "type": "TEXT",
+          "codeKey": null,
+          "x": 24,
+          "y": 64,
+          "width": 352,
+          "height": 20,
+          "characters": "This removes all projects and can't be undone.",
+          "fontSize": 14,
+          "fontName": {
+            "family": "Inter",
+            "style": "Regular",
+            "variationSettings": {
+              "slnt": 0,
+              "wght": 400
+            }
+          },
+          "lineHeight": {
+            "unit": "AUTO"
+          },
+          "letterSpacing": {
+            "unit": "PERCENT",
+            "value": 0
+          },
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.41960784792900085,
+                "g": 0.4274509847164154,
+                "b": 0.4470588266849518
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:7",
+                "name": "Ink 500"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "OUTSIDE",
+          "boundVariables": {}
+        },
+        {
+          "id": "2:89",
+          "name": "Cancel",
+          "type": "RECTANGLE",
+          "codeKey": null,
+          "x": 136,
+          "y": 156,
+          "width": 88,
+          "height": 32,
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.9803921580314636,
+                "g": 0.9764705896377563,
+                "b": 0.9686274528503418
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:8",
+                "name": "Paper 000"
+              }
+            }
+          ],
+          "strokes": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.8784313797950745,
+                "g": 0.8666666746139526,
+                "b": 0.843137264251709
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:9",
+                "name": "Line"
+              }
+            }
+          ],
+          "strokeWeight": 1,
+          "strokeAlign": "INSIDE",
+          "boundVariables": {}
+        },
+        {
+          "id": "2:90",
+          "name": "Cancel",
+          "type": "TEXT",
+          "codeKey": null,
+          "x": 148,
+          "y": 163,
+          "width": 47,
+          "height": 17,
+          "characters": "Cancel",
+          "fontSize": 14,
+          "fontName": {
+            "family": "Inter",
+            "style": "Medium",
+            "variationSettings": {
+              "slnt": 0,
+              "wght": 500
+            }
+          },
+          "lineHeight": {
+            "unit": "AUTO"
+          },
+          "letterSpacing": {
+            "unit": "PERCENT",
+            "value": 0
+          },
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.09019608050584793,
+                "g": 0.0941176488995552,
+                "b": 0.10980392247438431
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:5",
+                "name": "Ink 900"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "OUTSIDE",
+          "boundVariables": {}
+        },
+        {
+          "id": "2:91",
+          "name": "Delete workspace",
+          "type": "RECTANGLE",
+          "codeKey": null,
+          "x": 232,
+          "y": 156,
+          "width": 144,
+          "height": 32,
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.6901960968971252,
+                "g": 0.250980406999588,
+                "b": 0.18431372940540314
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:12",
+                "name": "Signal/red"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "INSIDE",
+          "boundVariables": {}
+        },
+        {
+          "id": "2:92",
+          "name": "Delete workspace",
+          "type": "TEXT",
+          "codeKey": null,
+          "x": 244,
+          "y": 163,
+          "width": 121,
+          "height": 17,
+          "characters": "Delete workspace",
+          "fontSize": 14,
+          "fontName": {
+            "family": "Inter",
+            "style": "Medium",
+            "variationSettings": {
+              "slnt": 0,
+              "wght": 500
+            }
+          },
+          "lineHeight": {
+            "unit": "AUTO"
+          },
+          "letterSpacing": {
+            "unit": "PERCENT",
+            "value": 0
+          },
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.9803921580314636,
+                "g": 0.9764705896377563,
+                "b": 0.9686274528503418
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:8",
+                "name": "Paper 000"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "OUTSIDE",
+          "boundVariables": {}
+        }
+      ]
+    },
+    {
+      "id": "2:93",
+      "name": "Toast",
+      "type": "COMPONENT",
+      "codeKey": "rift-labs/markdown/toast",
+      "x": 0,
+      "y": 3000,
+      "width": 360,
+      "height": 64,
+      "layoutMode": "NONE",
+      "itemSpacing": 0,
+      "paddingTop": 0,
+      "paddingRight": 0,
+      "paddingBottom": 0,
+      "paddingLeft": 0,
+      "cornerRadius": 6,
+      "description": "A brief, self-dismissing confirmation for something that already happened — a payout landing, an invoice getting paid.",
+      "effects": [],
+      "variantProperties": null,
+      "fills": [
+        {
+          "type": "SOLID",
+          "color": {
+            "r": 0.9803921580314636,
+            "g": 0.9764705896377563,
+            "b": 0.9686274528503418
+          },
+          "opacity": 1,
+          "boundVariable": {
+            "id": "VariableID:1:8",
+            "name": "Paper 000"
+          }
+        }
+      ],
+      "strokes": [
+        {
+          "type": "SOLID",
+          "color": {
+            "r": 0.8784313797950745,
+            "g": 0.8666666746139526,
+            "b": 0.843137264251709
+          },
+          "opacity": 1,
+          "boundVariable": {
+            "id": "VariableID:1:9",
+            "name": "Line"
+          }
+        }
+      ],
+      "strokeWeight": 1,
+      "strokeAlign": "INSIDE",
+      "boundVariables": {
+        "topLeftRadius": {
+          "id": "VariableID:1:32",
+          "name": "Radius/container"
+        },
+        "topRightRadius": {
+          "id": "VariableID:1:32",
+          "name": "Radius/container"
+        },
+        "bottomLeftRadius": {
+          "id": "VariableID:1:32",
+          "name": "Radius/container"
+        },
+        "bottomRightRadius": {
+          "id": "VariableID:1:32",
+          "name": "Radius/container"
+        }
+      },
+      "children": [
+        {
+          "id": "2:94",
+          "name": "Success",
+          "type": "ELLIPSE",
+          "codeKey": null,
+          "x": 16,
+          "y": 28,
+          "width": 8,
+          "height": 8,
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.2078431397676468,
+                "g": 0.4588235318660736,
+                "b": 0.30588236451148987
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:13",
+                "name": "Signal/green"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "INSIDE",
+          "boundVariables": {}
+        },
+        {
+          "id": "2:95",
+          "name": "Payout of $420.00 sent",
+          "type": "TEXT",
+          "codeKey": null,
+          "x": 32,
+          "y": 22,
+          "width": 156,
+          "height": 17,
+          "characters": "Payout of $420.00 sent",
+          "fontSize": 14,
+          "fontName": {
+            "family": "Inter",
+            "style": "Regular",
+            "variationSettings": {
+              "slnt": 0,
+              "wght": 400
+            }
+          },
+          "lineHeight": {
+            "unit": "AUTO"
+          },
+          "letterSpacing": {
+            "unit": "PERCENT",
+            "value": 0
+          },
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.09019608050584793,
+                "g": 0.0941176488995552,
+                "b": 0.10980392247438431
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:5",
+                "name": "Ink 900"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "OUTSIDE",
+          "boundVariables": {}
+        }
+      ]
+    },
+    {
+      "id": "2:96",
+      "name": "Amount input",
+      "type": "COMPONENT",
+      "codeKey": "rift-labs/markdown/amount-input",
+      "x": 800,
+      "y": 3000,
+      "width": 320,
+      "height": 64,
+      "layoutMode": "NONE",
+      "itemSpacing": 0,
+      "paddingTop": 0,
+      "paddingRight": 0,
+      "paddingBottom": 0,
+      "paddingLeft": 0,
+      "cornerRadius": 0,
+      "description": "Money entry, specifically — distinct from the plain text Input because precision, asset, and available balance all have to be visible at once.",
+      "effects": [],
+      "variantProperties": null,
+      "fills": [
+        {
+          "type": "SOLID",
+          "color": {
+            "r": 0.9803921580314636,
+            "g": 0.9764705896377563,
+            "b": 0.9686274528503418
+          },
+          "opacity": 1,
+          "boundVariable": {
+            "id": "VariableID:1:8",
+            "name": "Paper 000"
+          }
+        }
+      ],
+      "strokes": [],
+      "strokeWeight": 1,
+      "strokeAlign": "INSIDE",
+      "boundVariables": {},
+      "children": [
+        {
+          "id": "2:97",
+          "name": "Input",
+          "type": "RECTANGLE",
+          "codeKey": null,
+          "x": 0,
+          "y": 0,
+          "width": 320,
+          "height": 40,
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.9803921580314636,
+                "g": 0.9764705896377563,
+                "b": 0.9686274528503418
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:8",
+                "name": "Paper 000"
+              }
+            }
+          ],
+          "strokes": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.8784313797950745,
+                "g": 0.8666666746139526,
+                "b": 0.843137264251709
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:9",
+                "name": "Line"
+              }
+            }
+          ],
+          "strokeWeight": 1,
+          "strokeAlign": "INSIDE",
+          "boundVariables": {}
+        },
+        {
+          "id": "2:98",
+          "name": "$420.00",
+          "type": "TEXT",
+          "codeKey": null,
+          "x": 12,
+          "y": 12,
+          "width": 55,
+          "height": 17,
+          "characters": "$420.00",
+          "fontSize": 13,
+          "fontName": {
+            "family": "JetBrains Mono",
+            "style": "Regular",
+            "variationSettings": {
+              "wght": 400
+            }
+          },
+          "lineHeight": {
+            "unit": "AUTO"
+          },
+          "letterSpacing": {
+            "unit": "PERCENT",
+            "value": 0
+          },
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.09019608050584793,
+                "g": 0.0941176488995552,
+                "b": 0.10980392247438431
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:5",
+                "name": "Ink 900"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "OUTSIDE",
+          "boundVariables": {}
+        },
+        {
+          "id": "2:99",
+          "name": "USDC",
+          "type": "TEXT",
+          "codeKey": null,
+          "x": 264,
+          "y": 12,
+          "width": 34,
+          "height": 15,
+          "characters": "USDC",
+          "fontSize": 12,
+          "fontName": {
+            "family": "Inter",
+            "style": "Regular",
+            "variationSettings": {
+              "slnt": 0,
+              "wght": 400
+            }
+          },
+          "lineHeight": {
+            "unit": "AUTO"
+          },
+          "letterSpacing": {
+            "unit": "PERCENT",
+            "value": 0
+          },
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.41960784792900085,
+                "g": 0.4274509847164154,
+                "b": 0.4470588266849518
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:7",
+                "name": "Ink 500"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "OUTSIDE",
+          "boundVariables": {}
+        },
+        {
+          "id": "2:100",
+          "name": "Available: $1,204.50",
+          "type": "TEXT",
+          "codeKey": null,
+          "x": 0,
+          "y": 48,
+          "width": 114,
+          "height": 15,
+          "characters": "Available: $1,204.50",
+          "fontSize": 12,
+          "fontName": {
+            "family": "Inter",
+            "style": "Regular",
+            "variationSettings": {
+              "slnt": 0,
+              "wght": 400
+            }
+          },
+          "lineHeight": {
+            "unit": "AUTO"
+          },
+          "letterSpacing": {
+            "unit": "PERCENT",
+            "value": 0
+          },
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.41960784792900085,
+                "g": 0.4274509847164154,
+                "b": 0.4470588266849518
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:7",
+                "name": "Ink 500"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "OUTSIDE",
+          "boundVariables": {}
+        }
+      ]
+    },
+    {
+      "id": "2:101",
+      "name": "Avatar",
+      "type": "COMPONENT",
+      "codeKey": "rift-labs/markdown/avatar",
+      "x": 1600,
+      "y": 3000,
+      "width": 32,
+      "height": 32,
+      "layoutMode": "NONE",
+      "itemSpacing": 0,
+      "paddingTop": 0,
+      "paddingRight": 0,
+      "paddingBottom": 0,
+      "paddingLeft": 0,
+      "cornerRadius": 0,
+      "description": "Represents a person or business — a client, a team member, a merchant — anywhere the product needs a face rather than just a name.",
+      "effects": [],
+      "variantProperties": null,
+      "fills": [
+        {
+          "type": "SOLID",
+          "color": {
+            "r": 0.9803921580314636,
+            "g": 0.9764705896377563,
+            "b": 0.9686274528503418
+          },
+          "opacity": 1,
+          "boundVariable": {
+            "id": "VariableID:1:8",
+            "name": "Paper 000"
+          }
+        }
+      ],
+      "strokes": [],
+      "strokeWeight": 1,
+      "strokeAlign": "INSIDE",
+      "boundVariables": {},
+      "children": [
+        {
+          "id": "2:102",
+          "name": "Initials background",
+          "type": "ELLIPSE",
+          "codeKey": null,
+          "x": 0,
+          "y": 0,
+          "width": 32,
+          "height": 32,
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.8784313797950745,
+                "g": 0.8666666746139526,
+                "b": 0.843137264251709
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:9",
+                "name": "Line"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "INSIDE",
+          "boundVariables": {}
+        },
+        {
+          "id": "2:103",
+          "name": "JD",
+          "type": "TEXT",
+          "codeKey": null,
+          "x": 7,
+          "y": 7,
+          "width": 16,
+          "height": 15,
+          "characters": "JD",
+          "fontSize": 12,
+          "fontName": {
+            "family": "Inter",
+            "style": "Medium",
+            "variationSettings": {
+              "slnt": 0,
+              "wght": 500
+            }
+          },
+          "lineHeight": {
+            "unit": "AUTO"
+          },
+          "letterSpacing": {
+            "unit": "PERCENT",
+            "value": 0
+          },
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.09019608050584793,
+                "g": 0.0941176488995552,
+                "b": 0.10980392247438431
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:5",
+                "name": "Ink 900"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "OUTSIDE",
+          "boundVariables": {}
+        }
+      ]
+    },
+    {
+      "id": "2:104",
+      "name": "Alert / banner",
+      "type": "COMPONENT",
+      "codeKey": "rift-labs/markdown/alert-banner",
+      "x": 0,
+      "y": 3600,
+      "width": 400,
+      "height": 80,
+      "layoutMode": "NONE",
+      "itemSpacing": 0,
+      "paddingTop": 0,
+      "paddingRight": 0,
+      "paddingBottom": 0,
+      "paddingLeft": 0,
+      "cornerRadius": 6,
+      "description": "Page-level, persistent messaging — the pattern already used for the notes throughout this document. Different from a Toast because it doesn't go away on its own.",
+      "effects": [],
+      "variantProperties": null,
+      "fills": [
+        {
+          "type": "SOLID",
+          "color": {
+            "r": 0.9803921580314636,
+            "g": 0.9764705896377563,
+            "b": 0.9686274528503418
+          },
+          "opacity": 1,
+          "boundVariable": {
+            "id": "VariableID:1:8",
+            "name": "Paper 000"
+          }
+        }
+      ],
+      "strokes": [
+        {
+          "type": "SOLID",
+          "color": {
+            "r": 0.8784313797950745,
+            "g": 0.8666666746139526,
+            "b": 0.843137264251709
+          },
+          "opacity": 1,
+          "boundVariable": {
+            "id": "VariableID:1:9",
+            "name": "Line"
+          }
+        }
+      ],
+      "strokeWeight": 1,
+      "strokeAlign": "INSIDE",
+      "boundVariables": {
+        "topLeftRadius": {
+          "id": "VariableID:1:32",
+          "name": "Radius/container"
+        },
+        "topRightRadius": {
+          "id": "VariableID:1:32",
+          "name": "Radius/container"
+        },
+        "bottomLeftRadius": {
+          "id": "VariableID:1:32",
+          "name": "Radius/container"
+        },
+        "bottomRightRadius": {
+          "id": "VariableID:1:32",
+          "name": "Radius/container"
+        }
+      },
+      "children": [
+        {
+          "id": "2:105",
+          "name": "Status",
+          "type": "ELLIPSE",
+          "codeKey": null,
+          "x": 16,
+          "y": 24,
+          "width": 8,
+          "height": 8,
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.6784313917160034,
+                "g": 0.49803921580314636,
+                "b": 0.13333334028720856
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:11",
+                "name": "Signal/amber"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "INSIDE",
+          "boundVariables": {}
+        },
+        {
+          "id": "2:106",
+          "name": "Action needed",
+          "type": "TEXT",
+          "codeKey": null,
+          "x": 32,
+          "y": 12,
+          "width": 98,
+          "height": 17,
+          "characters": "Action needed",
+          "fontSize": 14,
+          "fontName": {
+            "family": "Inter",
+            "style": "Medium",
+            "variationSettings": {
+              "slnt": 0,
+              "wght": 500
+            }
+          },
+          "lineHeight": {
+            "unit": "AUTO"
+          },
+          "letterSpacing": {
+            "unit": "PERCENT",
+            "value": 0
+          },
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.09019608050584793,
+                "g": 0.0941176488995552,
+                "b": 0.10980392247438431
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:5",
+                "name": "Ink 900"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "OUTSIDE",
+          "boundVariables": {}
+        },
+        {
+          "id": "2:107",
+          "name": "Verify your business details to enable payouts.",
+          "type": "TEXT",
+          "codeKey": null,
+          "x": 32,
+          "y": 36,
+          "width": 352,
+          "height": 20,
+          "characters": "Verify your business details to enable payouts.",
+          "fontSize": 14,
+          "fontName": {
+            "family": "Inter",
+            "style": "Regular",
+            "variationSettings": {
+              "slnt": 0,
+              "wght": 400
+            }
+          },
+          "lineHeight": {
+            "unit": "AUTO"
+          },
+          "letterSpacing": {
+            "unit": "PERCENT",
+            "value": 0
+          },
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.09019608050584793,
+                "g": 0.0941176488995552,
+                "b": 0.10980392247438431
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:5",
+                "name": "Ink 900"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "OUTSIDE",
+          "boundVariables": {}
+        }
+      ]
+    },
+    {
+      "id": "2:108",
+      "name": "Command palette",
+      "type": "COMPONENT",
+      "codeKey": "rift-labs/markdown/command-palette",
+      "x": 800,
+      "y": 3600,
+      "width": 480,
+      "height": 320,
+      "layoutMode": "NONE",
+      "itemSpacing": 0,
+      "paddingTop": 0,
+      "paddingRight": 0,
+      "paddingBottom": 0,
+      "paddingLeft": 0,
+      "cornerRadius": 6,
+      "description": "What the ⌘K hint on the persistent Search field actually opens — search and act on anything in the product without leaving the keyboard.",
+      "effects": [],
+      "variantProperties": null,
+      "fills": [
+        {
+          "type": "SOLID",
+          "color": {
+            "r": 0.9803921580314636,
+            "g": 0.9764705896377563,
+            "b": 0.9686274528503418
+          },
+          "opacity": 1,
+          "boundVariable": {
+            "id": "VariableID:1:8",
+            "name": "Paper 000"
+          }
+        }
+      ],
+      "strokes": [
+        {
+          "type": "SOLID",
+          "color": {
+            "r": 0.8784313797950745,
+            "g": 0.8666666746139526,
+            "b": 0.843137264251709
+          },
+          "opacity": 1,
+          "boundVariable": {
+            "id": "VariableID:1:9",
+            "name": "Line"
+          }
+        }
+      ],
+      "strokeWeight": 1,
+      "strokeAlign": "INSIDE",
+      "boundVariables": {
+        "topLeftRadius": {
+          "id": "VariableID:1:32",
+          "name": "Radius/container"
+        },
+        "topRightRadius": {
+          "id": "VariableID:1:32",
+          "name": "Radius/container"
+        },
+        "bottomLeftRadius": {
+          "id": "VariableID:1:32",
+          "name": "Radius/container"
+        },
+        "bottomRightRadius": {
+          "id": "VariableID:1:32",
+          "name": "Radius/container"
+        }
+      },
+      "children": [
+        {
+          "id": "2:109",
+          "name": "Search",
+          "type": "RECTANGLE",
+          "codeKey": null,
+          "x": 8,
+          "y": 8,
+          "width": 464,
+          "height": 40,
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.9803921580314636,
+                "g": 0.9764705896377563,
+                "b": 0.9686274528503418
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:8",
+                "name": "Paper 000"
+              }
+            }
+          ],
+          "strokes": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.8784313797950745,
+                "g": 0.8666666746139526,
+                "b": 0.843137264251709
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:9",
+                "name": "Line"
+              }
+            }
+          ],
+          "strokeWeight": 1,
+          "strokeAlign": "INSIDE",
+          "boundVariables": {}
+        },
+        {
+          "id": "2:110",
+          "name": "Search or run a command…",
+          "type": "TEXT",
+          "codeKey": null,
+          "x": 20,
+          "y": 20,
+          "width": 182,
+          "height": 17,
+          "characters": "Search or run a command…",
+          "fontSize": 14,
+          "fontName": {
+            "family": "Inter",
+            "style": "Regular",
+            "variationSettings": {
+              "slnt": 0,
+              "wght": 400
+            }
+          },
+          "lineHeight": {
+            "unit": "AUTO"
+          },
+          "letterSpacing": {
+            "unit": "PERCENT",
+            "value": 0
+          },
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.41960784792900085,
+                "g": 0.4274509847164154,
+                "b": 0.4470588266849518
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:7",
+                "name": "Ink 500"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "OUTSIDE",
+          "boundVariables": {}
+        },
+        {
+          "id": "2:111",
+          "name": "Actions",
+          "type": "TEXT",
+          "codeKey": null,
+          "x": 16,
+          "y": 64,
+          "width": 43,
+          "height": 15,
+          "characters": "Actions",
+          "fontSize": 12,
+          "fontName": {
+            "family": "Inter",
+            "style": "Regular",
+            "variationSettings": {
+              "slnt": 0,
+              "wght": 400
+            }
+          },
+          "lineHeight": {
+            "unit": "AUTO"
+          },
+          "letterSpacing": {
+            "unit": "PERCENT",
+            "value": 0
+          },
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.41960784792900085,
+                "g": 0.4274509847164154,
+                "b": 0.4470588266849518
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:7",
+                "name": "Ink 500"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "OUTSIDE",
+          "boundVariables": {}
+        },
+        {
+          "id": "2:112",
+          "name": "Highlighted result",
+          "type": "RECTANGLE",
+          "codeKey": null,
+          "x": 8,
+          "y": 88,
+          "width": 464,
+          "height": 32,
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.8784313797950745,
+                "g": 0.8666666746139526,
+                "b": 0.843137264251709
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:9",
+                "name": "Line"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "INSIDE",
+          "boundVariables": {}
+        },
+        {
+          "id": "2:113",
+          "name": "Create invoice",
+          "type": "TEXT",
+          "codeKey": null,
+          "x": 20,
+          "y": 96,
+          "width": 95,
+          "height": 17,
+          "characters": "Create invoice",
+          "fontSize": 14,
+          "fontName": {
+            "family": "Inter",
+            "style": "Regular",
+            "variationSettings": {
+              "slnt": 0,
+              "wght": 400
+            }
+          },
+          "lineHeight": {
+            "unit": "AUTO"
+          },
+          "letterSpacing": {
+            "unit": "PERCENT",
+            "value": 0
+          },
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.09019608050584793,
+                "g": 0.0941176488995552,
+                "b": 0.10980392247438431
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:5",
+                "name": "Ink 900"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "OUTSIDE",
+          "boundVariables": {}
+        },
+        {
+          "id": "2:114",
+          "name": "Send payout",
+          "type": "TEXT",
+          "codeKey": null,
+          "x": 20,
+          "y": 132,
+          "width": 84,
+          "height": 17,
+          "characters": "Send payout",
+          "fontSize": 14,
+          "fontName": {
+            "family": "Inter",
+            "style": "Regular",
+            "variationSettings": {
+              "slnt": 0,
+              "wght": 400
+            }
+          },
+          "lineHeight": {
+            "unit": "AUTO"
+          },
+          "letterSpacing": {
+            "unit": "PERCENT",
+            "value": 0
+          },
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.09019608050584793,
+                "g": 0.0941176488995552,
+                "b": 0.10980392247438431
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:5",
+                "name": "Ink 900"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "OUTSIDE",
+          "boundVariables": {}
+        },
+        {
+          "id": "2:115",
+          "name": "Recent",
+          "type": "TEXT",
+          "codeKey": null,
+          "x": 16,
+          "y": 180,
+          "width": 40,
+          "height": 15,
+          "characters": "Recent",
+          "fontSize": 12,
+          "fontName": {
+            "family": "Inter",
+            "style": "Regular",
+            "variationSettings": {
+              "slnt": 0,
+              "wght": 400
+            }
+          },
+          "lineHeight": {
+            "unit": "AUTO"
+          },
+          "letterSpacing": {
+            "unit": "PERCENT",
+            "value": 0
+          },
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.41960784792900085,
+                "g": 0.4274509847164154,
+                "b": 0.4470588266849518
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:7",
+                "name": "Ink 500"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "OUTSIDE",
+          "boundVariables": {}
+        },
+        {
+          "id": "2:116",
+          "name": "Invoice #0192",
+          "type": "TEXT",
+          "codeKey": null,
+          "x": 20,
+          "y": 212,
+          "width": 93,
+          "height": 17,
+          "characters": "Invoice #0192",
+          "fontSize": 14,
+          "fontName": {
+            "family": "Inter",
+            "style": "Regular",
+            "variationSettings": {
+              "slnt": 0,
+              "wght": 400
+            }
+          },
+          "lineHeight": {
+            "unit": "AUTO"
+          },
+          "letterSpacing": {
+            "unit": "PERCENT",
+            "value": 0
+          },
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.09019608050584793,
+                "g": 0.0941176488995552,
+                "b": 0.10980392247438431
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:5",
+                "name": "Ink 900"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "OUTSIDE",
+          "boundVariables": {}
+        },
+        {
+          "id": "2:117",
+          "name": "Separator",
+          "type": "RECTANGLE",
+          "codeKey": null,
+          "x": 8,
+          "y": 280,
+          "width": 464,
+          "height": 1,
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.8784313797950745,
+                "g": 0.8666666746139526,
+                "b": 0.843137264251709
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:9",
+                "name": "Line"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "INSIDE",
+          "boundVariables": {}
+        },
+        {
+          "id": "2:118",
+          "name": "↑↓ navigate     ↵ select     esc close",
+          "type": "TEXT",
+          "codeKey": null,
+          "x": 16,
+          "y": 292,
+          "width": 212,
+          "height": 15,
+          "characters": "↑↓ navigate     ↵ select     esc close",
+          "fontSize": 12,
+          "fontName": {
+            "family": "Inter",
+            "style": "Regular",
+            "variationSettings": {
+              "slnt": 0,
+              "wght": 400
+            }
+          },
+          "lineHeight": {
+            "unit": "AUTO"
+          },
+          "letterSpacing": {
+            "unit": "PERCENT",
+            "value": 0
+          },
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.41960784792900085,
+                "g": 0.4274509847164154,
+                "b": 0.4470588266849518
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:7",
+                "name": "Ink 500"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "OUTSIDE",
+          "boundVariables": {}
+        }
+      ]
+    },
+    {
+      "id": "2:119",
+      "name": "Skeleton",
+      "type": "COMPONENT",
+      "codeKey": "rift-labs/markdown/skeleton",
+      "x": 1600,
+      "y": 3600,
+      "width": 400,
+      "height": 64,
+      "layoutMode": "NONE",
+      "itemSpacing": 0,
+      "paddingTop": 0,
+      "paddingRight": 0,
+      "paddingBottom": 0,
+      "paddingLeft": 0,
+      "cornerRadius": 0,
+      "description": "A placeholder shaped exactly like the content it stands in for, while a balance, list, or chart is still loading.",
+      "effects": [],
+      "variantProperties": null,
+      "fills": [
+        {
+          "type": "SOLID",
+          "color": {
+            "r": 0.9803921580314636,
+            "g": 0.9764705896377563,
+            "b": 0.9686274528503418
+          },
+          "opacity": 1,
+          "boundVariable": {
+            "id": "VariableID:1:8",
+            "name": "Paper 000"
+          }
+        }
+      ],
+      "strokes": [],
+      "strokeWeight": 1,
+      "strokeAlign": "INSIDE",
+      "boundVariables": {},
+      "children": [
+        {
+          "id": "2:120",
+          "name": "Title placeholder",
+          "type": "RECTANGLE",
+          "codeKey": null,
+          "x": 24,
+          "y": 12,
+          "width": 160,
+          "height": 12,
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.8784313797950745,
+                "g": 0.8666666746139526,
+                "b": 0.843137264251709
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:9",
+                "name": "Line"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "INSIDE",
+          "boundVariables": {}
+        },
+        {
+          "id": "2:121",
+          "name": "Snippet placeholder",
+          "type": "RECTANGLE",
+          "codeKey": null,
+          "x": 24,
+          "y": 36,
+          "width": 296,
+          "height": 12,
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.8784313797950745,
+                "g": 0.8666666746139526,
+                "b": 0.843137264251709
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:9",
+                "name": "Line"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "INSIDE",
+          "boundVariables": {}
+        }
+      ]
+    },
+    {
+      "id": "2:122",
+      "name": "Tooltip",
+      "type": "COMPONENT",
+      "codeKey": "rift-labs/markdown/tooltip",
+      "x": 0,
+      "y": 4200,
+      "width": 72,
+      "height": 24,
+      "layoutMode": "NONE",
+      "itemSpacing": 0,
+      "paddingTop": 0,
+      "paddingRight": 0,
+      "paddingBottom": 0,
+      "paddingLeft": 0,
+      "cornerRadius": 4,
+      "description": "Required on every icon-only Button, per that component's own accessibility note — this is the piece that actually delivers it.",
+      "effects": [],
+      "variantProperties": null,
+      "fills": [
+        {
+          "type": "SOLID",
+          "color": {
+            "r": 0.09019608050584793,
+            "g": 0.0941176488995552,
+            "b": 0.10980392247438431
+          },
+          "opacity": 1,
+          "boundVariable": {
+            "id": "VariableID:1:5",
+            "name": "Ink 900"
+          }
+        }
+      ],
+      "strokes": [],
+      "strokeWeight": 1,
+      "strokeAlign": "INSIDE",
+      "boundVariables": {
+        "topLeftRadius": {
+          "id": "VariableID:1:31",
+          "name": "Radius/control"
+        },
+        "topRightRadius": {
+          "id": "VariableID:1:31",
+          "name": "Radius/control"
+        },
+        "bottomLeftRadius": {
+          "id": "VariableID:1:31",
+          "name": "Radius/control"
+        },
+        "bottomRightRadius": {
+          "id": "VariableID:1:31",
+          "name": "Radius/control"
+        }
+      },
+      "children": [
+        {
+          "id": "2:123",
+          "name": "Filter   F",
+          "type": "TEXT",
+          "codeKey": null,
+          "x": 8,
+          "y": 4,
+          "width": 46,
+          "height": 15,
+          "characters": "Filter   F",
+          "fontSize": 12,
+          "fontName": {
+            "family": "Inter",
+            "style": "Regular",
+            "variationSettings": {
+              "slnt": 0,
+              "wght": 400
+            }
+          },
+          "lineHeight": {
+            "unit": "AUTO"
+          },
+          "letterSpacing": {
+            "unit": "PERCENT",
+            "value": 0
+          },
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.9803921580314636,
+                "g": 0.9764705896377563,
+                "b": 0.9686274528503418
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:8",
+                "name": "Paper 000"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "OUTSIDE",
+          "boundVariables": {}
+        }
+      ]
+    },
+    {
+      "id": "2:124",
+      "name": "Pagination",
+      "type": "COMPONENT",
+      "codeKey": "rift-labs/markdown/pagination",
+      "x": 800,
+      "y": 4200,
+      "width": 328,
+      "height": 32,
+      "layoutMode": "NONE",
+      "itemSpacing": 0,
+      "paddingTop": 0,
+      "paddingRight": 0,
+      "paddingBottom": 0,
+      "paddingLeft": 0,
+      "cornerRadius": 0,
+      "description": "Pairs with the Table component once a list is long enough to split across pages.",
+      "effects": [],
+      "variantProperties": null,
+      "fills": [
+        {
+          "type": "SOLID",
+          "color": {
+            "r": 0.9803921580314636,
+            "g": 0.9764705896377563,
+            "b": 0.9686274528503418
+          },
+          "opacity": 1,
+          "boundVariable": {
+            "id": "VariableID:1:8",
+            "name": "Paper 000"
+          }
+        }
+      ],
+      "strokes": [],
+      "strokeWeight": 1,
+      "strokeAlign": "INSIDE",
+      "boundVariables": {},
+      "children": [
+        {
+          "id": "2:125",
+          "name": "Showing 1–10 of 42",
+          "type": "TEXT",
+          "codeKey": null,
+          "x": 0,
+          "y": 9,
+          "width": 110,
+          "height": 15,
+          "characters": "Showing 1–10 of 42",
+          "fontSize": 12,
+          "fontName": {
+            "family": "Inter",
+            "style": "Regular",
+            "variationSettings": {
+              "slnt": 0,
+              "wght": 400
+            }
+          },
+          "lineHeight": {
+            "unit": "AUTO"
+          },
+          "letterSpacing": {
+            "unit": "PERCENT",
+            "value": 0
+          },
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.41960784792900085,
+                "g": 0.4274509847164154,
+                "b": 0.4470588266849518
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:7",
+                "name": "Ink 500"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "OUTSIDE",
+          "boundVariables": {}
+        },
+        {
+          "id": "2:126",
+          "name": "‹",
+          "type": "TEXT",
+          "codeKey": null,
+          "x": 159,
+          "y": 7,
+          "width": 6,
+          "height": 17,
+          "characters": "‹",
+          "fontSize": 14,
+          "fontName": {
+            "family": "Inter",
+            "style": "Regular",
+            "variationSettings": {
+              "slnt": 0,
+              "wght": 400
+            }
+          },
+          "lineHeight": {
+            "unit": "AUTO"
+          },
+          "letterSpacing": {
+            "unit": "PERCENT",
+            "value": 0
+          },
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.09019608050584793,
+                "g": 0.0941176488995552,
+                "b": 0.10980392247438431
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:5",
+                "name": "Ink 900"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "OUTSIDE",
+          "boundVariables": {}
+        },
+        {
+          "id": "2:127",
+          "name": "Current page",
+          "type": "RECTANGLE",
+          "codeKey": null,
+          "x": 184,
+          "y": 0,
+          "width": 32,
+          "height": 32,
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.29019609093666077,
+                "g": 0.3333333432674408,
+                "b": 0.7882353067398071
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:10",
+                "name": "Accent"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "INSIDE",
+          "boundVariables": {}
+        },
+        {
+          "id": "2:128",
+          "name": "1",
+          "type": "TEXT",
+          "codeKey": null,
+          "x": 195,
+          "y": 7,
+          "width": 7,
+          "height": 17,
+          "characters": "1",
+          "fontSize": 14,
+          "fontName": {
+            "family": "Inter",
+            "style": "Regular",
+            "variationSettings": {
+              "slnt": 0,
+              "wght": 400
+            }
+          },
+          "lineHeight": {
+            "unit": "AUTO"
+          },
+          "letterSpacing": {
+            "unit": "PERCENT",
+            "value": 0
+          },
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.9803921580314636,
+                "g": 0.9764705896377563,
+                "b": 0.9686274528503418
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:8",
+                "name": "Paper 000"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "OUTSIDE",
+          "boundVariables": {}
+        },
+        {
+          "id": "2:129",
+          "name": "2",
+          "type": "TEXT",
+          "codeKey": null,
+          "x": 231,
+          "y": 7,
+          "width": 9,
+          "height": 17,
+          "characters": "2",
+          "fontSize": 14,
+          "fontName": {
+            "family": "Inter",
+            "style": "Regular",
+            "variationSettings": {
+              "slnt": 0,
+              "wght": 400
+            }
+          },
+          "lineHeight": {
+            "unit": "AUTO"
+          },
+          "letterSpacing": {
+            "unit": "PERCENT",
+            "value": 0
+          },
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.09019608050584793,
+                "g": 0.0941176488995552,
+                "b": 0.10980392247438431
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:5",
+                "name": "Ink 900"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "OUTSIDE",
+          "boundVariables": {}
+        },
+        {
+          "id": "2:130",
+          "name": "3",
+          "type": "TEXT",
+          "codeKey": null,
+          "x": 267,
+          "y": 7,
+          "width": 9,
+          "height": 17,
+          "characters": "3",
+          "fontSize": 14,
+          "fontName": {
+            "family": "Inter",
+            "style": "Regular",
+            "variationSettings": {
+              "slnt": 0,
+              "wght": 400
+            }
+          },
+          "lineHeight": {
+            "unit": "AUTO"
+          },
+          "letterSpacing": {
+            "unit": "PERCENT",
+            "value": 0
+          },
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.09019608050584793,
+                "g": 0.0941176488995552,
+                "b": 0.10980392247438431
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:5",
+                "name": "Ink 900"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "OUTSIDE",
+          "boundVariables": {}
+        },
+        {
+          "id": "2:131",
+          "name": "›",
+          "type": "TEXT",
+          "codeKey": null,
+          "x": 303,
+          "y": 7,
+          "width": 6,
+          "height": 17,
+          "characters": "›",
+          "fontSize": 14,
+          "fontName": {
+            "family": "Inter",
+            "style": "Regular",
+            "variationSettings": {
+              "slnt": 0,
+              "wght": 400
+            }
+          },
+          "lineHeight": {
+            "unit": "AUTO"
+          },
+          "letterSpacing": {
+            "unit": "PERCENT",
+            "value": 0
+          },
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.09019608050584793,
+                "g": 0.0941176488995552,
+                "b": 0.10980392247438431
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:5",
+                "name": "Ink 900"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "OUTSIDE",
+          "boundVariables": {}
+        }
+      ]
+    },
+    {
+      "id": "2:22",
+      "name": "Chart (area)",
+      "type": "COMPONENT",
+      "codeKey": "rift-labs/markdown/chart-area",
+      "x": 0,
+      "y": 1200,
+      "width": 400,
+      "height": 240,
+      "layoutMode": "NONE",
+      "itemSpacing": 0,
+      "paddingTop": 0,
+      "paddingRight": 0,
+      "paddingBottom": 0,
+      "paddingLeft": 0,
+      "cornerRadius": 0,
+      "description": "The only chart type in this system for now. Reserved for a value trending over time — balance, volume, activity — where the filled region is what communicates magnitude, not for comparing unrelated categories.",
+      "effects": [],
+      "variantProperties": null,
+      "fills": [
+        {
+          "type": "SOLID",
+          "color": {
+            "r": 0.9803921580314636,
+            "g": 0.9764705896377563,
+            "b": 0.9686274528503418
+          },
+          "opacity": 1,
+          "boundVariable": {
+            "id": "VariableID:1:8",
+            "name": "Paper 000"
+          }
+        }
+      ],
+      "strokes": [],
+      "strokeWeight": 1,
+      "strokeAlign": "INSIDE",
+      "boundVariables": {},
+      "children": [
+        {
+          "id": "2:156",
+          "name": "Hedwig balance, 30 days",
+          "type": "TEXT",
+          "codeKey": null,
+          "x": 16,
+          "y": 12,
+          "width": 169,
+          "height": 17,
+          "characters": "Hedwig balance, 30 days",
+          "fontSize": 14,
+          "fontName": {
+            "family": "Inter",
+            "style": "Medium",
+            "variationSettings": {
+              "slnt": 0,
+              "wght": 500
+            }
+          },
+          "lineHeight": {
+            "unit": "AUTO"
+          },
+          "letterSpacing": {
+            "unit": "PERCENT",
+            "value": 0
+          },
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.09019608050584793,
+                "g": 0.0941176488995552,
+                "b": 0.10980392247438431
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:5",
+                "name": "Ink 900"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "OUTSIDE",
+          "boundVariables": {}
+        },
+        {
+          "id": "2:157",
+          "name": "$18,420.10",
+          "type": "TEXT",
+          "codeKey": null,
+          "x": 16,
+          "y": 40,
+          "width": 78,
+          "height": 17,
+          "characters": "$18,420.10",
+          "fontSize": 13,
+          "fontName": {
+            "family": "JetBrains Mono",
+            "style": "Regular",
+            "variationSettings": {
+              "wght": 400
+            }
+          },
+          "lineHeight": {
+            "unit": "AUTO"
+          },
+          "letterSpacing": {
+            "unit": "PERCENT",
+            "value": 0
+          },
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.09019608050584793,
+                "g": 0.0941176488995552,
+                "b": 0.10980392247438431
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:5",
+                "name": "Ink 900"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "OUTSIDE",
+          "boundVariables": {}
+        },
+        {
+          "id": "2:158",
+          "name": "Separator",
+          "type": "RECTANGLE",
+          "codeKey": null,
+          "x": 40,
+          "y": 88,
+          "width": 344,
+          "height": 1,
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.8784313797950745,
+                "g": 0.8666666746139526,
+                "b": 0.843137264251709
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:9",
+                "name": "Line"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "INSIDE",
+          "boundVariables": {}
+        },
+        {
+          "id": "2:159",
+          "name": "Separator",
+          "type": "RECTANGLE",
+          "codeKey": null,
+          "x": 40,
+          "y": 128,
+          "width": 344,
+          "height": 1,
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.8784313797950745,
+                "g": 0.8666666746139526,
+                "b": 0.843137264251709
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:9",
+                "name": "Line"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "INSIDE",
+          "boundVariables": {}
+        },
+        {
+          "id": "2:160",
+          "name": "Separator",
+          "type": "RECTANGLE",
+          "codeKey": null,
+          "x": 40,
+          "y": 168,
+          "width": 344,
+          "height": 1,
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.8784313797950745,
+                "g": 0.8666666746139526,
+                "b": 0.843137264251709
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:9",
+                "name": "Line"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "INSIDE",
+          "boundVariables": {}
+        },
+        {
+          "id": "2:161",
+          "name": "Separator",
+          "type": "RECTANGLE",
+          "codeKey": null,
+          "x": 40,
+          "y": 208,
+          "width": 344,
+          "height": 1,
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.8784313797950745,
+                "g": 0.8666666746139526,
+                "b": 0.843137264251709
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:9",
+                "name": "Line"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "INSIDE",
+          "boundVariables": {}
+        },
+        {
+          "id": "2:162",
+          "name": "Illustrative balance area",
+          "type": "VECTOR",
+          "codeKey": null,
+          "x": 40,
+          "y": 88,
+          "width": 344,
+          "height": 120,
+          "vectorPaths": [
+            {
+              "windingRule": "NONZERO",
+              "data": "M 0 120 L 0 100 L 44 84 L 88 94 L 132 48 L 176 60 L 220 24 L 264 32 L 308 0 L 344 8 L 344 120 L 0 120 Z"
+            }
+          ],
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.29019609093666077,
+                "g": 0.3333333432674408,
+                "b": 0.7882353067398071
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:10",
+                "name": "Accent"
+              }
+            }
+          ],
+          "strokes": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.29019609093666077,
+                "g": 0.3333333432674408,
+                "b": 0.7882353067398071
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:10",
+                "name": "Accent"
+              }
+            }
+          ],
+          "strokeWeight": 0,
+          "strokeAlign": "INSIDE",
+          "boundVariables": {}
+        },
+        {
+          "id": "2:163",
+          "name": "Illustrative balance trend",
+          "type": "VECTOR",
+          "codeKey": null,
+          "x": 40,
+          "y": 88,
+          "width": 344,
+          "height": 100,
+          "vectorPaths": [
+            {
+              "windingRule": "NONZERO",
+              "data": "M 0 100 L 44 84 L 88 94 L 132 48 L 176 60 L 220 24 L 264 32 L 308 0 L 344 8"
+            }
+          ],
+          "effects": [],
+          "fills": [],
+          "strokes": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.29019609093666077,
+                "g": 0.3333333432674408,
+                "b": 0.7882353067398071
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:10",
+                "name": "Accent"
+              }
+            }
+          ],
+          "strokeWeight": 2,
+          "strokeAlign": "INSIDE",
+          "boundVariables": {}
+        },
+        {
+          "id": "2:164",
+          "name": "Illustrative data",
+          "type": "TEXT",
+          "codeKey": null,
+          "x": 260,
+          "y": 220,
+          "width": 88,
+          "height": 15,
+          "characters": "Illustrative data",
+          "fontSize": 12,
+          "fontName": {
+            "family": "Inter",
+            "style": "Regular",
+            "variationSettings": {
+              "slnt": 0,
+              "wght": 400
+            }
+          },
+          "lineHeight": {
+            "unit": "AUTO"
+          },
+          "letterSpacing": {
+            "unit": "PERCENT",
+            "value": 0
+          },
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.41960784792900085,
+                "g": 0.4274509847164154,
+                "b": 0.4470588266849518
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:7",
+                "name": "Ink 500"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "OUTSIDE",
+          "boundVariables": {}
+        }
+      ]
+    },
+    {
+      "id": "2:9",
+      "name": "Nav item",
+      "type": "COMPONENT",
+      "codeKey": "rift-labs/markdown/nav-item",
+      "x": 0,
+      "y": 600,
+      "width": 240,
+      "height": 36,
+      "layoutMode": "NONE",
+      "itemSpacing": 0,
+      "paddingTop": 0,
+      "paddingRight": 0,
+      "paddingBottom": 0,
+      "paddingLeft": 0,
+      "cornerRadius": 4,
+      "description": "Primary navigation inside a workspace. Icon and label always travel together — never icon-only in this context.",
+      "effects": [],
+      "variantProperties": null,
+      "fills": [
+        {
+          "type": "SOLID",
+          "color": {
+            "r": 0.8784313797950745,
+            "g": 0.8666666746139526,
+            "b": 0.843137264251709
+          },
+          "opacity": 1,
+          "boundVariable": {
+            "id": "VariableID:1:9",
+            "name": "Line"
+          }
+        }
+      ],
+      "strokes": [
+        {
+          "type": "SOLID",
+          "color": {
+            "r": 0.8784313797950745,
+            "g": 0.8666666746139526,
+            "b": 0.843137264251709
+          },
+          "opacity": 1,
+          "boundVariable": {
+            "id": "VariableID:1:9",
+            "name": "Line"
+          }
+        }
+      ],
+      "strokeWeight": 1,
+      "strokeAlign": "INSIDE",
+      "boundVariables": {
+        "topLeftRadius": {
+          "id": "VariableID:1:31",
+          "name": "Radius/control"
+        },
+        "topRightRadius": {
+          "id": "VariableID:1:31",
+          "name": "Radius/control"
+        },
+        "bottomLeftRadius": {
+          "id": "VariableID:1:31",
+          "name": "Radius/control"
+        },
+        "bottomRightRadius": {
+          "id": "VariableID:1:31",
+          "name": "Radius/control"
+        }
+      },
+      "children": [
+        {
+          "id": "2:165",
+          "name": "Active indicator",
+          "type": "ELLIPSE",
+          "codeKey": null,
+          "x": 8,
+          "y": 15,
+          "width": 6,
+          "height": 6,
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.29019609093666077,
+                "g": 0.3333333432674408,
+                "b": 0.7882353067398071
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:10",
+                "name": "Accent"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "INSIDE",
+          "boundVariables": {}
+        },
+        {
+          "id": "2:166",
+          "name": "Inbox",
+          "type": "TEXT",
+          "codeKey": null,
+          "x": 24,
+          "y": 9,
+          "width": 37,
+          "height": 17,
+          "characters": "Inbox",
+          "fontSize": 14,
+          "fontName": {
+            "family": "Inter",
+            "style": "Medium",
+            "variationSettings": {
+              "slnt": 0,
+              "wght": 500
+            }
+          },
+          "lineHeight": {
+            "unit": "AUTO"
+          },
+          "letterSpacing": {
+            "unit": "PERCENT",
+            "value": 0
+          },
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.09019608050584793,
+                "g": 0.0941176488995552,
+                "b": 0.10980392247438431
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:5",
+                "name": "Ink 900"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "OUTSIDE",
+          "boundVariables": {}
+        },
+        {
+          "id": "2:167",
+          "name": "1",
+          "type": "TEXT",
+          "codeKey": null,
+          "x": 214,
+          "y": 10,
+          "width": 8,
+          "height": 17,
+          "characters": "1",
+          "fontSize": 13,
+          "fontName": {
+            "family": "JetBrains Mono",
+            "style": "Regular",
+            "variationSettings": {
+              "wght": 400
+            }
+          },
+          "lineHeight": {
+            "unit": "AUTO"
+          },
+          "letterSpacing": {
+            "unit": "PERCENT",
+            "value": 0
+          },
+          "effects": [],
+          "fills": [
+            {
+              "type": "SOLID",
+              "color": {
+                "r": 0.41960784792900085,
+                "g": 0.4274509847164154,
+                "b": 0.4470588266849518
+              },
+              "opacity": 1,
+              "boundVariable": {
+                "id": "VariableID:1:7",
+                "name": "Ink 500"
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1,
+          "strokeAlign": "OUTSIDE",
+          "boundVariables": {}
+        }
+      ]
+    }
+  ]
+}

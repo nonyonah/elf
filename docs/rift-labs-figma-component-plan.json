@@ -1,0 +1,2546 @@
+{
+  "schema": 1,
+  "stage": "23 default masters applied and read back; full variants and documentation/presentation page pending",
+  "targetFileKey": "eu8zGUOsrdyXXQqvJeyl1E",
+  "source": "docs/DESIGN_SYSTEM.md",
+  "sourceHash": "04a30b14e179be2162d97bf4cb7269daf546301d297bc84f2ed70264b4bb629f",
+  "proposalHash": "65ac913e99dad604872513ba6cd6d472797a301945381de4c6254d20e90d4278",
+  "operations": [
+    {
+      "tool": "upsert_component",
+      "arguments": {
+        "name": "Button",
+        "codeKey": "rift-labs/markdown/button",
+        "description": "The single mechanism for triggering an action. Weight (primary \u2192 destructive) signals how much attention the action deserves.",
+        "position": {
+          "x": 0,
+          "y": 0
+        },
+        "layoutMode": "NONE",
+        "size": {
+          "width": 108,
+          "height": 32
+        },
+        "fill": {
+          "variable": "VariableID:1:10"
+        },
+        "layers": [
+          {
+            "type": "text",
+            "name": "Create issue",
+            "position": {
+              "x": 12,
+              "y": 7
+            },
+            "text": {
+              "characters": "Create issue",
+              "fontSize": 14,
+              "fontFamily": "Inter",
+              "fontStyle": "Medium",
+              "color": {
+                "variable": "VariableID:1:8"
+              }
+            }
+          }
+        ],
+        "cornerRadius": {
+          "variable": "VariableID:1:31"
+        }
+      }
+    },
+    {
+      "tool": "upsert_component",
+      "arguments": {
+        "name": "Input",
+        "codeKey": "rift-labs/markdown/input",
+        "description": "Text entry and search. Search fields in persistent chrome show a keyboard shortcut hint; form fields inside a flow do not.",
+        "position": {
+          "x": 800,
+          "y": 0
+        },
+        "layoutMode": "NONE",
+        "size": {
+          "width": 280,
+          "height": 36
+        },
+        "fill": {
+          "variable": "VariableID:1:8"
+        },
+        "layers": [
+          {
+            "type": "text",
+            "name": "Search issues",
+            "position": {
+              "x": 12,
+              "y": 9
+            },
+            "text": {
+              "characters": "Search issues",
+              "fontSize": 14,
+              "fontFamily": "Inter",
+              "fontStyle": "Regular",
+              "color": {
+                "variable": "VariableID:1:7"
+              }
+            }
+          },
+          {
+            "type": "text",
+            "name": "\u2318K",
+            "position": {
+              "x": 244,
+              "y": 10
+            },
+            "text": {
+              "characters": "\u2318K",
+              "fontSize": 12,
+              "fontFamily": "Inter",
+              "fontStyle": "Regular",
+              "color": {
+                "variable": "VariableID:1:7"
+              }
+            }
+          }
+        ],
+        "stroke": {
+          "color": {
+            "variable": "VariableID:1:9"
+          },
+          "weight": 1
+        },
+        "cornerRadius": {
+          "variable": "VariableID:1:32"
+        }
+      }
+    },
+    {
+      "tool": "upsert_component",
+      "arguments": {
+        "name": "Badge & counter",
+        "codeKey": "rift-labs/markdown/badge-counter",
+        "description": "Counters show an unseen total in navigation; dots show state on a row; tag badges label a category.",
+        "position": {
+          "x": 1600,
+          "y": 0
+        },
+        "layoutMode": "NONE",
+        "size": {
+          "width": 72,
+          "height": 24
+        },
+        "fill": {
+          "variable": "VariableID:1:8"
+        },
+        "layers": [
+          {
+            "type": "text",
+            "name": "Hedwig",
+            "position": {
+              "x": 8,
+              "y": 4
+            },
+            "text": {
+              "characters": "Hedwig",
+              "fontSize": 12,
+              "fontFamily": "Inter",
+              "fontStyle": "Regular",
+              "color": {
+                "variable": "VariableID:1:5"
+              }
+            }
+          }
+        ],
+        "stroke": {
+          "color": {
+            "variable": "VariableID:1:9"
+          },
+          "weight": 1
+        },
+        "cornerRadius": {
+          "variable": "VariableID:1:31"
+        }
+      }
+    },
+    {
+      "tool": "upsert_component",
+      "arguments": {
+        "name": "Nav item",
+        "codeKey": "rift-labs/markdown/nav-item",
+        "description": "Primary navigation inside a workspace. Icon and label always travel together \u2014 never icon-only in this context.",
+        "position": {
+          "x": 0,
+          "y": 600
+        },
+        "layoutMode": "NONE",
+        "size": {
+          "width": 240,
+          "height": 36
+        },
+        "fill": {
+          "variable": "VariableID:1:9"
+        },
+        "layers": [
+          {
+            "type": "ellipse",
+            "name": "Active indicator",
+            "position": {
+              "x": 8,
+              "y": 15
+            },
+            "size": {
+              "width": 6,
+              "height": 6
+            },
+            "fill": {
+              "variable": "VariableID:1:10"
+            }
+          },
+          {
+            "type": "text",
+            "name": "Inbox",
+            "position": {
+              "x": 24,
+              "y": 9
+            },
+            "text": {
+              "characters": "Inbox",
+              "fontSize": 14,
+              "fontFamily": "Inter",
+              "fontStyle": "Medium",
+              "color": {
+                "variable": "VariableID:1:5"
+              }
+            }
+          },
+          {
+            "type": "text",
+            "name": "1",
+            "position": {
+              "x": 214,
+              "y": 10
+            },
+            "text": {
+              "characters": "1",
+              "fontSize": 13,
+              "fontFamily": "JetBrains Mono",
+              "fontStyle": "Regular",
+              "color": {
+                "variable": "VariableID:1:7"
+              }
+            }
+          }
+        ],
+        "stroke": {
+          "color": {
+            "variable": "VariableID:1:9"
+          },
+          "weight": 1
+        },
+        "cornerRadius": {
+          "variable": "VariableID:1:31"
+        }
+      }
+    },
+    {
+      "tool": "upsert_component",
+      "arguments": {
+        "name": "List row",
+        "codeKey": "rift-labs/markdown/list-row",
+        "description": "Any scannable list \u2014 inbox, transactions, notifications \u2014 where someone compares many items at a glance.",
+        "position": {
+          "x": 800,
+          "y": 600
+        },
+        "layoutMode": "NONE",
+        "size": {
+          "width": 400,
+          "height": 64
+        },
+        "fill": {
+          "variable": "VariableID:1:8"
+        },
+        "layers": [
+          {
+            "type": "ellipse",
+            "name": "Unread",
+            "position": {
+              "x": 8,
+              "y": 18
+            },
+            "size": {
+              "width": 6,
+              "height": 6
+            },
+            "fill": {
+              "variable": "VariableID:1:10"
+            }
+          },
+          {
+            "type": "text",
+            "name": "Payout received",
+            "position": {
+              "x": 24,
+              "y": 10
+            },
+            "text": {
+              "characters": "Payout received",
+              "fontSize": 14,
+              "fontFamily": "Inter",
+              "fontStyle": "Medium",
+              "color": {
+                "variable": "VariableID:1:5"
+              }
+            }
+          },
+          {
+            "type": "text",
+            "name": "$420.00 USDC landed in your Hedwig balance",
+            "position": {
+              "x": 24,
+              "y": 34
+            },
+            "text": {
+              "characters": "$420.00 USDC landed in your Hedwig balance",
+              "fontSize": 12,
+              "fontFamily": "Inter",
+              "fontStyle": "Regular",
+              "color": {
+                "variable": "VariableID:1:7"
+              }
+            },
+            "size": {
+              "width": 320,
+              "height": 18
+            }
+          },
+          {
+            "type": "text",
+            "name": "2m",
+            "position": {
+              "x": 364,
+              "y": 12
+            },
+            "text": {
+              "characters": "2m",
+              "fontSize": 12,
+              "fontFamily": "Inter",
+              "fontStyle": "Regular",
+              "color": {
+                "variable": "VariableID:1:7"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "tool": "upsert_component",
+      "arguments": {
+        "name": "Empty state",
+        "codeKey": "rift-labs/markdown/empty-state",
+        "description": "Replaces a bare blank screen when a list has zero items \u2014 first run, cleared, or blocked.",
+        "position": {
+          "x": 1600,
+          "y": 600
+        },
+        "layoutMode": "NONE",
+        "size": {
+          "width": 400,
+          "height": 180
+        },
+        "fill": {
+          "variable": "VariableID:1:8"
+        },
+        "layers": [
+          {
+            "type": "ellipse",
+            "name": "Decorative status",
+            "position": {
+              "x": 184,
+              "y": 24
+            },
+            "size": {
+              "width": 32,
+              "height": 32
+            },
+            "stroke": {
+              "color": {
+                "variable": "VariableID:1:9"
+              },
+              "weight": 1
+            }
+          },
+          {
+            "type": "text",
+            "name": "You're all caught up",
+            "position": {
+              "x": 104,
+              "y": 76
+            },
+            "text": {
+              "characters": "You're all caught up",
+              "fontSize": 16,
+              "fontFamily": "Inter",
+              "fontStyle": "Medium",
+              "color": {
+                "variable": "VariableID:1:5"
+              }
+            }
+          },
+          {
+            "type": "text",
+            "name": "New activity will show up here.",
+            "position": {
+              "x": 100,
+              "y": 104
+            },
+            "text": {
+              "characters": "New activity will show up here.",
+              "fontSize": 12,
+              "fontFamily": "Inter",
+              "fontStyle": "Regular",
+              "color": {
+                "variable": "VariableID:1:7"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "tool": "upsert_component",
+      "arguments": {
+        "name": "Chart (area)",
+        "codeKey": "rift-labs/markdown/chart-area",
+        "description": "The only chart type in this system for now. Reserved for a value trending over time \u2014 balance, volume, activity \u2014 where the filled region is what communicates magnitude, not for comparing unrelated categories.",
+        "position": {
+          "x": 0,
+          "y": 1200
+        },
+        "layoutMode": "NONE",
+        "size": {
+          "width": 400,
+          "height": 240
+        },
+        "fill": {
+          "variable": "VariableID:1:8"
+        },
+        "layers": [
+          {
+            "type": "text",
+            "name": "Hedwig balance, 30 days",
+            "position": {
+              "x": 16,
+              "y": 12
+            },
+            "text": {
+              "characters": "Hedwig balance, 30 days",
+              "fontSize": 14,
+              "fontFamily": "Inter",
+              "fontStyle": "Medium",
+              "color": {
+                "variable": "VariableID:1:5"
+              }
+            }
+          },
+          {
+            "type": "text",
+            "name": "$18,420.10",
+            "position": {
+              "x": 16,
+              "y": 40
+            },
+            "text": {
+              "characters": "$18,420.10",
+              "fontSize": 13,
+              "fontFamily": "JetBrains Mono",
+              "fontStyle": "Regular",
+              "color": {
+                "variable": "VariableID:1:5"
+              }
+            }
+          },
+          {
+            "type": "rectangle",
+            "name": "Separator",
+            "position": {
+              "x": 40,
+              "y": 88
+            },
+            "size": {
+              "width": 344,
+              "height": 1
+            },
+            "fill": {
+              "variable": "VariableID:1:9"
+            }
+          },
+          {
+            "type": "rectangle",
+            "name": "Separator",
+            "position": {
+              "x": 40,
+              "y": 128
+            },
+            "size": {
+              "width": 344,
+              "height": 1
+            },
+            "fill": {
+              "variable": "VariableID:1:9"
+            }
+          },
+          {
+            "type": "rectangle",
+            "name": "Separator",
+            "position": {
+              "x": 40,
+              "y": 168
+            },
+            "size": {
+              "width": 344,
+              "height": 1
+            },
+            "fill": {
+              "variable": "VariableID:1:9"
+            }
+          },
+          {
+            "type": "rectangle",
+            "name": "Separator",
+            "position": {
+              "x": 40,
+              "y": 208
+            },
+            "size": {
+              "width": 344,
+              "height": 1
+            },
+            "fill": {
+              "variable": "VariableID:1:9"
+            }
+          },
+          {
+            "type": "vector",
+            "name": "Illustrative balance area",
+            "points": [
+              {
+                "x": 40,
+                "y": 208
+              },
+              {
+                "x": 40,
+                "y": 188
+              },
+              {
+                "x": 84,
+                "y": 172
+              },
+              {
+                "x": 128,
+                "y": 182
+              },
+              {
+                "x": 172,
+                "y": 136
+              },
+              {
+                "x": 216,
+                "y": 148
+              },
+              {
+                "x": 260,
+                "y": 112
+              },
+              {
+                "x": 304,
+                "y": 120
+              },
+              {
+                "x": 348,
+                "y": 88
+              },
+              {
+                "x": 384,
+                "y": 96
+              },
+              {
+                "x": 384,
+                "y": 208
+              }
+            ],
+            "closed": true,
+            "opacity": 0.12,
+            "fill": {
+              "variable": "VariableID:1:10"
+            },
+            "stroke": {
+              "color": {
+                "variable": "VariableID:1:10"
+              },
+              "weight": 0
+            }
+          },
+          {
+            "type": "vector",
+            "name": "Illustrative balance trend",
+            "points": [
+              {
+                "x": 40,
+                "y": 188
+              },
+              {
+                "x": 84,
+                "y": 172
+              },
+              {
+                "x": 128,
+                "y": 182
+              },
+              {
+                "x": 172,
+                "y": 136
+              },
+              {
+                "x": 216,
+                "y": 148
+              },
+              {
+                "x": 260,
+                "y": 112
+              },
+              {
+                "x": 304,
+                "y": 120
+              },
+              {
+                "x": 348,
+                "y": 88
+              },
+              {
+                "x": 384,
+                "y": 96
+              }
+            ],
+            "closed": false,
+            "opacity": 1,
+            "stroke": {
+              "color": {
+                "variable": "VariableID:1:10"
+              },
+              "weight": 2
+            }
+          },
+          {
+            "type": "text",
+            "name": "Illustrative data",
+            "position": {
+              "x": 260,
+              "y": 220
+            },
+            "text": {
+              "characters": "Illustrative data",
+              "fontSize": 12,
+              "fontFamily": "Inter",
+              "fontStyle": "Regular",
+              "color": {
+                "variable": "VariableID:1:7"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "tool": "upsert_component",
+      "arguments": {
+        "name": "Table",
+        "codeKey": "rift-labs/markdown/table",
+        "description": "For rows with three or more comparable attributes \u2014 use the List row component instead when a row only really has a title and one piece of metadata.",
+        "position": {
+          "x": 800,
+          "y": 1200
+        },
+        "layoutMode": "NONE",
+        "size": {
+          "width": 640,
+          "height": 156
+        },
+        "fill": {
+          "variable": "VariableID:1:8"
+        },
+        "layers": [
+          {
+            "type": "rectangle",
+            "name": "Header",
+            "position": {
+              "x": 0,
+              "y": 0
+            },
+            "size": {
+              "width": 640,
+              "height": 36
+            },
+            "fill": {
+              "variable": "VariableID:1:9"
+            }
+          },
+          {
+            "type": "text",
+            "name": "Invoice",
+            "position": {
+              "x": 12,
+              "y": 9
+            },
+            "text": {
+              "characters": "Invoice",
+              "fontSize": 12,
+              "fontFamily": "Inter",
+              "fontStyle": "Medium",
+              "color": {
+                "variable": "VariableID:1:5"
+              }
+            }
+          },
+          {
+            "type": "text",
+            "name": "Status",
+            "position": {
+              "x": 292,
+              "y": 9
+            },
+            "text": {
+              "characters": "Status",
+              "fontSize": 12,
+              "fontFamily": "Inter",
+              "fontStyle": "Medium",
+              "color": {
+                "variable": "VariableID:1:5"
+              }
+            }
+          },
+          {
+            "type": "text",
+            "name": "Amount",
+            "position": {
+              "x": 414,
+              "y": 9
+            },
+            "text": {
+              "characters": "Amount",
+              "fontSize": 12,
+              "fontFamily": "Inter",
+              "fontStyle": "Medium",
+              "color": {
+                "variable": "VariableID:1:5"
+              }
+            },
+            "align": "RIGHT",
+            "size": {
+              "width": 112,
+              "height": 20
+            }
+          },
+          {
+            "type": "text",
+            "name": "Date",
+            "position": {
+              "x": 552,
+              "y": 9
+            },
+            "text": {
+              "characters": "Date",
+              "fontSize": 12,
+              "fontFamily": "Inter",
+              "fontStyle": "Medium",
+              "color": {
+                "variable": "VariableID:1:5"
+              }
+            },
+            "align": "RIGHT",
+            "size": {
+              "width": 76,
+              "height": 20
+            }
+          },
+          {
+            "type": "text",
+            "name": "#0192 \u2014 Acme Co.",
+            "position": {
+              "x": 12,
+              "y": 48
+            },
+            "text": {
+              "characters": "#0192 \u2014 Acme Co.",
+              "fontSize": 12,
+              "fontFamily": "Inter",
+              "fontStyle": "Regular",
+              "color": {
+                "variable": "VariableID:1:5"
+              }
+            }
+          },
+          {
+            "type": "ellipse",
+            "name": "Paid indicator",
+            "position": {
+              "x": 280,
+              "y": 52
+            },
+            "size": {
+              "width": 6,
+              "height": 6
+            },
+            "fill": {
+              "variable": "VariableID:1:13"
+            }
+          },
+          {
+            "type": "text",
+            "name": "Paid",
+            "position": {
+              "x": 292,
+              "y": 48
+            },
+            "text": {
+              "characters": "Paid",
+              "fontSize": 12,
+              "fontFamily": "Inter",
+              "fontStyle": "Regular",
+              "color": {
+                "variable": "VariableID:1:5"
+              }
+            }
+          },
+          {
+            "type": "text",
+            "name": "$1,204.50",
+            "position": {
+              "x": 414,
+              "y": 48
+            },
+            "text": {
+              "characters": "$1,204.50",
+              "fontSize": 13,
+              "fontFamily": "JetBrains Mono",
+              "fontStyle": "Regular",
+              "color": {
+                "variable": "VariableID:1:5"
+              }
+            },
+            "align": "RIGHT",
+            "size": {
+              "width": 112,
+              "height": 20
+            }
+          },
+          {
+            "type": "text",
+            "name": "Sep 12",
+            "position": {
+              "x": 552,
+              "y": 48
+            },
+            "text": {
+              "characters": "Sep 12",
+              "fontSize": 12,
+              "fontFamily": "Inter",
+              "fontStyle": "Regular",
+              "color": {
+                "variable": "VariableID:1:7"
+              }
+            },
+            "align": "RIGHT",
+            "size": {
+              "width": 76,
+              "height": 20
+            }
+          },
+          {
+            "type": "rectangle",
+            "name": "Separator",
+            "position": {
+              "x": 0,
+              "y": 75
+            },
+            "size": {
+              "width": 640,
+              "height": 1
+            },
+            "fill": {
+              "variable": "VariableID:1:9"
+            }
+          },
+          {
+            "type": "text",
+            "name": "#0193 \u2014 Northwind",
+            "position": {
+              "x": 12,
+              "y": 88
+            },
+            "text": {
+              "characters": "#0193 \u2014 Northwind",
+              "fontSize": 12,
+              "fontFamily": "Inter",
+              "fontStyle": "Regular",
+              "color": {
+                "variable": "VariableID:1:5"
+              }
+            }
+          },
+          {
+            "type": "ellipse",
+            "name": "Pending indicator",
+            "position": {
+              "x": 280,
+              "y": 92
+            },
+            "size": {
+              "width": 6,
+              "height": 6
+            },
+            "fill": {
+              "variable": "VariableID:1:11"
+            }
+          },
+          {
+            "type": "text",
+            "name": "Pending",
+            "position": {
+              "x": 292,
+              "y": 88
+            },
+            "text": {
+              "characters": "Pending",
+              "fontSize": 12,
+              "fontFamily": "Inter",
+              "fontStyle": "Regular",
+              "color": {
+                "variable": "VariableID:1:5"
+              }
+            }
+          },
+          {
+            "type": "text",
+            "name": "$420.00",
+            "position": {
+              "x": 414,
+              "y": 88
+            },
+            "text": {
+              "characters": "$420.00",
+              "fontSize": 13,
+              "fontFamily": "JetBrains Mono",
+              "fontStyle": "Regular",
+              "color": {
+                "variable": "VariableID:1:5"
+              }
+            },
+            "align": "RIGHT",
+            "size": {
+              "width": 112,
+              "height": 20
+            }
+          },
+          {
+            "type": "text",
+            "name": "Sep 15",
+            "position": {
+              "x": 552,
+              "y": 88
+            },
+            "text": {
+              "characters": "Sep 15",
+              "fontSize": 12,
+              "fontFamily": "Inter",
+              "fontStyle": "Regular",
+              "color": {
+                "variable": "VariableID:1:7"
+              }
+            },
+            "align": "RIGHT",
+            "size": {
+              "width": 76,
+              "height": 20
+            }
+          },
+          {
+            "type": "rectangle",
+            "name": "Separator",
+            "position": {
+              "x": 0,
+              "y": 115
+            },
+            "size": {
+              "width": 640,
+              "height": 1
+            },
+            "fill": {
+              "variable": "VariableID:1:9"
+            }
+          },
+          {
+            "type": "text",
+            "name": "#0194 \u2014 Loom Ltd.",
+            "position": {
+              "x": 12,
+              "y": 128
+            },
+            "text": {
+              "characters": "#0194 \u2014 Loom Ltd.",
+              "fontSize": 12,
+              "fontFamily": "Inter",
+              "fontStyle": "Regular",
+              "color": {
+                "variable": "VariableID:1:5"
+              }
+            }
+          },
+          {
+            "type": "ellipse",
+            "name": "Overdue indicator",
+            "position": {
+              "x": 280,
+              "y": 132
+            },
+            "size": {
+              "width": 6,
+              "height": 6
+            },
+            "fill": {
+              "variable": "VariableID:1:12"
+            }
+          },
+          {
+            "type": "text",
+            "name": "Overdue",
+            "position": {
+              "x": 292,
+              "y": 128
+            },
+            "text": {
+              "characters": "Overdue",
+              "fontSize": 12,
+              "fontFamily": "Inter",
+              "fontStyle": "Regular",
+              "color": {
+                "variable": "VariableID:1:5"
+              }
+            }
+          },
+          {
+            "type": "text",
+            "name": "$88.00",
+            "position": {
+              "x": 414,
+              "y": 128
+            },
+            "text": {
+              "characters": "$88.00",
+              "fontSize": 13,
+              "fontFamily": "JetBrains Mono",
+              "fontStyle": "Regular",
+              "color": {
+                "variable": "VariableID:1:5"
+              }
+            },
+            "align": "RIGHT",
+            "size": {
+              "width": 112,
+              "height": 20
+            }
+          },
+          {
+            "type": "text",
+            "name": "Aug 30",
+            "position": {
+              "x": 552,
+              "y": 128
+            },
+            "text": {
+              "characters": "Aug 30",
+              "fontSize": 12,
+              "fontFamily": "Inter",
+              "fontStyle": "Regular",
+              "color": {
+                "variable": "VariableID:1:7"
+              }
+            },
+            "align": "RIGHT",
+            "size": {
+              "width": 76,
+              "height": 20
+            }
+          },
+          {
+            "type": "rectangle",
+            "name": "Separator",
+            "position": {
+              "x": 0,
+              "y": 155
+            },
+            "size": {
+              "width": 640,
+              "height": 1
+            },
+            "fill": {
+              "variable": "VariableID:1:9"
+            }
+          }
+        ],
+        "stroke": {
+          "color": {
+            "variable": "VariableID:1:9"
+          },
+          "weight": 1
+        }
+      }
+    },
+    {
+      "tool": "upsert_component",
+      "arguments": {
+        "name": "Dropdown",
+        "codeKey": "rift-labs/markdown/dropdown",
+        "description": "Covers two Base UI primitives: a Menu for a set of actions attached to a trigger, and a Select for choosing one value from a fixed list.",
+        "position": {
+          "x": 1600,
+          "y": 1200
+        },
+        "layoutMode": "NONE",
+        "size": {
+          "width": 208,
+          "height": 140
+        },
+        "fill": {
+          "variable": "VariableID:1:8"
+        },
+        "layers": [
+          {
+            "type": "text",
+            "name": "Rename",
+            "position": {
+              "x": 12,
+              "y": 12
+            },
+            "text": {
+              "characters": "Rename",
+              "fontSize": 14,
+              "fontFamily": "Inter",
+              "fontStyle": "Regular",
+              "color": {
+                "variable": "VariableID:1:5"
+              }
+            }
+          },
+          {
+            "type": "text",
+            "name": "Duplicate",
+            "position": {
+              "x": 12,
+              "y": 44
+            },
+            "text": {
+              "characters": "Duplicate",
+              "fontSize": 14,
+              "fontFamily": "Inter",
+              "fontStyle": "Regular",
+              "color": {
+                "variable": "VariableID:1:5"
+              }
+            }
+          },
+          {
+            "type": "text",
+            "name": "Move to project",
+            "position": {
+              "x": 12,
+              "y": 76
+            },
+            "text": {
+              "characters": "Move to project",
+              "fontSize": 14,
+              "fontFamily": "Inter",
+              "fontStyle": "Regular",
+              "color": {
+                "variable": "VariableID:1:5"
+              }
+            }
+          },
+          {
+            "type": "text",
+            "name": "Delete",
+            "position": {
+              "x": 12,
+              "y": 108
+            },
+            "text": {
+              "characters": "Delete",
+              "fontSize": 14,
+              "fontFamily": "Inter",
+              "fontStyle": "Regular",
+              "color": {
+                "variable": "VariableID:1:12"
+              }
+            }
+          },
+          {
+            "type": "rectangle",
+            "name": "Separator",
+            "position": {
+              "x": 8,
+              "y": 100
+            },
+            "size": {
+              "width": 192,
+              "height": 1
+            },
+            "fill": {
+              "variable": "VariableID:1:9"
+            }
+          }
+        ],
+        "stroke": {
+          "color": {
+            "variable": "VariableID:1:9"
+          },
+          "weight": 1
+        },
+        "cornerRadius": {
+          "variable": "VariableID:1:32"
+        }
+      }
+    },
+    {
+      "tool": "upsert_component",
+      "arguments": {
+        "name": "Card",
+        "codeKey": "rift-labs/markdown/card",
+        "description": "A bordered container for related content. Three uses: a plain grouping surface, a clickable summary, and a single-stat headline.",
+        "position": {
+          "x": 0,
+          "y": 1800
+        },
+        "layoutMode": "NONE",
+        "size": {
+          "width": 320,
+          "height": 160
+        },
+        "fill": {
+          "variable": "VariableID:1:8"
+        },
+        "layers": [
+          {
+            "type": "text",
+            "name": "Payout schedule",
+            "position": {
+              "x": 16,
+              "y": 16
+            },
+            "text": {
+              "characters": "Payout schedule",
+              "fontSize": 16,
+              "fontFamily": "Inter",
+              "fontStyle": "Medium",
+              "color": {
+                "variable": "VariableID:1:5"
+              }
+            }
+          },
+          {
+            "type": "text",
+            "name": "Runs every Friday at 9:00 AM.",
+            "position": {
+              "x": 16,
+              "y": 52
+            },
+            "text": {
+              "characters": "Runs every Friday at 9:00 AM.",
+              "fontSize": 14,
+              "fontFamily": "Inter",
+              "fontStyle": "Regular",
+              "color": {
+                "variable": "VariableID:1:7"
+              }
+            }
+          }
+        ],
+        "stroke": {
+          "color": {
+            "variable": "VariableID:1:9"
+          },
+          "weight": 1
+        },
+        "cornerRadius": {
+          "variable": "VariableID:1:32"
+        }
+      }
+    },
+    {
+      "tool": "upsert_component",
+      "arguments": {
+        "name": "Tabs",
+        "codeKey": "rift-labs/markdown/tabs",
+        "description": "Two designs: primary tabs switch between full page-level views; secondary tabs switch a scoped region without changing the page.",
+        "position": {
+          "x": 800,
+          "y": 1800
+        },
+        "layoutMode": "NONE",
+        "size": {
+          "width": 320,
+          "height": 36
+        },
+        "fill": {
+          "variable": "VariableID:1:8"
+        },
+        "layers": [
+          {
+            "type": "text",
+            "name": "Overview",
+            "position": {
+              "x": 12,
+              "y": 8
+            },
+            "text": {
+              "characters": "Overview",
+              "fontSize": 14,
+              "fontFamily": "Inter",
+              "fontStyle": "Medium",
+              "color": {
+                "variable": "VariableID:1:10"
+              }
+            }
+          },
+          {
+            "type": "text",
+            "name": "Activity",
+            "position": {
+              "x": 112,
+              "y": 8
+            },
+            "text": {
+              "characters": "Activity",
+              "fontSize": 14,
+              "fontFamily": "Inter",
+              "fontStyle": "Regular",
+              "color": {
+                "variable": "VariableID:1:7"
+              }
+            }
+          },
+          {
+            "type": "text",
+            "name": "Settings",
+            "position": {
+              "x": 204,
+              "y": 8
+            },
+            "text": {
+              "characters": "Settings",
+              "fontSize": 14,
+              "fontFamily": "Inter",
+              "fontStyle": "Regular",
+              "color": {
+                "variable": "VariableID:1:7"
+              }
+            }
+          },
+          {
+            "type": "rectangle",
+            "name": "Active underline",
+            "position": {
+              "x": 8,
+              "y": 34
+            },
+            "size": {
+              "width": 88,
+              "height": 2
+            },
+            "fill": {
+              "variable": "VariableID:1:10"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "tool": "upsert_component",
+      "arguments": {
+        "name": "Switch",
+        "codeKey": "rift-labs/markdown/switch",
+        "description": "An immediate, self-contained on/off setting \u2014 it takes effect the moment it's toggled, with no separate save step.",
+        "position": {
+          "x": 1600,
+          "y": 1800
+        },
+        "layoutMode": "NONE",
+        "size": {
+          "width": 240,
+          "height": 32
+        },
+        "fill": {
+          "variable": "VariableID:1:8"
+        },
+        "layers": [
+          {
+            "type": "rectangle",
+            "name": "Track",
+            "position": {
+              "x": 0,
+              "y": 6
+            },
+            "size": {
+              "width": 36,
+              "height": 20
+            },
+            "fill": {
+              "variable": "VariableID:1:10"
+            },
+            "cornerRadius": 10
+          },
+          {
+            "type": "ellipse",
+            "name": "Thumb",
+            "position": {
+              "x": 18,
+              "y": 8
+            },
+            "size": {
+              "width": 16,
+              "height": 16
+            },
+            "fill": {
+              "variable": "VariableID:1:8"
+            }
+          },
+          {
+            "type": "text",
+            "name": "Email receipts on",
+            "position": {
+              "x": 44,
+              "y": 7
+            },
+            "text": {
+              "characters": "Email receipts on",
+              "fontSize": 14,
+              "fontFamily": "Inter",
+              "fontStyle": "Regular",
+              "color": {
+                "variable": "VariableID:1:5"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "tool": "upsert_component",
+      "arguments": {
+        "name": "Checkbox & radio",
+        "codeKey": "rift-labs/markdown/checkbox-radio",
+        "description": "Checkbox for zero-to-many selections; radio for exactly one choice from a small, fully visible set of options.",
+        "position": {
+          "x": 0,
+          "y": 2400
+        },
+        "layoutMode": "NONE",
+        "size": {
+          "width": 260,
+          "height": 32
+        },
+        "fill": {
+          "variable": "VariableID:1:8"
+        },
+        "layers": [
+          {
+            "type": "rectangle",
+            "name": "Checkbox",
+            "position": {
+              "x": 4,
+              "y": 8
+            },
+            "size": {
+              "width": 16,
+              "height": 16
+            },
+            "fill": {
+              "variable": "VariableID:1:10"
+            },
+            "cornerRadius": 4
+          },
+          {
+            "type": "vector",
+            "name": "Checked",
+            "points": [
+              {
+                "x": 7,
+                "y": 16
+              },
+              {
+                "x": 11,
+                "y": 20
+              },
+              {
+                "x": 17,
+                "y": 12
+              }
+            ],
+            "closed": false,
+            "opacity": 1,
+            "stroke": {
+              "color": {
+                "variable": "VariableID:1:8"
+              },
+              "weight": 2
+            }
+          },
+          {
+            "type": "text",
+            "name": "Row selected",
+            "position": {
+              "x": 28,
+              "y": 7
+            },
+            "text": {
+              "characters": "Row selected",
+              "fontSize": 14,
+              "fontFamily": "Inter",
+              "fontStyle": "Regular",
+              "color": {
+                "variable": "VariableID:1:5"
+              }
+            }
+          },
+          {
+            "type": "ellipse",
+            "name": "Radio",
+            "position": {
+              "x": 176,
+              "y": 8
+            },
+            "size": {
+              "width": 16,
+              "height": 16
+            },
+            "stroke": {
+              "color": {
+                "variable": "VariableID:1:10"
+              },
+              "weight": 1
+            }
+          },
+          {
+            "type": "ellipse",
+            "name": "Selected",
+            "position": {
+              "x": 180,
+              "y": 12
+            },
+            "size": {
+              "width": 8,
+              "height": 8
+            },
+            "fill": {
+              "variable": "VariableID:1:10"
+            }
+          },
+          {
+            "type": "text",
+            "name": "Weekly",
+            "position": {
+              "x": 200,
+              "y": 7
+            },
+            "text": {
+              "characters": "Weekly",
+              "fontSize": 14,
+              "fontFamily": "Inter",
+              "fontStyle": "Regular",
+              "color": {
+                "variable": "VariableID:1:5"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "tool": "upsert_component",
+      "arguments": {
+        "name": "Accordion",
+        "codeKey": "rift-labs/markdown/accordion",
+        "description": "Progressive disclosure for secondary content the person doesn't need immediately \u2014 never the primary content on a screen.",
+        "position": {
+          "x": 800,
+          "y": 2400
+        },
+        "layoutMode": "NONE",
+        "size": {
+          "width": 400,
+          "height": 112
+        },
+        "fill": {
+          "variable": "VariableID:1:8"
+        },
+        "layers": [
+          {
+            "type": "text",
+            "name": "How do payouts settle?",
+            "position": {
+              "x": 16,
+              "y": 12
+            },
+            "text": {
+              "characters": "How do payouts settle?",
+              "fontSize": 14,
+              "fontFamily": "Inter",
+              "fontStyle": "Medium",
+              "color": {
+                "variable": "VariableID:1:5"
+              }
+            }
+          },
+          {
+            "type": "text",
+            "name": "\u2212",
+            "position": {
+              "x": 372,
+              "y": 10
+            },
+            "text": {
+              "characters": "\u2212",
+              "fontSize": 16,
+              "fontFamily": "Inter",
+              "fontStyle": "Regular",
+              "color": {
+                "variable": "VariableID:1:7"
+              }
+            }
+          },
+          {
+            "type": "text",
+            "name": "Payouts settle on-chain within a few minutes of being sent.",
+            "position": {
+              "x": 16,
+              "y": 52
+            },
+            "text": {
+              "characters": "Payouts settle on-chain within a few minutes of being sent.",
+              "fontSize": 14,
+              "fontFamily": "Inter",
+              "fontStyle": "Regular",
+              "color": {
+                "variable": "VariableID:1:7"
+              }
+            },
+            "size": {
+              "width": 368,
+              "height": 20
+            }
+          },
+          {
+            "type": "rectangle",
+            "name": "Separator",
+            "position": {
+              "x": 0,
+              "y": 111
+            },
+            "size": {
+              "width": 400,
+              "height": 1
+            },
+            "fill": {
+              "variable": "VariableID:1:9"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "tool": "upsert_component",
+      "arguments": {
+        "name": "Dialog",
+        "codeKey": "rift-labs/markdown/dialog",
+        "description": "An interruption reserved for decisions that need a deliberate, in-the-moment answer \u2014 most often the confirming step a destructive Button already promises.",
+        "position": {
+          "x": 1600,
+          "y": 2400
+        },
+        "layoutMode": "NONE",
+        "size": {
+          "width": 400,
+          "height": 212
+        },
+        "fill": {
+          "variable": "VariableID:1:8"
+        },
+        "layers": [
+          {
+            "type": "text",
+            "name": "Delete workspace?",
+            "position": {
+              "x": 24,
+              "y": 24
+            },
+            "text": {
+              "characters": "Delete workspace?",
+              "fontSize": 20,
+              "fontFamily": "Inter",
+              "fontStyle": "Medium",
+              "color": {
+                "variable": "VariableID:1:5"
+              }
+            }
+          },
+          {
+            "type": "text",
+            "name": "This removes all projects and can't be undone.",
+            "position": {
+              "x": 24,
+              "y": 64
+            },
+            "text": {
+              "characters": "This removes all projects and can't be undone.",
+              "fontSize": 14,
+              "fontFamily": "Inter",
+              "fontStyle": "Regular",
+              "color": {
+                "variable": "VariableID:1:7"
+              }
+            },
+            "size": {
+              "width": 352,
+              "height": 20
+            }
+          },
+          {
+            "type": "rectangle",
+            "name": "Cancel",
+            "position": {
+              "x": 136,
+              "y": 156
+            },
+            "size": {
+              "width": 88,
+              "height": 32
+            },
+            "fill": {
+              "variable": "VariableID:1:8"
+            },
+            "cornerRadius": 4,
+            "stroke": {
+              "color": {
+                "variable": "VariableID:1:9"
+              },
+              "weight": 1
+            }
+          },
+          {
+            "type": "text",
+            "name": "Cancel",
+            "position": {
+              "x": 148,
+              "y": 163
+            },
+            "text": {
+              "characters": "Cancel",
+              "fontSize": 14,
+              "fontFamily": "Inter",
+              "fontStyle": "Medium",
+              "color": {
+                "variable": "VariableID:1:5"
+              }
+            }
+          },
+          {
+            "type": "rectangle",
+            "name": "Delete workspace",
+            "position": {
+              "x": 232,
+              "y": 156
+            },
+            "size": {
+              "width": 144,
+              "height": 32
+            },
+            "fill": {
+              "variable": "VariableID:1:12"
+            },
+            "cornerRadius": 4
+          },
+          {
+            "type": "text",
+            "name": "Delete workspace",
+            "position": {
+              "x": 244,
+              "y": 163
+            },
+            "text": {
+              "characters": "Delete workspace",
+              "fontSize": 14,
+              "fontFamily": "Inter",
+              "fontStyle": "Medium",
+              "color": {
+                "variable": "VariableID:1:8"
+              }
+            }
+          }
+        ],
+        "stroke": {
+          "color": {
+            "variable": "VariableID:1:9"
+          },
+          "weight": 1
+        },
+        "cornerRadius": {
+          "variable": "VariableID:1:32"
+        }
+      }
+    },
+    {
+      "tool": "upsert_component",
+      "arguments": {
+        "name": "Toast",
+        "codeKey": "rift-labs/markdown/toast",
+        "description": "A brief, self-dismissing confirmation for something that already happened \u2014 a payout landing, an invoice getting paid.",
+        "position": {
+          "x": 0,
+          "y": 3000
+        },
+        "layoutMode": "NONE",
+        "size": {
+          "width": 360,
+          "height": 64
+        },
+        "fill": {
+          "variable": "VariableID:1:8"
+        },
+        "layers": [
+          {
+            "type": "ellipse",
+            "name": "Success",
+            "position": {
+              "x": 16,
+              "y": 28
+            },
+            "size": {
+              "width": 8,
+              "height": 8
+            },
+            "fill": {
+              "variable": "VariableID:1:13"
+            }
+          },
+          {
+            "type": "text",
+            "name": "Payout of $420.00 sent",
+            "position": {
+              "x": 32,
+              "y": 22
+            },
+            "text": {
+              "characters": "Payout of $420.00 sent",
+              "fontSize": 14,
+              "fontFamily": "Inter",
+              "fontStyle": "Regular",
+              "color": {
+                "variable": "VariableID:1:5"
+              }
+            }
+          }
+        ],
+        "stroke": {
+          "color": {
+            "variable": "VariableID:1:9"
+          },
+          "weight": 1
+        },
+        "cornerRadius": {
+          "variable": "VariableID:1:32"
+        }
+      }
+    },
+    {
+      "tool": "upsert_component",
+      "arguments": {
+        "name": "Amount input",
+        "codeKey": "rift-labs/markdown/amount-input",
+        "description": "Money entry, specifically \u2014 distinct from the plain text Input because precision, asset, and available balance all have to be visible at once.",
+        "position": {
+          "x": 800,
+          "y": 3000
+        },
+        "layoutMode": "NONE",
+        "size": {
+          "width": 320,
+          "height": 64
+        },
+        "fill": {
+          "variable": "VariableID:1:8"
+        },
+        "layers": [
+          {
+            "type": "rectangle",
+            "name": "Input",
+            "position": {
+              "x": 0,
+              "y": 0
+            },
+            "size": {
+              "width": 320,
+              "height": 40
+            },
+            "fill": {
+              "variable": "VariableID:1:8"
+            },
+            "cornerRadius": 6,
+            "stroke": {
+              "color": {
+                "variable": "VariableID:1:9"
+              },
+              "weight": 1
+            }
+          },
+          {
+            "type": "text",
+            "name": "$420.00",
+            "position": {
+              "x": 12,
+              "y": 12
+            },
+            "text": {
+              "characters": "$420.00",
+              "fontSize": 13,
+              "fontFamily": "JetBrains Mono",
+              "fontStyle": "Regular",
+              "color": {
+                "variable": "VariableID:1:5"
+              }
+            }
+          },
+          {
+            "type": "text",
+            "name": "USDC",
+            "position": {
+              "x": 264,
+              "y": 12
+            },
+            "text": {
+              "characters": "USDC",
+              "fontSize": 12,
+              "fontFamily": "Inter",
+              "fontStyle": "Regular",
+              "color": {
+                "variable": "VariableID:1:7"
+              }
+            }
+          },
+          {
+            "type": "text",
+            "name": "Available: $1,204.50",
+            "position": {
+              "x": 0,
+              "y": 48
+            },
+            "text": {
+              "characters": "Available: $1,204.50",
+              "fontSize": 12,
+              "fontFamily": "Inter",
+              "fontStyle": "Regular",
+              "color": {
+                "variable": "VariableID:1:7"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "tool": "upsert_component",
+      "arguments": {
+        "name": "Avatar",
+        "codeKey": "rift-labs/markdown/avatar",
+        "description": "Represents a person or business \u2014 a client, a team member, a merchant \u2014 anywhere the product needs a face rather than just a name.",
+        "position": {
+          "x": 1600,
+          "y": 3000
+        },
+        "layoutMode": "NONE",
+        "size": {
+          "width": 32,
+          "height": 32
+        },
+        "fill": {
+          "variable": "VariableID:1:8"
+        },
+        "layers": [
+          {
+            "type": "ellipse",
+            "name": "Initials background",
+            "position": {
+              "x": 0,
+              "y": 0
+            },
+            "size": {
+              "width": 32,
+              "height": 32
+            },
+            "fill": {
+              "variable": "VariableID:1:9"
+            }
+          },
+          {
+            "type": "text",
+            "name": "JD",
+            "position": {
+              "x": 7,
+              "y": 7
+            },
+            "text": {
+              "characters": "JD",
+              "fontSize": 12,
+              "fontFamily": "Inter",
+              "fontStyle": "Medium",
+              "color": {
+                "variable": "VariableID:1:5"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "tool": "upsert_component",
+      "arguments": {
+        "name": "Alert / banner",
+        "codeKey": "rift-labs/markdown/alert-banner",
+        "description": "Page-level, persistent messaging \u2014 the pattern already used for the notes throughout this document. Different from a Toast because it doesn't go away on its own.",
+        "position": {
+          "x": 0,
+          "y": 3600
+        },
+        "layoutMode": "NONE",
+        "size": {
+          "width": 400,
+          "height": 80
+        },
+        "fill": {
+          "variable": "VariableID:1:8"
+        },
+        "layers": [
+          {
+            "type": "ellipse",
+            "name": "Status",
+            "position": {
+              "x": 16,
+              "y": 24
+            },
+            "size": {
+              "width": 8,
+              "height": 8
+            },
+            "fill": {
+              "variable": "VariableID:1:11"
+            }
+          },
+          {
+            "type": "text",
+            "name": "Action needed",
+            "position": {
+              "x": 32,
+              "y": 12
+            },
+            "text": {
+              "characters": "Action needed",
+              "fontSize": 14,
+              "fontFamily": "Inter",
+              "fontStyle": "Medium",
+              "color": {
+                "variable": "VariableID:1:5"
+              }
+            }
+          },
+          {
+            "type": "text",
+            "name": "Verify your business details to enable payouts.",
+            "position": {
+              "x": 32,
+              "y": 36
+            },
+            "text": {
+              "characters": "Verify your business details to enable payouts.",
+              "fontSize": 14,
+              "fontFamily": "Inter",
+              "fontStyle": "Regular",
+              "color": {
+                "variable": "VariableID:1:5"
+              }
+            },
+            "size": {
+              "width": 352,
+              "height": 20
+            }
+          }
+        ],
+        "stroke": {
+          "color": {
+            "variable": "VariableID:1:9"
+          },
+          "weight": 1
+        },
+        "cornerRadius": {
+          "variable": "VariableID:1:32"
+        }
+      }
+    },
+    {
+      "tool": "upsert_component",
+      "arguments": {
+        "name": "Command palette",
+        "codeKey": "rift-labs/markdown/command-palette",
+        "description": "What the \u2318K hint on the persistent Search field actually opens \u2014 search and act on anything in the product without leaving the keyboard.",
+        "position": {
+          "x": 800,
+          "y": 3600
+        },
+        "layoutMode": "NONE",
+        "size": {
+          "width": 480,
+          "height": 320
+        },
+        "fill": {
+          "variable": "VariableID:1:8"
+        },
+        "layers": [
+          {
+            "type": "rectangle",
+            "name": "Search",
+            "position": {
+              "x": 8,
+              "y": 8
+            },
+            "size": {
+              "width": 464,
+              "height": 40
+            },
+            "fill": {
+              "variable": "VariableID:1:8"
+            },
+            "cornerRadius": 4,
+            "stroke": {
+              "color": {
+                "variable": "VariableID:1:9"
+              },
+              "weight": 1
+            }
+          },
+          {
+            "type": "text",
+            "name": "Search or run a command\u2026",
+            "position": {
+              "x": 20,
+              "y": 20
+            },
+            "text": {
+              "characters": "Search or run a command\u2026",
+              "fontSize": 14,
+              "fontFamily": "Inter",
+              "fontStyle": "Regular",
+              "color": {
+                "variable": "VariableID:1:7"
+              }
+            }
+          },
+          {
+            "type": "text",
+            "name": "Actions",
+            "position": {
+              "x": 16,
+              "y": 64
+            },
+            "text": {
+              "characters": "Actions",
+              "fontSize": 12,
+              "fontFamily": "Inter",
+              "fontStyle": "Regular",
+              "color": {
+                "variable": "VariableID:1:7"
+              }
+            }
+          },
+          {
+            "type": "rectangle",
+            "name": "Highlighted result",
+            "position": {
+              "x": 8,
+              "y": 88
+            },
+            "size": {
+              "width": 464,
+              "height": 32
+            },
+            "fill": {
+              "variable": "VariableID:1:9"
+            },
+            "cornerRadius": 4
+          },
+          {
+            "type": "text",
+            "name": "Create invoice",
+            "position": {
+              "x": 20,
+              "y": 96
+            },
+            "text": {
+              "characters": "Create invoice",
+              "fontSize": 14,
+              "fontFamily": "Inter",
+              "fontStyle": "Regular",
+              "color": {
+                "variable": "VariableID:1:5"
+              }
+            }
+          },
+          {
+            "type": "text",
+            "name": "Send payout",
+            "position": {
+              "x": 20,
+              "y": 132
+            },
+            "text": {
+              "characters": "Send payout",
+              "fontSize": 14,
+              "fontFamily": "Inter",
+              "fontStyle": "Regular",
+              "color": {
+                "variable": "VariableID:1:5"
+              }
+            }
+          },
+          {
+            "type": "text",
+            "name": "Recent",
+            "position": {
+              "x": 16,
+              "y": 180
+            },
+            "text": {
+              "characters": "Recent",
+              "fontSize": 12,
+              "fontFamily": "Inter",
+              "fontStyle": "Regular",
+              "color": {
+                "variable": "VariableID:1:7"
+              }
+            }
+          },
+          {
+            "type": "text",
+            "name": "Invoice #0192",
+            "position": {
+              "x": 20,
+              "y": 212
+            },
+            "text": {
+              "characters": "Invoice #0192",
+              "fontSize": 14,
+              "fontFamily": "Inter",
+              "fontStyle": "Regular",
+              "color": {
+                "variable": "VariableID:1:5"
+              }
+            }
+          },
+          {
+            "type": "rectangle",
+            "name": "Separator",
+            "position": {
+              "x": 8,
+              "y": 280
+            },
+            "size": {
+              "width": 464,
+              "height": 1
+            },
+            "fill": {
+              "variable": "VariableID:1:9"
+            }
+          },
+          {
+            "type": "text",
+            "name": "\u2191\u2193 navigate     \u21b5 select     esc close",
+            "position": {
+              "x": 16,
+              "y": 292
+            },
+            "text": {
+              "characters": "\u2191\u2193 navigate     \u21b5 select     esc close",
+              "fontSize": 12,
+              "fontFamily": "Inter",
+              "fontStyle": "Regular",
+              "color": {
+                "variable": "VariableID:1:7"
+              }
+            }
+          }
+        ],
+        "stroke": {
+          "color": {
+            "variable": "VariableID:1:9"
+          },
+          "weight": 1
+        },
+        "cornerRadius": {
+          "variable": "VariableID:1:32"
+        }
+      }
+    },
+    {
+      "tool": "upsert_component",
+      "arguments": {
+        "name": "Skeleton",
+        "codeKey": "rift-labs/markdown/skeleton",
+        "description": "A placeholder shaped exactly like the content it stands in for, while a balance, list, or chart is still loading.",
+        "position": {
+          "x": 1600,
+          "y": 3600
+        },
+        "layoutMode": "NONE",
+        "size": {
+          "width": 400,
+          "height": 64
+        },
+        "fill": {
+          "variable": "VariableID:1:8"
+        },
+        "layers": [
+          {
+            "type": "rectangle",
+            "name": "Title placeholder",
+            "position": {
+              "x": 24,
+              "y": 12
+            },
+            "size": {
+              "width": 160,
+              "height": 12
+            },
+            "fill": {
+              "variable": "VariableID:1:9"
+            },
+            "cornerRadius": 4
+          },
+          {
+            "type": "rectangle",
+            "name": "Snippet placeholder",
+            "position": {
+              "x": 24,
+              "y": 36
+            },
+            "size": {
+              "width": 296,
+              "height": 12
+            },
+            "fill": {
+              "variable": "VariableID:1:9"
+            },
+            "cornerRadius": 4
+          }
+        ]
+      }
+    },
+    {
+      "tool": "upsert_component",
+      "arguments": {
+        "name": "Tooltip",
+        "codeKey": "rift-labs/markdown/tooltip",
+        "description": "Required on every icon-only Button, per that component's own accessibility note \u2014 this is the piece that actually delivers it.",
+        "position": {
+          "x": 0,
+          "y": 4200
+        },
+        "layoutMode": "NONE",
+        "size": {
+          "width": 72,
+          "height": 24
+        },
+        "fill": {
+          "variable": "VariableID:1:5"
+        },
+        "layers": [
+          {
+            "type": "text",
+            "name": "Filter   F",
+            "position": {
+              "x": 8,
+              "y": 4
+            },
+            "text": {
+              "characters": "Filter   F",
+              "fontSize": 12,
+              "fontFamily": "Inter",
+              "fontStyle": "Regular",
+              "color": {
+                "variable": "VariableID:1:8"
+              }
+            }
+          }
+        ],
+        "cornerRadius": {
+          "variable": "VariableID:1:31"
+        }
+      }
+    },
+    {
+      "tool": "upsert_component",
+      "arguments": {
+        "name": "Pagination",
+        "codeKey": "rift-labs/markdown/pagination",
+        "description": "Pairs with the Table component once a list is long enough to split across pages.",
+        "position": {
+          "x": 800,
+          "y": 4200
+        },
+        "layoutMode": "NONE",
+        "size": {
+          "width": 328,
+          "height": 32
+        },
+        "fill": {
+          "variable": "VariableID:1:8"
+        },
+        "layers": [
+          {
+            "type": "text",
+            "name": "Showing 1\u201310 of 42",
+            "position": {
+              "x": 0,
+              "y": 9
+            },
+            "text": {
+              "characters": "Showing 1\u201310 of 42",
+              "fontSize": 12,
+              "fontFamily": "Inter",
+              "fontStyle": "Regular",
+              "color": {
+                "variable": "VariableID:1:7"
+              }
+            }
+          },
+          {
+            "type": "text",
+            "name": "\u2039",
+            "position": {
+              "x": 159,
+              "y": 7
+            },
+            "text": {
+              "characters": "\u2039",
+              "fontSize": 14,
+              "fontFamily": "Inter",
+              "fontStyle": "Regular",
+              "color": {
+                "variable": "VariableID:1:5"
+              }
+            }
+          },
+          {
+            "type": "rectangle",
+            "name": "Current page",
+            "position": {
+              "x": 184,
+              "y": 0
+            },
+            "size": {
+              "width": 32,
+              "height": 32
+            },
+            "fill": {
+              "variable": "VariableID:1:10"
+            },
+            "cornerRadius": 4
+          },
+          {
+            "type": "text",
+            "name": "1",
+            "position": {
+              "x": 195,
+              "y": 7
+            },
+            "text": {
+              "characters": "1",
+              "fontSize": 14,
+              "fontFamily": "Inter",
+              "fontStyle": "Regular",
+              "color": {
+                "variable": "VariableID:1:8"
+              }
+            }
+          },
+          {
+            "type": "text",
+            "name": "2",
+            "position": {
+              "x": 231,
+              "y": 7
+            },
+            "text": {
+              "characters": "2",
+              "fontSize": 14,
+              "fontFamily": "Inter",
+              "fontStyle": "Regular",
+              "color": {
+                "variable": "VariableID:1:5"
+              }
+            }
+          },
+          {
+            "type": "text",
+            "name": "3",
+            "position": {
+              "x": 267,
+              "y": 7
+            },
+            "text": {
+              "characters": "3",
+              "fontSize": 14,
+              "fontFamily": "Inter",
+              "fontStyle": "Regular",
+              "color": {
+                "variable": "VariableID:1:5"
+              }
+            }
+          },
+          {
+            "type": "text",
+            "name": "\u203a",
+            "position": {
+              "x": 303,
+              "y": 7
+            },
+            "text": {
+              "characters": "\u203a",
+              "fontSize": 14,
+              "fontFamily": "Inter",
+              "fontStyle": "Regular",
+              "color": {
+                "variable": "VariableID:1:5"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "remaining": [
+    "Build the full approved variant/state roster after default masters have been visually verified.",
+    "Create the optional presentation/documentation page through a separately supported renderer.",
+    "Verify fonts and layout against real Figma; this JSON has only been schema-checked locally."
+  ],
+  "notes": [
+    "Uses approved existing variable IDs for this file only.",
+    "One-off MCP resources are not adopted into project drift monitoring.",
+    "No runtime interaction, accessibility behavior or library installation is claimed."
+  ]
+}

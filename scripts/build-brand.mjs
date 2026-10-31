@@ -5,7 +5,7 @@ const root=fileURLToPath(new URL('../',import.meta.url));
 const source=join(root,'assets/brand/elf-mascot.png');
 const data=`data:image/png;base64,${readFileSync(source).toString('base64')}`;
 for(const target of ['extension/media/elf-mascot.png','settings-next/public/brand/elf-mascot.png']){
- const path=join(root,target);mkdirSync(dirname(path),{recursive:true});copyFileSync(source,path);
+ const path=join(root,target);mkdirSync(dirname(path),{recursive:true});copyFileSync(target.startsWith('extension/')?join(root,'assets/brand/elf-mascot-icon.png'):source,path);
 }
 for(const target of ['bridge-plugin/ui.html','plugin/ui.html']){
  const path=join(root,target),html=readFileSync(path,'utf8');

@@ -1,0 +1,82 @@
+{
+  "fileKey": "eu8zGUOsrdyXXQqvJeyl1E",
+  "artifact": "elf-tokens-1.0.0.tgz",
+  "setId": "7:1506",
+  "variantIds": [
+    {
+      "id": "7:1494",
+      "name": "State=Default"
+    },
+    {
+      "id": "7:1497",
+      "name": "State=Hover"
+    },
+    {
+      "id": "7:1500",
+      "name": "State=Pressed"
+    },
+    {
+      "id": "7:1503",
+      "name": "State=Disabled"
+    }
+  ],
+  "collections": [
+    {
+      "id": "VariableCollectionId:7:1489",
+      "name": "Elf Acceptance Color",
+      "key": "46515bd48f59d697f314f456161f7184956b2824",
+      "defaultModeId": "7:0",
+      "modes": [
+        {
+          "modeId": "7:0",
+          "name": "Default"
+        }
+      ],
+      "variableCount": 2
+    },
+    {
+      "id": "VariableCollectionId:7:1490",
+      "name": "Elf Acceptance Spacing",
+      "key": "07725b2470bea7a5c40124eb88e6b0c58ecaf420",
+      "defaultModeId": "7:1",
+      "modes": [
+        {
+          "modeId": "7:1",
+          "name": "Default"
+        }
+      ],
+      "variableCount": 1
+    }
+  ],
+  "verified": {
+    "collectionCount": 5,
+    "variableCount": 31,
+    "topLevelComponentCount": 24,
+    "originalComponentIdentitiesPreserved": 23,
+    "duplicateSampleSets": 0,
+    "stableVariableIds": true,
+    "stableSetAndVariantIds": true,
+    "documentation": true,
+    "colorBindings": true,
+    "dimensionsAndPadding": true,
+    "stateLayerOpacities": {
+      "Default": 1,
+      "Hover": 0.9,
+      "Pressed": 0.8,
+      "Disabled": 0.4
+    },
+    "mcpClientRestartWithoutPairing": true,
+    "liveTokenDriftSingleItem": true,
+    "liveIntentionalDifferenceAndExpiry": true,
+    "liveDeprecationLifecycle": true,
+    "liveSlackAcceptedMessages": 2,
+    "unchangedSlackSuppressed": true,
+    "fullBridgeRestartPairingStorePreserved": true,
+    "savedPairingReconnectAfterPluginReopen": true
+  },
+  "limits": [
+    "No prototype transitions or height binding.",
+    "Owned visual child layer IDs are replaced on upsert; master and variant IDs are preserved.",
+    "Live npm/extension drift, Slack and restart tests remain separate."
+  ]
+}

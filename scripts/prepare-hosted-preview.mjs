@@ -1,5 +1,4 @@
 import { readFileSync, writeFileSync, mkdirSync, copyFileSync, chmodSync, existsSync } from 'node:fs';
-import { parseEnv } from 'node:util';
 import { randomBytes } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
@@ -13,8 +12,6 @@ if(url.protocol!=='https:'||url.username||url.password||url.port||url.search||ur
    !/^[a-z0-9-]+\.ngrok-free\.app$/.test(url.hostname))throw new Error('Supply the exact HTTPS ngrok-free.app origin, without a path or credentials.');
 const origin=url.origin,production='https://elf-console.nonyonah.workers.dev';
 const directory=join(root,'.elf','hosted-preview'),plugin=join(root,'dist','bridge-plugin-hosted-preview');
-const values=parseEnv(readFileSync(join(root,'console','.dev.vars'),'utf8'));
-if(!values.CLERK_SECRET_KEY?.startsWith('sk_')||!values.CLERK_PUBLISHABLE_KEY?.startsWith('pk_'))throw new Error('Set real Clerk credentials in console/.dev.vars first. Never use DEV_ONLY_FAKE_USER through a public tunnel.');
 if(!existsSync(join(root,'console','dist','client','index.html')))throw new Error('Build the Console client first: npm --prefix console run build');
 mkdirSync(directory,{recursive:true,mode:0o700});chmodSync(directory,0o700);
 mkdirSync(plugin,{recursive:true});
@@ -29,7 +26,7 @@ const config={name:'elf-hosted-preview',main:join(root,'console','src','index.ts
   observability:{enabled:false},workers_dev:false,
 };
 writeFileSync(join(directory,'wrangler.json'),JSON.stringify(config,null,2)+'\n',{mode:0o600});
-const secrets={CLERK_SECRET_KEY:values.CLERK_SECRET_KEY,CLERK_PUBLISHABLE_KEY:values.CLERK_PUBLISHABLE_KEY,
+const secrets={CLERK_SECRET_KEY:'',CLERK_PUBLISHABLE_KEY:'',
   SECRETS_KEY:randomBytes(32).toString('base64'),DEV_ONLY_FAKE_USER:'',CONSOLE_ORIGIN:origin,CLERK_AUTHORIZED_PARTIES:origin,HOSTED_MCP_ENABLED:'true'};
 const secretPath=join(directory,'.dev.vars');
 writeFileSync(secretPath,Object.entries(secrets).map(([key,value])=>`${key}=${JSON.stringify(value)}`).join('\n')+'\n',{mode:0o600});chmodSync(secretPath,0o600);
@@ -43,10 +40,10 @@ code=code.replace('const PUBLIC_FILE_LINK_REQUIRED = false;','const PUBLIC_FILE_
 writeFileSync(join(plugin,'code.js'),code);
 const ui=readFileSync(join(root,'bridge-plugin','ui.html'),'utf8');
 if(!ui.includes(`const HOSTED_ORIGIN = '${production}'`))throw new Error('Hosted UI origin marker missing');
-writeFileSync(join(plugin,'ui.html'),ui.replaceAll(production,origin));
+writeFileSync(join(plugin,'ui.html'),ui.replaceAll(production,origin).replace('<option value="local">Local Elf · editor or npm</option>', '<option value="local">Local Elf · editor or npm</option><option value="hosted">Hosted Elf · development preview</option>'));
 copyFileSync(join(root,'assets','brand','elf-mascot.png'),join(plugin,'plugin-icon.png'));
 writeFileSync(join(directory,'preview.json'),JSON.stringify({origin,mcpUrl:origin+'/mcp',plugin:join(plugin,'manifest.json'),config:join(directory,'wrangler.json')},null,2)+'\n',{mode:0o600});
 console.log('Prepared isolated hosted preview.');
 console.log(`Connector: ${origin}/mcp`);
 console.log(`Plugin: ${join(plugin,'manifest.json')}`);
-console.log('Real Clerk sign-in required. Development sign-in bypass disabled. Production files unchanged.');
+console.log('Approval in Elf Bridge required; no Elf account sign-in. Development sign-in bypass disabled. Production files unchanged.');

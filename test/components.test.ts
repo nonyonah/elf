@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import { FakeBridge, scratchFixtures, type Scratch } from "../batch/test/helpers.js";
@@ -153,7 +153,7 @@ test("a deleted Figma node counts as changed in Figma", async () => {
   scratch.cleanup();
 });
 
-test("never-synced components and stale Figma nodes land in their own buckets", async () => {
+test("never-synced components and unmanaged Figma nodes land in their own buckets", async () => {
   const scratch = await syncedScratch();
   const manifestPath = scratch.config.manifestFile;
   const syncedRefs = figmaRefs(manifestPath);
@@ -163,7 +163,6 @@ test("never-synced components and stale Figma nodes land in their own buckets", 
   delete manifest.components["Button.tsx#Button"];
   writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
 
-  // Button is still in Figma (just never recorded locally); Icon is in neither.
   const refs = syncedRefs.filter((ref) => ref.codeKey !== "Icon.tsx#Icon");
   refs.push({ id: "G:1", name: "Ghost", codeKey: "Ghost.tsx#Ghost" });
   const bridge = new ComponentBridge(refs);
@@ -174,9 +173,25 @@ test("never-synced components and stale Figma nodes land in their own buckets", 
   assert.match(diff.inCodeNotInFigma[0]?.detail ?? "", /never synced by elf-batch/);
   assert.deepEqual(diff.outOfDate.map((issue) => issue.name), ["Button"]);
   assert.match(diff.outOfDate[0]?.detail ?? "", /in Figma but never synced by elf-batch/);
-  assert.deepEqual(diff.inFigmaNotInCode.map((issue) => issue.name), ["Ghost"]);
-  assert.equal(diff.inFigmaNotInCode[0]?.codeKey, "Ghost.tsx#Ghost");
+  assert.deepEqual(diff.inFigmaNotInCode, []);
+  assert.equal(diff.figmaCodeKeys.has("Ghost.tsx#Ghost"), true);
   scratch.cleanup();
+});
+
+test("a manifest-managed Figma component removed from code still reports drift", async () => {
+  const scratch = await syncedScratch();
+  try {
+    const manifest = loadManifest(scratch.config.manifestFile);
+    const nodeId = manifest.components["Icon.tsx#Icon"]?.figmaNodeId;
+    assert.ok(nodeId);
+    rmSync(join(scratch.componentsDir, "Icon.tsx"));
+    const bridge = new ComponentBridge(figmaRefs(scratch.config.manifestFile));
+    const diff = await diffComponents(scratch.componentsDir, scratch.config.manifestFile, bridge);
+    assert.deepEqual(diff.inFigmaNotInCode.map((issue) => issue.name), ["Icon"]);
+    assert.equal(diff.inFigmaNotInCode[0]?.codeKey, "Icon.tsx#Icon");
+    assert.equal(diff.inFigmaNotInCode[0]?.nodeId, nodeId);
+    assert.match(diff.inFigmaNotInCode[0]?.detail ?? "", /managed/);
+  } finally { scratch.cleanup(); }
 });
 
 test("implementation-only edits are reported even when parsed props and sidecars are unchanged", async () => {

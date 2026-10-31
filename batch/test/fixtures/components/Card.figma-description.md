@@ -1,0 +1,1 @@
+The Card component serves as a bordered container for displaying content, such as a title and a badge. It can be interactive, changing its border color to accent when hovered, and can also present a headline number.
