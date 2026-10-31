@@ -3,15 +3,37 @@ title: "Connect Figma"
 description: "Pair the open document with your local Elf runtime."
 ---
 
-## Install Elf Bridge from Figma
+## Install in Figma Desktop
 
-1. Open [Elf Bridge on Figma Community](https://www.figma.com/community/plugin/1698340879529702744).
-2. Open the official Elf Bridge listing from the Elf maintainer and choose **Open in…** or **Run**, as shown by Figma.
-3. Choose the file you want to connect and run the plugin. You can reopen it from Figma’s Plugins menu.
+**Figma Desktop is required for this development-plugin setup.** Use the desktop app, not Figma in a browser.
 
-If the official listing is still awaiting approval, it will not appear publicly yet. Do not install an unrelated plugin with a similar name.
+Elf Bridge is currently installed from a development manifest. It is not approved or available through Figma Community; clarification of the review requirements is pending. Development installation does not imply Figma approval.
 
-You do not need to clone the repository or import a development manifest to use the published plugin.
+### Locate the plugin files
+
+From your local project directory, install the beta package when available:
+
+```sh
+npm install --save-dev elf-tokens@beta
+node -p "require.resolve('elf-tokens/package.json')"
+```
+
+The second command prints the installed package’s `package.json` path. Open its containing folder, then find:
+
+```text
+dist/bridge-plugin-public/manifest.json
+```
+
+If you received a plugin folder directly from the maintainer, extract the whole folder and use its `manifest.json`. Keep `manifest.json`, `code.js`, and `ui.html` together. A manifest file alone is not the plugin.
+
+### Import and run
+
+1. Open the intended file in **Figma Desktop**.
+2. Choose **Plugins → Development → Import plugin from manifest**.
+3. Select the public bundle’s **manifest.json**. Do not select the source `manifest.public.json`.
+4. Run **Elf Bridge** from **Plugins → Development**.
+
+Keep the plugin folder on your machine. Reopen Elf Bridge from the Development menu on later visits. After a plugin update, close and reopen it; re-import the manifest if its location changed.
 
 ## Pair and approve
 

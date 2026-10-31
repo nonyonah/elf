@@ -16,7 +16,7 @@ npx elf-tokens@beta start
 
 Complete onboarding, choose the intended Figma file, open Elf Bridge in that file, and paste the pairing code. Approve the document connection, run a check, and review proposed changes before enabling automatic sync. Keep Elf running and the plugin open.
 
-During beta, the plugin can be imported from `dist/bridge-plugin-public/manifest.json` inside the installed npm package. Use the official Community listing once announced.
+Figma Desktop is required. Import `dist/bridge-plugin-public/manifest.json` from the installed npm package using **Plugins → Development → Import plugin from manifest**. Keep the accompanying `code.js` and `ui.html` in the same folder. The Community submission was not approved; review clarification is pending. See [installation instructions](https://elf-docs.riftlabs.xyz/pairing).
 
 ## Workflows
 

@@ -15,8 +15,9 @@ macOS with Node 22 has local acceptance evidence. Windows/Linux support remains 
 1. Install the official Elf extension, or install a maintainer-provided VSIX with **Extensions → … → Install from VSIX** while the Marketplace listing is pending.
 2. Open your project and select the Elf activity-bar icon.
 3. Choose **Start** and complete project setup.
-4. Open Elf Bridge in Figma, paste the pairing code, and approve the intended document connection.
-5. Run a check and inspect the changes before enabling automatic sync.
+4. In **Figma Desktop**, import Elf Bridge’s development `manifest.json` using **Plugins → Development → Import plugin from manifest**. See [plugin installation](https://elf-docs.riftlabs.xyz/pairing).
+5. Run Elf Bridge, paste the pairing code, and approve the intended document connection.
+6. Run a check and inspect the changes before enabling automatic sync.
 
 Keep Elf Bridge open: saved pairing does not make a closed Figma plugin run in the background.
 
