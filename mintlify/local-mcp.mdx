@@ -1,27 +1,126 @@
 ---
 title: "Local MCP"
-description: "Connect a coding assistant without hosting a server."
+description: "Install Elf from your terminal and connect Codex or another local assistant."
 ---
 
-Use a desktop client with local stdio MCP support for project-side tools and local monitoring integration. For web or remote MCP clients, use the separate [hosted connector](/hosted-mcp) at `https://elf.riftlabs.xyz/mcp`.
+Run Elf locally through an assistant that supports **stdio MCP**. You do not need an IDE, an Elf account, a hosted connector URL, or a cloned Elf repository. You need Node.js 22, npm, an existing local project folder, and Figma Desktop with Elf Bridge open.
 
-Settings → Coding assistants provides configuration for the current installation. A generic configuration is:
+Your assistant launches the MCP process for you. You do not need to keep a separate terminal running `elf mcp`. The shared bridge may remain running so saved plugin connections can reconnect.
+
+For Claude’s website or another remote-only client, use the separate [hosted connector](/hosted-mcp). A local stdio command is not a web connector URL.
+
+## Add Elf to Codex from the terminal
+
+With Codex CLI installed, replace the project path and run:
+
+```sh
+codex mcp add elf -- npx -y elf-tokens@1.0.0-beta.1 mcp --project "/absolute/path/to/project"
+```
+
+This registers Elf as a local server; it does not open Figma or approve any document changes. The pinned version makes the installation reproducible. You can use `elf-tokens@beta` instead if you intentionally want the current beta when npm resolves it.
+
+Check the registration:
+
+```sh
+codex mcp list
+codex mcp get elf
+```
+
+Restart the Codex app, reload the IDE extension, or start a new Codex CLI session so it loads the server. In Codex CLI, `/mcp` shows active servers. Codex’s [official MCP documentation](https://learn.chatgpt.com/docs/extend/mcp) covers its shared configuration and client controls.
+
+If you already registered `elf`, check its existing configuration first. To replace that registration intentionally, run `codex mcp remove elf` before adding the replacement. This removes the client configuration; it does not delete your Figma resources.
+
+## Reliable desktop setup: absolute Node and package paths
+
+Desktop apps may not inherit the terminal’s Node/npm PATH, especially with fnm, nvm, or another Node version manager. Use an absolute Node executable and an absolute Elf entry point, just as you would when launching a local repository checkout.
+
+From your project folder:
+
+```sh
+npm install --save-dev elf-tokens@1.0.0-beta.1
+node -p "process.execPath"
+node -p "require('node:path').join(require('node:path').dirname(require.resolve('elf-tokens/package.json')), 'bin', 'elf-tokens.js')"
+```
+
+The last two commands print the **Node executable** and **installed Elf entry point**. Put those exact paths into this command:
+
+```sh
+codex mcp add elf -- "/absolute/path/to/node" "/absolute/path/to/project/node_modules/elf-tokens/bin/elf-tokens.js" mcp --project "/absolute/path/to/project"
+```
+
+Keep all paths quoted, particularly if they contain spaces. Keep the package installed in that location. If you remove a Node version or move the project, update the registration.
+
+### Using an Elf repository checkout
+
+If you already have a checkout with dependencies installed, the same pattern works:
+
+```sh
+codex mcp add elf -- "/absolute/path/to/node" "/absolute/path/to/elf/bin/elf-tokens.js" mcp --project "/absolute/path/to/project"
+```
+
+The Elf installation folder and the project folder can be different. Use your project as `--project`; you do not need to copy your design system into Elf’s repository. A new or empty project folder is supported for Figma onboarding.
+
+## Claude Code
+
+With Claude Code installed, register a local stdio server:
+
+```sh
+claude mcp add --transport stdio --scope user elf -- npx -y elf-tokens@1.0.0-beta.1 mcp --project "/absolute/path/to/project"
+```
+
+For desktop PATH problems, replace `npx -y elf-tokens@1.0.0-beta.1` with the absolute Node executable followed by the installed Elf entry point, as above. Restart the client’s MCP connection after registration. This is for **Claude Code/local clients**, not the custom connector URL field on Claude’s website.
+
+## Cursor and other stdio clients
+
+Settings → Coding assistants provides configuration for the current installation. For a client using `mcpServers` JSON, use:
 
 ```json
 {
   "mcpServers": {
     "elf": {
       "command": "npx",
-      "args": ["-y", "elf-tokens@beta", "mcp", "--project", "/absolute/path/to/project"]
+      "args": ["-y", "elf-tokens@1.0.0-beta.1", "mcp", "--project", "/absolute/path/to/project"]
     }
   }
 }
 ```
 
-Replace the project path. On Windows use an absolute Windows path escaped for JSON and your client’s documented npx-launch method. Beta Windows support remains unverified.
+For an absolute-path installation, use:
 
-Restart the assistant’s MCP connection after changing configuration. Ask for `figma_onboarding_status`, select the intended file URL, pair Elf Bridge, and complete document authorization before inspecting or editing.
+```json
+{
+  "mcpServers": {
+    "elf": {
+      "command": "/absolute/path/to/node",
+      "args": ["/absolute/path/to/project/node_modules/elf-tokens/bin/elf-tokens.js", "mcp", "--project", "/absolute/path/to/project"]
+    }
+  }
+}
+```
 
-The plugin shows MCP session status. Review concrete changes before asking the assistant to apply them. npm can be used without an IDE; the plugin still needs to stay open in Figma.
+Merge the entry into the client’s existing configuration instead of replacing its other servers. Follow that client’s instructions for its configuration file and reload controls. On Windows, use escaped absolute Windows paths and the client’s documented launch method; beta Windows support remains unverified.
 
-For reproducible installations, replace `@beta` with the exact reviewed package version.
+## Pair Figma and verify the connection
+
+1. Ask your assistant to call `figma_onboarding_status`.
+2. Give it the intended Figma file URL and specify whether this is a new or existing design system. For setup without Figma OAuth, ask it to call `select_figma_file` with `authorization: "plugin"` and the appropriate `purpose`.
+3. Ask for `get_figma_pairing_code`. In local MCP this tool takes no URL argument; target selection happens in the previous step.
+4. [Install Elf Bridge](/pairing) in Figma Desktop and open it in the exact target file. Choose **Local Elf**, enter the file URL if requested, select plugin-only document approval, and paste the current code.
+5. Ask the assistant to inspect the pending approval with `inspect_figma_target_approval`. Review the actual file key/name and explicitly approve plugin-only trust before it calls `approve_figma_target`.
+6. Ask for `figma_onboarding_status` again. It should report `ready: true`; the plugin also shows the MCP session status. Start with a read before proposing changes.
+
+Figma OAuth is optional for local strict REST verification. It is not needed for the plugin-only path above. Local approval is completed through the assistant’s reviewed approval tool; the hosted workflow instead has an **Approve assistant for this file** button in the plugin.
+
+When switching local MCP targets, give the assistant the new URL and have it select and approve that exact file again. Target selection does not rewrite the project’s drift-monitoring file configuration. Review fresh changes for the new target; do not carry over approvals.
+
+## Troubleshooting
+
+- **Command not found / fails only in the desktop app:** use the absolute Node and Elf paths above, then restart the client.
+- **Startup times out:** run `npx -y elf-tokens@1.0.0-beta.1 mcp --help` once to resolve the package, or use the installed-package route. Codex also supports `startup_timeout_sec` under its server configuration.
+- **The terminal appears to wait:** a manually started stdio server waits for an MCP client on stdin. Register it in the assistant instead of expecting a browser page.
+- **Plugin is offline:** keep Figma Desktop and Elf Bridge open; select Local Elf rather than Hosted Elf.
+- **Older shared bridge:** stop your Elf watchers/MCP clients, then use `npx elf-tokens@1.0.0-beta.1 bridge --stop` before restarting. Saved pairings are preserved. Do not stop someone else’s bridge or replace its credentials.
+
+## Verification
+
+The published npm release `1.0.0-beta.1` was installed into a clean temporary folder and checked on macOS with Node.js `22.23.0`. Real MCP SDK connections through `npx`, the installed package’s absolute Node entry point, and the repository entry point each initialized, listed 44 tools, selected a synthetic file with plugin-only authorization, and generated a pairing code. No real Figma resources were accessed or modified. Codex registration syntax and installed Claude Code command help were checked; this does not claim end-to-end testing in every desktop client.

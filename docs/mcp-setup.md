@@ -2,13 +2,14 @@
 
 Elf's release path is a local MCP server installed with the npm package and an
 open Elf Bridge plugin in Figma. A desktop MCP client can launch it without an
-IDE or extension. There is no hosted MCP URL or Elf account sign-in required
-for local transport. Figma account OAuth, when selected for strict verification,
+IDE or extension. No hosted URL or Elf account sign-in is required
+for local transport. The separate hosted connector is documented at
+https://elf-docs.riftlabs.xyz/hosted-mcp. Figma account OAuth, when selected for strict verification,
 is a separate permission flow. Plugin-only approval is also supported.
 
-The commands below describe the candidate package interface; clean installation
-and external-client acceptance must pass before advertising a public release.
-Hosted MCP and web-only connector setup are deferred.
+The published `elf-tokens@1.0.0-beta.1` local entry points were checked with real
+MCP SDK initialization and tool discovery from a clean temporary npm install.
+The complete terminal walkthrough is https://elf-docs.riftlabs.xyz/local-mcp.
 
 For drift monitoring, complete local project setup with `elf` first. Keep the Figma plugin open.
 Settings → Coding assistants provides configuration for the installed Elf
@@ -18,8 +19,8 @@ or reconnect the assistant's MCP server after initial setup.
 For a published version of the package, equivalent launch commands are:
 
 ```bash
-codex mcp add elf -- npx -y elf-tokens mcp --project /absolute/project/path
-claude mcp add --transport stdio --scope local elf -- npx -y elf-tokens mcp --project /absolute/project/path
+codex mcp add elf -- npx -y elf-tokens@1.0.0-beta.1 mcp --project "/absolute/project/path"
+claude mcp add --transport stdio --scope local elf -- npx -y elf-tokens@1.0.0-beta.1 mcp --project "/absolute/project/path"
 ```
 
 Cursor uses `.cursor/mcp.json`:
@@ -30,11 +31,22 @@ Cursor uses `.cursor/mcp.json`:
     "elf": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "elf-tokens", "mcp", "--project", "/absolute/project/path"]
+      "args": ["-y", "elf-tokens@1.0.0-beta.1", "mcp", "--project", "/absolute/project/path"]
     }
   }
 }
 ```
+
+For desktop apps that cannot find Node/npm on PATH, install the package locally
+and register absolute paths, matching the repository-based installation pattern:
+
+```sh
+codex mcp add elf -- "/absolute/path/to/node" "/absolute/path/to/project/node_modules/elf-tokens/bin/elf-tokens.js" mcp --project "/absolute/path/to/project"
+```
+
+Use `node -p "process.execPath"` to find Node. For an existing checkout with
+dependencies installed, the entry point can instead be `/absolute/path/to/elf/bin/elf-tokens.js`.
+Restart the assistant after registration; it launches the stdio process itself.
 
 The Settings snippets use the currently installed launcher so local/unreleased
 changes do not accidentally invoke an older npm release. Pin a reviewed package
@@ -52,9 +64,10 @@ This status does not grant permission to modify the document. If it says
 bridge, then reopen the updated plugin and reconnect MCP.
 
 Local stdio MCP can also start in an existing project directory without an
-`elf.config.json`. Use `figma_onboarding_status`, `connect_figma_account`, then
+`elf.config.json`. Use `figma_onboarding_status`, then
 `select_figma_file` with the user-provided URL, new/existing purpose and explicit
-strict/plugin mode. Open the selected file and Elf Bridge; request a code with
+strict/plugin mode. Figma OAuth via `connect_figma_account` is optional and only
+needed for strict REST verification. Open the selected file and Elf Bridge; request a code with
 `get_figma_pairing_code` if a saved pairing does not reconnect. Plugin-only mode
 requires `inspect_figma_target_approval` and explicit human confirmation before
 `approve_figma_target`. Check readiness before reading or changing resources.
