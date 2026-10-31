@@ -15,7 +15,7 @@ function project(components = false) {
     writeFileSync(join(root, "components", "Button.figma.json"), JSON.stringify({ size: { width: 120, height: 40 }, text: { characters: "Save", fontSize: 14 } }));
   }
   writeFileSync(path, JSON.stringify({ figma: { fileKey: "project-file", source: "bridge" }, codebase: { path: "tokens.css", source: "css" }, ...(components ? { components: { path: "components", manifest: "elf.manifest.json" } } : {}) }));
-  const collections: any[] = []; const variables: any[] = []; const refs: any[] = []; const nodes: Record<string, any> = {}; const calls: string[] = [];
+  const collections: any[] = []; const variables: any[] = []; const refs: any[] = []; const nodes: Record<string, any> = {}; const calls: string[] = []; const nodeReads: string[] = [];
   const race = { enabled: false };
   const client = { async call(method: string, params: any = {}): Promise<any> {
     calls.push(method);
@@ -24,7 +24,7 @@ function project(components = false) {
     if (method === "list_components") return { components: refs };
     if(method==='get_component_description') {const node=nodes[params.nodeId];return {nodeId:node.id,name:node.name,codeKey:node.codeKey??null,description:node.description??''};}
     if(method==='set_component_description') {const node=nodes[params.nodeId];if((node.description??'')!==params.expectedDescription||(node.codeKey??null)!==params.expectedCodeKey)throw new Error('Component documentation changed');node.description=params.description;return {nodeId:node.id,description:node.description};}
-    if (method === "get_node") return { node: nodes[params.nodeId] };
+    if (method === "get_node") { nodeReads.push(params.nodeId); return { node: nodes[params.nodeId] }; }
     if (method === "create_collection") return { collection: { id: "collection" } };
     if (method === "upsert_variables") {
       const stored = params.variables.map((input: any) => {
@@ -52,7 +52,7 @@ function project(components = false) {
     throw new Error(`Unexpected ${method}`);
   } };
   const runtime = { transaction: async (file: string, work: (client: any) => any) => { assert.equal(file, "project-file"); return work(client); }, connection: { status: { file: { key: "project-file" } } } } as unknown as BridgeRuntime;
-  return { root, path, collections, variables, refs, nodes, calls, race, service: new ProjectService(path, runtime), cleanup: () => rmSync(root, { recursive: true }) };
+  return { root, path, collections, variables, refs, nodes, calls, nodeReads, race, runtime, service: new ProjectService(path, runtime), cleanup: () => rmSync(root, { recursive: true }) };
 }
 
 test('component discovery and generated-draft validation never save or call Figma', async () => {
@@ -376,12 +376,185 @@ test('individual component sync includes only referenced tokens and rejects stal
   } finally {p.cleanup();}
 });
 
+test('full plans read managed components but not unrelated unmanaged Figma nodes', async () => {
+  const p = project(true);
+  try {
+    await p.service.apply((await p.service.plan()).id);
+    const manifest = JSON.parse(readFileSync(join(p.root,'elf.manifest.json'),'utf8'));
+    const buttonId = Object.values<any>(manifest.components)[0].figmaNodeId;
+    p.refs.push({id:'unmanaged',name:'Unmanaged',codeKey:'Unmanaged.tsx#Unmanaged'});
+    p.nodes.unmanaged = {id:'unmanaged',name:'Unmanaged',codeKey:'Unmanaged.tsx#Unmanaged',type:'COMPONENT',width:100,height:40,children:[]};
+    p.nodeReads.length = 0;
+    const plan = await p.service.plan();
+    assert.deepEqual([...new Set(p.nodeReads)], [buttonId]);
+    assert.equal(plan.issues.some(issue => issue.key.includes('Unmanaged')), false);
+  } finally {p.cleanup();}
+});
+
+test('individual component review reads only the selected component and its dependencies', async () => {
+  const p = project(true);
+  try {
+    writeFileSync(join(p.root,'components/Child.tsx'),'export function Child(){return <div/>}');
+    writeFileSync(join(p.root,'components/Child.figma.json'),JSON.stringify({size:{width:80,height:40}}));
+    writeFileSync(join(p.root,'components/Other.tsx'),'export function Other(){return <div/>}');
+    writeFileSync(join(p.root,'components/Other.figma.json'),JSON.stringify({size:{width:90,height:40}}));
+    writeFileSync(join(p.root,'components/Button.tsx'),"import {Child} from './Child'; export function Button(){return <Child/>}");
+    await p.service.apply((await p.service.plan()).id);
+    const manifest = JSON.parse(readFileSync(join(p.root,'elf.manifest.json'),'utf8'));
+    const buttonKey = Object.keys(manifest.components).find(key => key.endsWith('#Button'))!;
+    const childKey = Object.keys(manifest.components).find(key => key.endsWith('#Child'))!;
+    const otherKey = Object.keys(manifest.components).find(key => key.endsWith('#Other'))!;
+    const buttonId = manifest.components[buttonKey].figmaNodeId;
+    const childId = manifest.components[childKey].figmaNodeId;
+    const otherId = manifest.components[otherKey].figmaNodeId;
+    p.calls.length = 0;
+    p.nodeReads.length = 0;
+    const plan = await p.service.plan({kind:'component',key:buttonKey});
+    assert.equal(plan.selection?.key,buttonKey);
+    const reads = [...new Set(p.nodeReads)].sort();
+    assert.deepEqual(reads,[buttonId,childId].sort());
+    assert.equal(reads.includes(otherId),false);
+    writeFileSync(join(p.root,'components/Button.figma.json'),JSON.stringify({size:{width:140,height:40},text:{characters:'Save',fontSize:14}}));
+    const reviewed = await p.service.plan({kind:'component',key:buttonKey});
+    assert.ok(reviewed.entries.some(entry => entry.key === buttonKey));
+    writeFileSync(join(p.root,'components/Other.figma.json'),JSON.stringify({size:{width:200,height:40}}));
+    await p.service.apply(reviewed.id);
+    assert.equal(p.nodes[otherId].width,90);
+  } finally {p.cleanup();}
+});
+
+test('automatic sync scopes watcher changes to the changed component and its dependencies', async () => {
+  const p = project(true);
+  try {
+    writeFileSync(join(p.root,'components/Child.tsx'),'export function Child(){return <div/>}');
+    writeFileSync(join(p.root,'components/Child.figma.json'),JSON.stringify({size:{width:80,height:40}}));
+    writeFileSync(join(p.root,'components/Other.tsx'),'export function Other(){return <div/>}');
+    writeFileSync(join(p.root,'components/Other.figma.json'),JSON.stringify({size:{width:90,height:40}}));
+    writeFileSync(join(p.root,'components/Button.tsx'),"import {Child} from './Child'; export function Button(){return <Child/>}");
+    await p.service.apply((await p.service.plan()).id,{enableAuto:true});
+    const manifest = JSON.parse(readFileSync(join(p.root,'elf.manifest.json'),'utf8'));
+    const buttonKey = Object.keys(manifest.components).find(key => key.endsWith('#Button'))!;
+    const childKey = Object.keys(manifest.components).find(key => key.endsWith('#Child'))!;
+    const otherKey = Object.keys(manifest.components).find(key => key.endsWith('#Other'))!;
+    const buttonId = manifest.components[buttonKey].figmaNodeId;
+    const childId = manifest.components[childKey].figmaNodeId;
+    const otherId = manifest.components[otherKey].figmaNodeId;
+    writeFileSync(join(p.root,'components/Button.figma.json'),JSON.stringify({size:{width:140,height:40},text:{characters:'Save',fontSize:14}}));
+    p.calls.length = 0; p.nodeReads.length = 0;
+    const result = await p.service.autoSync([join(p.root,'components/Button.figma.json')]);
+    assert.equal(result.paused,false);
+    assert.ok(Number(result.synced) >= 1);
+    assert.deepEqual([...new Set(p.nodeReads)].sort(),[buttonId,childId].sort());
+    assert.equal(p.nodes[buttonId].width,140);
+    assert.equal(p.nodes[otherId].width,90);
+  } finally {p.cleanup();}
+});
+
+test('automatic sync selects every component parsed from one source file', async () => {
+  const p = project(true);
+  try {
+    const config = {configPath:p.path,root:p.root,tokensFile:join(p.root,'tokens.css'),componentsDir:join(p.root,'components'),manifestFile:join(p.root,'elf.manifest.json'),modeStrategy:'modes',semanticModes:['Light','Dark'],chunkSize:5,collections:{primitives:'Primitives',semantic:'Semantic'}};
+    const parsed = ['PrimaryButton','SecondaryButton'].map(name => ({parsed:{name,codeKey:`controls.tsx#${name}`,file:'controls.tsx',variantProps:[],dependencies:[]},sidecar:null,variants:[]}));
+    const tokens = {primitives:{collection:'Primitives',modes:['Value'],variables:[]},semantic:{collection:'Semantic',modes:['Light','Dark'],variables:[]},textStyles:[],effectStyles:[]};
+    const scope = (p.service as any).autoScope(config,parsed,tokens,{version:1,components:{},tokens:{}},[join(p.root,'components/controls.tsx')]);
+    assert.deepEqual([...scope.ids].sort(),['component:controls.tsx#PrimaryButton','component:controls.tsx#SecondaryButton']);
+  } finally {p.cleanup();}
+});
+
+test('automatic sync detects deleted components by source file rather than filename', async () => {
+  const p = project(true);
+  try {
+    writeFileSync(join(p.root,'components/controls.tsx'),'export function PrimaryButton(){return <button/>}');
+    writeFileSync(join(p.root,'components/controls.figma.json'),JSON.stringify({text:{characters:'Controls',fontSize:14}}));
+    await p.service.apply((await p.service.plan()).id,{enableAuto:true});
+    const manifestPath = join(p.root,'elf.manifest.json');
+    const manifest = JSON.parse(readFileSync(manifestPath,'utf8'));
+    const key = Object.keys(manifest.components).find(item => item.startsWith('controls.tsx#'))!;
+    manifest.components['controls.tsx#PrimaryButton'] = manifest.components[key];
+    delete manifest.components[key];
+    writeFileSync(manifestPath,JSON.stringify(manifest));
+    rmSync(join(p.root,'components/controls.tsx'));
+    p.calls.length = 0; p.nodeReads.length = 0;
+    const result = await p.service.autoSync([join(p.root,'components/controls.tsx')]);
+    assert.equal(result.paused,true);
+    assert.ok((result.conflicts as any[]).some(issue => issue.kind === 'removed' && issue.key === 'controls.tsx#PrimaryButton'));
+    assert.equal(p.calls.some(call => /^(upsert|create|delete)/.test(call)),false);
+    assert.equal(p.nodeReads.length,0);
+  } finally {p.cleanup();}
+});
+
+test('automatic sync pauses when a managed component is deleted from code', async () => {
+  const p = project(true);
+  try {
+    await p.service.apply((await p.service.plan()).id,{enableAuto:true});
+    const manifest = JSON.parse(readFileSync(join(p.root,'elf.manifest.json'),'utf8'));
+    const buttonKey = Object.keys(manifest.components).find(key => key.endsWith('#Button'))!;
+    const buttonId = manifest.components[buttonKey].figmaNodeId;
+    rmSync(join(p.root,'components/Button.tsx'));
+    p.calls.length = 0; p.nodeReads.length = 0;
+    const result = await p.service.autoSync([join(p.root,'components/Button.tsx')]);
+    assert.equal(result.paused,true);
+    assert.ok((result.conflicts as any[]).some(issue => issue.kind === 'removed' && issue.key === buttonKey));
+    assert.equal(p.calls.some(call => /^(upsert|create|delete)/.test(call)),false);
+    assert.equal(p.nodeReads.length,0);
+    assert.ok(p.refs.some(ref => ref.id === buttonId));
+  } finally {p.cleanup();}
+});
+
+test('automatic sync scopes token changes without reading components', async () => {
+  const p = project(true);
+  try {
+    await p.service.apply((await p.service.plan()).id,{enableAuto:true});
+    writeFileSync(join(p.root,'tokens.css'), ':root { --color-primary: #112233; --spacing-2: 8px; }');
+    p.calls.length = 0; p.nodeReads.length = 0;
+    const result = await p.service.autoSync([join(p.root,'tokens.css')]);
+    assert.equal(result.paused,false);
+    assert.equal(p.calls.includes('list_components'),false);
+    assert.equal(p.nodeReads.length,0);
+    assert.ok(p.variables.some(item => item.codeKey === 'spacing-2'));
+    assert.equal(p.variables.find(item => item.codeKey === 'color-primary').valuesByMode.Value.value,'#112233');
+  } finally {p.cleanup();}
+});
+
+test('individual reviews reject selected remote and connection changes but ignore unrelated remote edits', async () => {
+  const p = project(true);
+  try {
+    writeFileSync(join(p.root,'components/Child.tsx'),'export function Child(){return <div/>}');
+    writeFileSync(join(p.root,'components/Child.figma.json'),JSON.stringify({size:{width:80,height:40}}));
+    writeFileSync(join(p.root,'components/Other.tsx'),'export function Other(){return <div/>}');
+    writeFileSync(join(p.root,'components/Other.figma.json'),JSON.stringify({size:{width:90,height:40}}));
+    writeFileSync(join(p.root,'components/Button.tsx'),"import {Child} from './Child'; export function Button(){return <Child/>}");
+    await p.service.apply((await p.service.plan()).id);
+    const manifest = JSON.parse(readFileSync(join(p.root,'elf.manifest.json'),'utf8'));
+    const buttonKey = Object.keys(manifest.components).find(key => key.endsWith('#Button'))!;
+    const otherKey = Object.keys(manifest.components).find(key => key.endsWith('#Other'))!;
+    const buttonId = manifest.components[buttonKey].figmaNodeId;
+    const otherId = manifest.components[otherKey].figmaNodeId;
+    writeFileSync(join(p.root,'components/Button.figma.json'),JSON.stringify({size:{width:140,height:40},text:{characters:'Save',fontSize:14}}));
+    const reviewed = await p.service.plan({kind:'component',key:buttonKey});
+    p.nodes[otherId].width = 200;
+    await p.service.apply(reviewed.id);
+    assert.equal(p.nodes[buttonId].width,140);
+    assert.equal(p.nodes[otherId].width,200);
+    writeFileSync(join(p.root,'components/Button.figma.json'),JSON.stringify({size:{width:150,height:40},text:{characters:'Save',fontSize:14}}));
+    const remoteReview = await p.service.plan({kind:'component',key:buttonKey});
+    p.nodes[buttonId].width = 160;
+    await assert.rejects(p.service.apply(remoteReview.id),/changed after review/);
+    assert.equal(p.nodes[buttonId].width,160);
+    writeFileSync(join(p.root,'components/Button.figma.json'),JSON.stringify({size:{width:170,height:40},text:{characters:'Save',fontSize:14}}));
+    const connectionReview = await p.service.plan({kind:'component',key:buttonKey});
+    (p.runtime.connection.status as any).connectedAt = new Date(Date.now() + 1000).toISOString();
+    await assert.rejects(p.service.apply(connectionReview.id),/changed after review/);
+  } finally {p.cleanup();}
+});
+
 test('individual token apply does not write unselected tokens or components', async () => {
   const p = project(true);
   try {
     writeFileSync(join(p.root,'tokens.css'), ':root { --color-primary: #112233; --color-unrelated: #abcdef; }');
     const plan = await p.service.plan({kind:'token',key:'color-primary'});
     assert.equal(plan.entries.length,1);
+    assert.equal(p.nodeReads.length,0);
     await p.service.apply(plan.id);
     assert.deepEqual(p.variables.map(item => item.codeKey),['color-primary']);
     assert.equal(p.calls.includes('upsert_component'),false);

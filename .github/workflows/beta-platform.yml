@@ -1,0 +1,65 @@
+# Local beta release platform coverage.
+# Node: package engine requirement is >=20; 20 and 22 are the tested train,
+# 24 is watched forward. macOS is where live acceptance runs happen; Linux and
+# Windows runs in this matrix have NOT been executed yet (see
+# docs/local-beta-rc.md platform coverage status).
+name: Beta platform checks
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  suites:
+    name: suites (${{ matrix.os }} node ${{ matrix.node }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest, windows-latest]
+        node: [20, 22]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - name: Install
+        run: npm ci --no-audit --no-fund
+      - name: Install settings-next
+        run: npm ci --no-audit --no-fund --prefix settings-next
+      - name: Conformance build chain
+        run: npm run prepublishOnly
+      - name: Root suites
+        run: npm test
+      - name: Batch suite and typecheck
+        run: npm --prefix batch test && npm run batch:typecheck
+      - name: Watch suite
+        run: npm run watch:test
+      - name: MCP suite and typecheck
+        run: npm run mcp:test
+
+  fresh-install:
+    name: fresh install (${{ matrix.os }} node ${{ matrix.node }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest, windows-latest]
+        node: [20, 22]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - name: Install and build candidate
+        run: npm ci --no-audit --no-fund && npm ci --no-audit --no-fund --prefix settings-next && npm run prepublishOnly
+      - name: Package
+        run: npm pack --ignore-scripts
+      - name: Smoke test packed install
+        run: node scripts/beta-fresh-smoke.mjs

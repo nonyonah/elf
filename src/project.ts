@@ -9,7 +9,7 @@ import { cssColorToHex } from "./core/normalize.js";
 import { readActivity, recordActivity, type Activity, type SyncedChange } from "./activity.js";
 import { createHash, randomUUID } from "node:crypto";
 import { existsSync, lstatSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from "node:fs";
-import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { runElfCheck } from "../watch/src/check.js";
 import { loadConfig } from "./config.js";
 import { projectResource, writeProjectConfig } from "./onboarding.js";
@@ -17,7 +17,7 @@ import { parseCodebaseTokens, parseProjectTokens } from "./codebase/index.js";
 import { hashSpec, loadManifest, saveManifest, stableStringify } from "../batch/src/manifest.js";
 import { planTokens, type TokenIndex } from "../batch/src/tokens.js";
 import { componentSourceHash, componentSpecHash, planComponent, processComponent, syncTokens } from "../batch/src/sync.js";
-import { parseComponents } from "../batch/src/parser.js";
+import { COMPONENT_EXTENSIONS, parseComponents } from "../batch/src/parser.js";
 import { DescriptionTokenError, loadSidecar, resolveSidecar, sidecarPathFor, validateSidecar } from "../batch/src/sidecar.js";
 import { orderComponents } from "../batch/src/graph.js";
 import { NODE_STATE_DEPTH, nodeStateHash } from "../batch/src/nodestate.js";
@@ -29,6 +29,7 @@ export interface PlanIssue { kind: "conflict" | "unsupported" | "removed"; key: 
 export interface SyncPlan { selection?: {kind: PlanEntry["kind"];key:string}; id: string; fileKey: string; entries: PlanEntry[]; issues: PlanIssue[]; expiresAt: string; }
 interface Snapshot { collections: any[]; variables: any[]; components: any[]; nodes: Record<string, unknown>; styles: any[]; }
 interface InternalPlan { selection?: {kind: PlanEntry["kind"]; key: string}; view: SyncPlan; fingerprint: string; config: BatchConfig; manifest: Manifest; tokens: TokensPlan; components: PlannedComponent[]; snapshot: Snapshot; }
+interface AutoScope { ids: Set<string>; removed: PlanIssue[] }
 const writes = (plan: SyncPlan, kind: PlanEntry["kind"]): Set<string> => new Set(plan.entries.filter(entry => entry.kind === kind).map(entry => entry.key));
 
 /** The same managed workflow is used by Settings, automatic watch, CLI and MCP. */
@@ -106,7 +107,7 @@ export class ProjectService {
   }
   async plan(selection?: {kind: PlanEntry["kind"]; key: string}): Promise<SyncPlan> {
     return this.serial(() => this.transaction( async client => {
-      const plan = await this.build(client);
+      const plan = await this.build(client, selection);
       if (selection) this.selectPlan(plan, selection);
       for (const [id, previous] of this.reviewed) if (Date.parse(previous.view.expiresAt) < Date.now()) this.reviewed.delete(id);
       if (this.reviewed.size >= 20) this.reviewed.delete(this.reviewed.keys().next().value!);
@@ -118,7 +119,7 @@ export class ProjectService {
     const result = await this.serial(() => this.transaction( async client => {
       const reviewed = this.reviewed.get(id);
       if (!reviewed || Date.parse(reviewed.view.expiresAt) < Date.now()) throw new Error("This sync plan expired. Review a fresh plan.");
-      const fresh = await this.build(client);
+      const fresh = await this.build(client, reviewed.selection);
       if (reviewed.selection) this.selectPlan(fresh, reviewed.selection);
       if (fresh.fingerprint !== reviewed.fingerprint) throw new Error("Code, configuration, or Figma changed after review. Review a fresh plan before applying.");
       if (!options.enableAuto && fresh.view.issues.some(issue => issue.kind === "conflict" && issue.blocksApply !== false) && !options.overwriteConflicts) throw new Error("Figma has edits. Keep them, or explicitly choose to replace the conflicts in this reviewed plan.");
@@ -134,10 +135,10 @@ export class ProjectService {
     try { await deliverSyncNotifications(this.configPath); } catch { this.record("error", "Sync completed, but its notification could not be delivered. Delivery will be retried."); }
     return result;
   }
-  async autoSync(): Promise<Record<string, unknown>> {
+  async autoSync(changedPaths?: string[]): Promise<Record<string, unknown>> {
     return this.serial(() => this.transaction( async client => {
       if (!this.automatic()) return { synced: 0, paused: false, issues: [] };
-      const plan = await this.build(client);
+      const plan = await this.build(client, undefined, changedPaths);
       if (!this.automatic()) return { synced: 0, paused: false, issues: [] };
       this.retainAutomaticEntries(plan);
       const result = await this.execute(plan, client);
@@ -387,31 +388,62 @@ export class ProjectService {
     }
     return { plan: { primitives: { collection: config.collections.primitives, modes: ["Value"], variables }, semantic: { collection: config.collections.semantic, modes: config.semanticModes, variables: [] }, textStyles: [], effectStyles: [] }, index, unsupported };
   }
-  private async snapshot(client: BridgeCaller, components: PlannedComponent[], styles: boolean, scanComponents = components.length > 0): Promise<Snapshot> {
+  private async snapshot(client: BridgeCaller, options: { scanComponents: boolean; readNodeIds: Set<string>; matchComponents?: PlannedComponent[]; scanStyles: boolean }): Promise<Snapshot> {
     const collections = await client.call<{ collections: any[] }>("list_collections");
     const variables = await client.call<{ variables: any[] }>("list_variables");
-    const refs = scanComponents ? await client.call<{ components: any[] }>("list_components", { deep: true }) : { components: [] };
-    const nodes: Record<string, unknown> = {};
-    for (const ref of refs.components) {
-      const { node } = await client.call<{ node: unknown }>("get_node", { nodeId: ref.id, depth: NODE_STATE_DEPTH }); nodes[ref.id] = node;
+    const refs = options.scanComponents ? await client.call<{ components: any[] }>("list_components", { deep: true }) : { components: [] };
+    const available = new Set(refs.components.map(ref => String(ref.id)));
+    const readNodeIds = new Set(options.readNodeIds);
+    if (options.matchComponents?.length) {
+      const codeKeys = new Set(options.matchComponents.map(component => component.parsed.codeKey));
+      const names = new Set(options.matchComponents.map(component => component.parsed.name));
+      for (const ref of refs.components) if ((ref.codeKey && codeKeys.has(ref.codeKey)) || names.has(ref.name)) readNodeIds.add(String(ref.id));
     }
-    const styleList = styles ? await client.call<{ styles: any[] }>("list_styles") : { styles: [] };
+    const nodes: Record<string, unknown> = {};
+    for (const nodeId of readNodeIds) if (available.has(nodeId)) {
+      const { node } = await client.call<{ node: unknown }>("get_node", { nodeId, depth: NODE_STATE_DEPTH }); nodes[nodeId] = node;
+    }
+    const styleList = options.scanStyles ? await client.call<{ styles: any[] }>("list_styles") : { styles: [] };
     return { collections: collections.collections, variables: variables.variables, components: refs.components, nodes, styles: styleList.styles };
   }
-  private async build(client: BridgeCaller): Promise<InternalPlan> {
+  private async build(client: BridgeCaller, selection?: {kind: PlanEntry["kind"]; key: string}, changedPaths?: string[]): Promise<InternalPlan> {
     const { config, hasComponents, structured } = this.batchConfig();
     const tokens = await this.tokens(config, structured);
     const parsed = hasComponents ? orderComponents(parseComponents(config.componentsDir, config.componentFiles)) : [];
     const components = parsed.map(component => planComponent(config, tokens.index, component));
     const manifest = loadManifest(config.manifestFile);
-    const snapshot = await this.snapshot(client, components, tokens.plan.textStyles.length + tokens.plan.effectStyles.length > 0, hasComponents || Object.keys(manifest.components).length > 0);
-    const entries: PlanEntry[] = []; const issues = [...tokens.unsupported];
+    const provisional: InternalPlan = {view: {id: "", fileKey: "", entries: [], issues: [], expiresAt: ""}, fingerprint: "", config, manifest, tokens: tokens.plan, components, snapshot: {collections: [], variables: [], components: [], nodes: {}, styles: []}};
+    const scope = changedPaths ? this.autoScope(config, components, tokens.plan, manifest, changedPaths) : null;
+    const scopedSelection = scope ? this.scopeSelection(provisional, scope.ids) : null;
+    const selected = selection ? this.collectSelection(provisional, selection) : scopedSelection?.selected ?? null;
+    const selectedIds = selected ?? new Set<string>();
+    const keysOf = (kind: PlanEntry["kind"]): Set<string> => new Set([...selectedIds].filter(id => id.startsWith(`${kind}:`)).map(id => id.slice(kind.length + 1)));
+    const componentKeys = selected ? keysOf("component") : null;
+    const tokenKeys = selected ? keysOf("token") : null;
+    const styleKeys = selected ? keysOf("style") : null;
+    const managedNodeIds = new Set(Object.entries(manifest.components)
+      .filter(([key, entry]) => Boolean(entry.figmaNodeId) && (!componentKeys || componentKeys.has(key)))
+      .map(([, entry]) => entry.figmaNodeId!));
+    const removedComponents = Boolean(scope?.removed.some(issue => manifest.components[issue.key]));
+    const scanComponents = (selected ? componentKeys!.size > 0 : hasComponents || Object.keys(manifest.components).length > 0) || removedComponents;
+    const scanStyles = selected ? styleKeys!.size > 0 : tokens.plan.textStyles.length + tokens.plan.effectStyles.length > 0;
+    const snapshot = selected?.size === 0 && !scope?.removed.length ? provisional.snapshot : await this.snapshot(client, {scanComponents, readNodeIds: managedNodeIds, matchComponents: componentKeys ? components.filter(component => componentKeys.has(component.parsed.codeKey)) : components, scanStyles});
+    const entries: PlanEntry[] = [];
+    const removed = (scope?.removed ?? []).filter(issue => {
+      const token = manifest.tokens[issue.key];
+      if (token) return snapshot.variables.some(item => item.id === token.figmaVariableId);
+      const component = manifest.components[issue.key];
+      if (component) return snapshot.components.some(item => item.id === component.figmaNodeId);
+      return true;
+    });
+    const issues = [...tokens.unsupported.filter(issue => !tokenKeys || tokenKeys.has(issue.key)), ...removed, ...(scopedSelection?.issues ?? [])];
     const sections = [tokens.plan.primitives, ...(tokens.plan.semanticCollections ?? [tokens.plan.semantic])];
     const deprecations = loadConfig(this.configPath).deprecations;
     const deprecated = (type: "token" | "component", name: string, key: string): boolean => deprecations.some(item => item.type === type && (item.name === name || item.name === key));
-    const tokenKeys = new Set<string>();
+    const tokenKeysInPlan = new Set<string>();
     for (const section of sections) for (const variable of section.variables) {
-      tokenKeys.add(variable.codeKey);
+      tokenKeysInPlan.add(variable.codeKey);
+      if (tokenKeys && !tokenKeys.has(variable.codeKey)) continue;
       if (deprecated("token", variable.name, variable.codeKey)) { issues.push({kind: "unsupported", key: variable.codeKey, message: `${variable.name}: deprecated; retained without automatic writes.`}); continue; }
       const known = manifest.tokens[variable.codeKey];
       const remote = snapshot.variables.find(item => item.codeKey === variable.codeKey || (item.collectionName === section.collection && item.name === variable.name));
@@ -422,13 +454,15 @@ export class ProjectService {
       if (!known || known.valueHash !== hashSpec(variable) || !remote || issues.some(issue => issue.kind === "conflict" && issue.key === variable.codeKey)) entries.push({ kind: "token", key: variable.codeKey, name: variable.name, action: remote ? "update" : "create" });
     }
     for (const component of components) {
+      if (componentKeys && !componentKeys.has(component.parsed.codeKey)) continue;
       if (component.parsed.deprecated !== undefined || deprecated("component", component.parsed.name, component.parsed.codeKey)) { issues.push({kind: "unsupported", key: component.parsed.codeKey, message: `${component.parsed.name}: deprecated; retained without automatic writes.`}); continue; }
       const known = manifest.components[component.parsed.codeKey];
       const remote = snapshot.components.find(item => item.codeKey === component.parsed.codeKey || item.id === known?.figmaNodeId || item.name === component.parsed.name);
       const key = component.parsed.codeKey;
       const specHash = componentSpecHash(config.componentsDir, component.parsed);
       const remoteNode: any = remote ? snapshot.nodes[remote.id] : null;
-      if (remoteNode?.type && (component.variants.length ? remoteNode.type !== "COMPONENT_SET" : remoteNode.type !== "COMPONENT")) {
+      const remoteType = remoteNode?.type ?? remote?.type;
+      if (remoteType && (component.variants.length ? remoteType !== "COMPONENT_SET" : remoteType !== "COMPONENT")) {
         issues.push({ kind: "conflict", key, message: `${component.parsed.name}: component and component-set types differ. Resolve the existing Figma resource explicitly before syncing.` }); continue;
       }
       if (remoteNode?.type === "COMPONENT_SET" && (remoteNode.children?.length !== component.variants.length || component.variants.some(variant => !remoteNode.children?.some((child: any) => child.name === variant.label)))) issues.push({ kind: "conflict", key, message: `${component.parsed.name}: its variant roster changed. Rebuilding this set detaches existing instances; review before replacing it.` });
@@ -440,17 +474,20 @@ export class ProjectService {
         issues.push({ kind: "unsupported", key, message: `${component.parsed.name}: its variant or child count exceeds the verified component limit. Split the description into smaller components before syncing.` }); continue;
       }
       if (component.sidecarError) { issues.push({ kind: "unsupported", key, component: component.parsed.codeKey, action: "prepare-component", message: `${component.parsed.name}: ${component.sidecarError} Prepare and review its Figma description before syncing.` }); continue; }
-      if (known?.nodeHash && remote && nodeStateHash(snapshot.nodes[remote.id]) !== known.nodeHash) issues.push({ kind: "conflict", key, message: `${component.parsed.name}: the Figma component was edited.` });
+      if (known?.nodeHash && remote && snapshot.nodes[remote.id] && nodeStateHash(snapshot.nodes[remote.id]) !== known.nodeHash) issues.push({ kind: "conflict", key, message: `${component.parsed.name}: the Figma component was edited.` });
       if (known?.sourceHash && known.sourceHash !== component.sourceHash && known.specHash === specHash) {
         issues.push({ kind: "unsupported", key, component: component.parsed.codeKey, action: "prepare-component", message: `${component.parsed.name}: implementation changed without an updated Figma description. Review the description before syncing.` }); continue;
       }
       if (!known || known.status !== "synced" || known.specHash !== specHash || !remote || !known.sourceHash || issues.some(issue => issue.kind === "conflict" && issue.key === key)) entries.push({ kind: "component", key, name: component.parsed.name, action: remote ? "update" : "create" });
     }
-    for (const [key, known] of Object.entries(manifest.tokens)) if (!tokenKeys.has(key) && snapshot.variables.some(item => item.id === known.figmaVariableId)) issues.push({ kind: "removed", key, message: `${key}: removed or renamed in code. Retained in Figma; review and remove it explicitly in Figma or with the delete_variable MCP tool.` });
-    const codeKeys = new Set(parsed.map(item => item.codeKey));
-    for (const [key, known] of Object.entries(manifest.components)) if (!codeKeys.has(key) && snapshot.components.some(item => item.id === known.figmaNodeId)) issues.push({ kind: "removed", key, message: `${key}: removed or renamed in code. Retained in Figma; review and remove it explicitly in Figma.` });
+    if (!selected) {
+      for (const [key, known] of Object.entries(manifest.tokens)) if (!tokenKeysInPlan.has(key) && snapshot.variables.some(item => item.id === known.figmaVariableId)) issues.push({ kind: "removed", key, message: `${key}: removed or renamed in code. Retained in Figma; review and remove it explicitly in Figma or with the delete_variable MCP tool.` });
+      const codeKeys = new Set(parsed.map(item => item.codeKey));
+      for (const [key, known] of Object.entries(manifest.components)) if (!codeKeys.has(key) && snapshot.components.some(item => item.id === known.figmaNodeId)) issues.push({ kind: "removed", key, message: `${key}: removed or renamed in code. Retained in Figma; review and remove it explicitly in Figma.` });
+    }
     for (const [kind, styles] of [["text", tokens.plan.textStyles], ["effect", tokens.plan.effectStyles]] as const) for (const style of styles) {
       const key = `${kind}:${style.key}`;
+      if (styleKeys && !styleKeys.has(key)) continue;
       if (deprecated("token", typeof style.params.name === "string" ? style.params.name : style.key, style.key) || deprecated("token", style.key, key)) { issues.push({kind: "unsupported", key, message: `${style.key}: deprecated; retained without automatic writes.`}); continue; }
       const known = manifest.styles?.[key];
       const remote = snapshot.styles.find(item => item.kind === kind && ((style.params.codeKey && item.codeKey === style.params.codeKey) || item.name === style.params.name));
@@ -477,10 +514,119 @@ export class ProjectService {
     }
     for (const issue of issues) if (issue.kind === "conflict") issue.blocksApply = !byKey.has(issue.key) || relevant.has(issue.key);
     const view: SyncPlan = { id: randomUUID(), fileKey: loadConfig(this.configPath).figma.fileKey, entries, issues, expiresAt: new Date(Date.now() + 10 * 60_000).toISOString() };
-    const fingerprint = createHash("sha256").update(stableStringify({ connectionIdentity: {connectedAt: this.runtime.connection.status.connectedAt, authorizationId: this.runtime.connection.status.file?.authorizationId}, config: this.raw(), tokens: tokens.plan, source: [...new Set([config.tokensFile, ...(loadConfig(this.configPath).codebase.paths ?? [])])].map(path => readFileSync(path, "utf8")), components: components.map(component => ({ ...component, source: readFileSync(resolve(config.componentsDir, component.parsed.file), "utf8"), raw: existsSync(sidecarPathFor(config.componentsDir, component.parsed)) ? readFileSync(sidecarPathFor(config.componentsDir, component.parsed), "utf8") : null })), manifest, snapshot })).digest("hex");
+    const fingerprintTokens = selected ? this.scopedTokens(tokens.plan, tokenKeys!, styleKeys!) : tokens.plan;
+    const fingerprintComponents = selected ? components.filter(component => componentKeys!.has(component.parsed.codeKey)) : components;
+    const fingerprintManifest = selected ? this.scopedManifest(manifest, componentKeys!, tokenKeys!, styleKeys!) : manifest;
+    const fingerprintSnapshot = this.fingerprintSnapshot(snapshot, {selected: Boolean(selected), componentKeys, tokenKeys, styleKeys, components, manifest, tokens: tokens.plan});
+    const fingerprint = createHash("sha256").update(stableStringify({ connectionIdentity: {connectedAt: this.runtime.connection.status.connectedAt, authorizationId: this.runtime.connection.status.file?.authorizationId}, config: this.raw(), tokens: fingerprintTokens, source: selected ? [] : [...new Set([config.tokensFile, ...(loadConfig(this.configPath).codebase.paths ?? [])])].map(path => readFileSync(path, "utf8")), components: fingerprintComponents.map(component => ({ ...component, source: readFileSync(resolve(config.componentsDir, component.parsed.file), "utf8"), raw: existsSync(sidecarPathFor(config.componentsDir, component.parsed)) ? readFileSync(sidecarPathFor(config.componentsDir, component.parsed), "utf8") : null })), manifest: fingerprintManifest, snapshot: fingerprintSnapshot })).digest("hex");
     return { view, fingerprint, config, manifest, tokens: tokens.plan, components, snapshot };
   }
-  private selectPlan(plan: InternalPlan, selection: {kind: PlanEntry["kind"]; key: string}): void {
+  private scopeSelection(plan: InternalPlan, ids: Set<string>): {selected: Set<string>; issues: PlanIssue[]} {
+    const selected = new Set<string>(); const issues: PlanIssue[] = [];
+    for (const id of ids) {
+      const separator = id.indexOf(":");
+      const kind = id.slice(0, separator) as PlanEntry["kind"];
+      const key = id.slice(separator + 1);
+      try {
+        for (const item of this.collectSelection(plan, {kind, key})) selected.add(item);
+      } catch (error) {
+        issues.push({kind: "unsupported", key, message: (error as Error).message});
+      }
+    }
+    return {selected, issues};
+  }
+  private autoScope(config: BatchConfig, components: PlannedComponent[], tokens: TokensPlan, manifest: Manifest, paths: string[]): AutoScope | null {
+    const canonical = (path: string): string => {
+      const absolute = resolve(path);
+      if (existsSync(absolute)) return realpathSync(absolute);
+      try { return join(realpathSync(dirname(absolute)), basename(absolute)); } catch { return absolute; }
+    };
+    const configPath = canonical(this.configPath);
+    const componentsDir = canonical(config.componentsDir);
+    const drift = loadConfig(this.configPath);
+    const tokenSources = [...new Set([config.tokensFile, ...(drift.codebase.paths ?? []), this.resource(config.root, drift.codebase.path)].map(canonical))];
+    const generated = new Set(this.generatedPaths().map(canonical));
+    const within = (base: string, path: string): boolean => {
+      const rel = relative(resolve(base), resolve(path));
+      return rel === "" || (rel !== ".." && !rel.startsWith(`..${sep}`) && !isAbsolute(rel));
+    };
+    const ids = new Set<string>(); const removed: PlanIssue[] = [];
+    const existing = new Set(components.map(component => component.parsed.codeKey));
+    const fileFor = (key: string): string => {
+      const hash = key.lastIndexOf("#");
+      return hash === -1 ? key : key.slice(0, hash);
+    };
+    const withoutExtension = (file: string): string => file.slice(0, -extname(file).length);
+    let tokenChanged = false;
+    for (const raw of paths) {
+      const path = canonical(raw);
+      if (path === configPath) return null;
+      if (generated.has(path)) continue;
+      const rel = within(componentsDir, path) ? relative(componentsDir, path).split(sep).join("/") : "";
+      const sidecar = rel.endsWith(".figma.json");
+      const extension = extname(rel);
+      if (rel && (sidecar || COMPONENT_EXTENSIONS.includes(extension))) {
+        const sourcePath = sidecar ? rel.slice(0, -".figma.json".length) : rel;
+        const matches = (file: string): boolean => sidecar ? withoutExtension(file) === sourcePath : file === sourcePath;
+        for (const component of components) if (matches(component.parsed.file)) ids.add(`component:${component.parsed.codeKey}`);
+        for (const key of Object.keys(manifest.components)) {
+          if (!matches(fileFor(key)) || existing.has(key)) continue;
+          removed.push({kind: "removed", key, message: `${key}: removed or renamed in code. Retained in Figma; review and remove it explicitly in Figma.`});
+        }
+        continue;
+      }
+      if (tokenSources.some(tokenSource => within(tokenSource, path))) { tokenChanged = true; continue; }
+    }
+    if (tokenChanged) {
+      const sections = [tokens.primitives, ...(tokens.semanticCollections ?? [tokens.semantic])];
+      const variables = sections.flatMap(section => section.variables);
+      const planned = new Set(variables.map(variable => variable.codeKey));
+      for (const variable of variables) {
+        const known = manifest.tokens[variable.codeKey];
+        if (!known || known.valueHash !== hashSpec(variable)) ids.add(`token:${variable.codeKey}`);
+      }
+      for (const [key, known] of Object.entries(manifest.tokens)) if (!planned.has(key) && known.figmaVariableId) removed.push({kind: "removed", key, message: `${key}: removed or renamed in code. Retained in Figma; review and remove it explicitly in Figma or with the delete_variable MCP tool.`});
+      for (const [kind, styles] of [["text", tokens.textStyles], ["effect", tokens.effectStyles]] as const) for (const style of styles) {
+        const key = `${kind}:${style.key}`; const known = manifest.styles?.[key];
+        if (!known || known.valueHash !== hashSpec(style.params)) ids.add(`style:${key}`);
+      }
+    }
+    return {ids, removed};
+  }
+  private scopedTokens(plan: TokensPlan, tokenKeys: Set<string>, styleKeys: Set<string>): TokensPlan {
+    const variables = (items: TokensPlan["primitives"]["variables"]) => items.filter(item => tokenKeys.has(item.codeKey));
+    return {
+      primitives: {...plan.primitives, variables: variables(plan.primitives.variables)},
+      semantic: {...plan.semantic, variables: variables(plan.semantic.variables)},
+      ...(plan.semanticCollections ? {semanticCollections: plan.semanticCollections.map(section => ({...section, variables: variables(section.variables)}))} : {}),
+      textStyles: plan.textStyles.filter(style => styleKeys.has(`text:${style.key}`)),
+      effectStyles: plan.effectStyles.filter(style => styleKeys.has(`effect:${style.key}`)),
+    };
+  }
+  private scopedManifest(manifest: Manifest, componentKeys: Set<string>, tokenKeys: Set<string>, styleKeys: Set<string>): Manifest {
+    const pick = <T>(record: Record<string, T> | undefined, keys: Set<string>): Record<string, T> => Object.fromEntries(Object.entries(record ?? {}).filter(([key]) => keys.has(key))) as Record<string, T>;
+    return {version: manifest.version, components: pick(manifest.components, componentKeys), tokens: pick(manifest.tokens, tokenKeys), ...(manifest.styles ? {styles: pick(manifest.styles, styleKeys)} : {})};
+  }
+  private fingerprintSnapshot(snapshot: Snapshot, scope: {selected: boolean; componentKeys: Set<string> | null; tokenKeys: Set<string> | null; styleKeys: Set<string> | null; components: PlannedComponent[]; manifest: Manifest; tokens: TokensPlan}): Snapshot {
+    const managedIds = new Set(Object.entries(scope.manifest.components)
+      .filter(([key]) => !scope.componentKeys || scope.componentKeys.has(key))
+      .map(([, entry]) => entry.figmaNodeId)
+      .filter((id): id is string => Boolean(id)));
+    const scopedComponents = scope.selected ? scope.components.filter(component => scope.componentKeys!.has(component.parsed.codeKey)) : scope.components;
+    const componentKeys = new Set(scopedComponents.map(component => component.parsed.codeKey));
+    const componentNames = new Set(scopedComponents.map(component => component.parsed.name));
+    const components = snapshot.components.filter(ref => managedIds.has(ref.id) || (ref.codeKey && componentKeys.has(ref.codeKey)) || componentNames.has(ref.name));
+    const componentIds = new Set(components.map(ref => String(ref.id)));
+    const nodes = Object.fromEntries(Object.entries(snapshot.nodes).filter(([id]) => componentIds.has(id)));
+    if (!scope.selected) return {...snapshot, components, nodes};
+    const variables = [scope.tokens.primitives, ...(scope.tokens.semanticCollections ?? [scope.tokens.semantic])].flatMap(section => section.variables).filter(item => scope.tokenKeys!.has(item.codeKey));
+    const variableNames = new Set(variables.map(item => item.name));
+    const selectedVariables = snapshot.variables.filter(item => (item.codeKey && scope.tokenKeys!.has(item.codeKey)) || variableNames.has(item.name) || [...variableNames].some(name => `${item.collectionName}/${item.name}` === name));
+    const styles = [...scope.tokens.textStyles.map(style => ({kind: "text" as const, ...style})), ...scope.tokens.effectStyles.map(style => ({kind: "effect" as const, ...style}))].filter(style => scope.styleKeys!.has(`${style.kind}:${style.key}`));
+    const selectedStyles = snapshot.styles.filter(item => styles.some(style => item.kind === style.kind && ((style.params.codeKey && item.codeKey === style.params.codeKey) || item.name === style.params.name)));
+    return {...snapshot, variables: selectedVariables, components, nodes, styles: selectedStyles};
+  }
+  private collectSelection(plan: InternalPlan, selection: {kind: PlanEntry["kind"]; key: string}): Set<string> {
     if (!['token','component','style'].includes(selection.kind) || typeof selection.key !== 'string' || !selection.key) throw new Error('Select one supported resource.');
     const selected = new Set<string>();
     const include = (kind: PlanEntry['kind'], key: string): void => {
@@ -525,6 +671,10 @@ export class ProjectService {
       }
     };
     include(selection.kind, selection.key);
+    return selected;
+  }
+  private selectPlan(plan: InternalPlan, selection: {kind: PlanEntry["kind"]; key: string}): void {
+    const selected = this.collectSelection(plan, selection);
     plan.selection = {...selection}; plan.view.selection={...selection};
     plan.view.entries = plan.view.entries.filter(entry => selected.has(`${entry.kind}:${entry.key}`));
     plan.view.issues = plan.view.issues.filter(issue => [...selected].some(id => id.slice(id.indexOf(':') + 1) === issue.key));
@@ -567,7 +717,8 @@ export class ProjectService {
       const outcome = await processComponent(component, outcomes, { client, manifest: plan.manifest, force: true, dryRun: false, log: () => {} });
       outcomes.set(component.parsed.codeKey, outcome); saveManifest(plan.config.manifestFile, plan.manifest);
     }
-    const after = await this.snapshot(client, plan.components, styleKeys.size > 0, plan.snapshot.components.length > 0 || plan.components.length > 0);
+    const writtenNodeIds = new Set([...componentKeys].map(key => plan.manifest.components[key]?.figmaNodeId).filter((id): id is string => Boolean(id)));
+    const after = await this.snapshot(client, {scanComponents: componentKeys.size > 0, readNodeIds: writtenNodeIds, matchComponents: plan.components.filter(component => componentKeys.has(component.parsed.codeKey)), scanStyles: styleKeys.size > 0});
     for (const key of variableKeys) {
       const remote = after.variables.find(item => item.codeKey === key || item.id === plan.manifest.tokens[key]?.figmaVariableId);
       const expected = [plan.tokens.primitives, ...(plan.tokens.semanticCollections ?? [plan.tokens.semantic])].flatMap(section => section.variables).find(variable => variable.codeKey === key);

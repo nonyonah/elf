@@ -40,6 +40,11 @@ export async function diffComponents(
     figmaComponents.map((component) => component.codeKey).filter((key): key is string => Boolean(key)),
   );
   const parsedKeys = new Set(parsed.map((component) => component.codeKey));
+  const managedByNode = new Map(
+    Object.entries(manifest.components)
+      .filter(([, entry]) => Boolean(entry.figmaNodeId))
+      .map(([codeKey, entry]) => [entry.figmaNodeId!, codeKey] as const),
+  );
 
   const outOfDate: ComponentIssue[] = [];
   const changedInFigma: ComponentIssue[] = [];
@@ -102,12 +107,15 @@ export async function diffComponents(
 
   const inFigmaNotInCode: ComponentIssue[] = [];
   for (const figma of figmaComponents) {
-    if (!figma.codeKey || parsedKeys.has(figma.codeKey)) continue;
+    const managedCodeKey = managedByNode.get(figma.id);
+    if (!managedCodeKey) continue;
+    const codeKey = figma.codeKey ?? managedCodeKey;
+    if (parsedKeys.has(codeKey) || parsedKeys.has(managedCodeKey)) continue;
     inFigmaNotInCode.push({
       name: figma.name,
-      codeKey: figma.codeKey,
+      codeKey,
       nodeId: figma.id,
-      detail: "has an elf codeKey but no matching component file in code",
+      detail: "managed in the project manifest but has no matching component file in code",
     });
   }
 
