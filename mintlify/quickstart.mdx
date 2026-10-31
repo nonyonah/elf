@@ -1,0 +1,30 @@
+---
+title: "Quickstart"
+description: "Start with your project and one Figma file."
+---
+
+## Requirements
+
+Use Node.js 22 and npm, a local project directory, and Figma Desktop. Import Elf Bridge’s development manifest in **Figma Desktop**, then run it in the file you want to connect. Follow [Connect Figma](/pairing). The Community plugin is not currently approved.
+
+## Choose your workflow
+
+For a native sidebar in **VS Code** or compatible editors such as **Cursor**, follow [editor installation](/vscode). For a terminal workflow, continue below. Both need Elf Bridge running in Figma Desktop.
+
+## Start Elf
+
+From your project directory:
+
+```sh
+npx elf-tokens@beta start
+```
+
+Complete onboarding: select the project and Figma file, then open Elf Bridge in that file. Paste the pairing code printed by Elf into the plugin. Pairing codes are single-use and expire; saved pairing credentials let the plugin reconnect later.
+
+Follow the document-approval prompt. Strict verification uses your connected Figma account; plugin-only mode requires explicit approval of the current connection.
+
+Start with a check. Review proposed changes before enabling automatic sync. Leave Elf running and Elf Bridge open.
+
+The beta command requires the npm beta to have been published. If npm cannot find it, the release is not available yet.
+
+Continue with [pairing](/pairing), [drift checks](/drift), or [VS Code](/vscode).

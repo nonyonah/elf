@@ -1,11 +1,52 @@
 # Production readiness
 
-## Release gate update — 29 October 2026
+## Release scope — 30 October 2026
 
-Hosted MCP plus Elf Bridge now has a disabled local preview. Complete its
-[deployment and desktop/web acceptance](hosted-mcp-deployment.md) before enabling
-the public connector. This adds a new OAuth and tenant-isolation release gate;
-it does not replace the existing installation and distribution checks below.
+The first release uses **local MCP + Elf Bridge**, installed through the npm
+package. No IDE or VS Code extension is required for MCP. The extension remains
+an optional interface for project drift/sync workflows. The Figma plugin must
+stay open to execute reads and writes.
+
+Hosted MCP, remote connector OAuth, ngrok and hosted accountless authorization
+are deferred and are **not release dependencies**. Keep `HOSTED_MCP_ENABLED=false`.
+Unfinished hosted MCP authorization work is not accepted or production-ready;
+do not deploy it or package its preview as a public feature. Existing server-side
+Figma/Slack OAuth callbacks are a separate service and remain necessary for those
+optional account integrations; deferring hosted MCP does not remove them.
+
+The [30 October local acceptance record](acceptance-2026-10-30.md) records a
+successful clean tarball installation, real stdio protocol smoke test and all
+111 MCP tests. Real assistant/Figma pairing and writes remain live gates.
+
+The continuation also passed live token drift, intentional-difference expiry,
+deprecation lifecycle, two approved Slack deliveries with unchanged suppression,
+saved-pairing bridge recovery, individual component updates, stale-plan rejection
+and real watcher-driven component updates/restoration. See the acceptance record
+for observed results and limits. Before beta, resolve unrelated Figma-only
+component noise (213 baseline items in the isolated fixture) and slow full-page
+review scans (roughly 23–59 seconds in this test). These are open release issues;
+do not treat the current whole-file drift verdict as clean.
+
+### Next acceptance order
+
+1. Build a candidate npm tarball and install it into an empty project outside
+   this checkout. Configure a desktop assistant using the installed launcher,
+   without global `tsx`, a VSIX, or repository dependencies.
+2. Pair Elf Bridge, authorize the exact file, then read resources. Repeat after
+   restarting the assistant and plugin. Reject wrong-file and revoked access.
+3. Provide a small Markdown design system: review extraction, variables,
+   collections, component states and documentation; apply approved changes and
+   read them back. Repeat against an existing file and verify stable master IDs.
+4. Run project drift/sync acceptance through npm and extension: one token change,
+   one component change, intentional divergence, deprecation expiry, Slack
+   deduplication, stale review and interrupted-write recovery.
+5. Run final security/dependency/package audits and release suites. Finish Figma
+   plugin distribution, external-user OAuth availability, extension publisher,
+   privacy/support documentation and versioned installation guidance.
+
+Record actual live results separately from mocks. Then publish a reviewed beta;
+production readiness depends on these results, not feature count. Web assistants
+that require a public MCP URL are outside this local release scope.
 
 The local preview now includes prose Figma documentation separately from visual
 specifications, reviewed individual sync, independent automatic-sync filtering,

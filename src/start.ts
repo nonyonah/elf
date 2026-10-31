@@ -59,6 +59,7 @@ export async function main(argv: string[]): Promise<number> {
   let polling: NodeJS.Timeout | undefined;
   let checking: Promise<void> | null = null;
   let rerun = false;
+  const changedPaths = new Set<string>();
   let lastCheck: Record<string, unknown> | null = null;
   let lastError: string | null = null;
   let handle: Awaited<ReturnType<typeof createSettingsServer>> | null = null;
@@ -78,6 +79,8 @@ export async function main(argv: string[]): Promise<number> {
     checking = (async () => {
       do {
         rerun = false;
+        const changed = changedPaths.size ? [...changedPaths] : undefined;
+        changedPaths.clear();
         const config = loadConfig(configPath);
         const file = runtime.connection.status.file;
         if (runtime.connection.status.pendingApproval) {
@@ -97,7 +100,7 @@ export async function main(argv: string[]): Promise<number> {
         const notify = Boolean(config.notify && resolveNotifyWebhook(config.notify, configPath));
         if (project.automatic()) {
           try {
-            const sync = await project.autoSync();
+            const sync = await project.autoSync(changed);
             if (sync.paused && notify) {
               const alert = createHash("sha256").update(JSON.stringify(sync.conflicts)).digest("hex");
               await alerts.update(alert, () => postNotification(resolveNotifyWebhook(config.notify, configPath)!.url, config.notify!.format, { text: "Elf is watching for changes. Some resources and their dependents need review and were skipped; safe independent changes continue syncing. Open Elf to review pending items." }));
@@ -233,6 +236,7 @@ export async function main(argv: string[]): Promise<number> {
         watcher = watch([...paths, configPath], { ignoreInitial: true, followSymlinks: false, ignored: /(^|[/\\])(node_modules|\.git|dist|build|\.next|\.elf)([/\\]|$)|\.tmp$/, awaitWriteFinish: { stabilityThreshold: 150, pollInterval: 50 } });
         watcher.on("all", (_event, path) => {
           if (generated.has(resolve(path)) && resolve(path) !== resolve(configPath)) return;
+          changedPaths.add(resolve(path));
           if (resolve(path) === resolve(configPath)) {
             try { watcher?.add(project.watchPaths()); }
             catch (error) { lastError = (error as Error).message; }

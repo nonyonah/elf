@@ -1,0 +1,39 @@
+---
+title: "VS Code, Cursor, and other editors"
+description: "Install Elf in VS Code or a compatible VS Code-based editor."
+---
+
+The extension provides **Overview**, **Changes**, and **Activity**. Use **Manage** for connections, pairing, notification preferences, automatic sync, and coding-assistant setup.
+
+Install [Elf from the Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=NonsoOnah.elf-design-system). Choose the pre-release version for the current beta. The extension ID is **NonsoOnah.elf-design-system**.
+
+Alternatively, install from your terminal:
+
+```sh
+code --install-extension NonsoOnah.elf-design-system --pre-release
+```
+
+Reload VS Code, open a trusted local project, then select the Elf activity-bar icon and Start. For a maintainer-provided VSIX, use **Extensions → … → Install from VSIX**.
+
+## Cursor and other compatible editors
+
+Elf is built against the VS Code extension API. You can use its VSIX in compatible VS Code-based desktop editors such as Cursor. Other editors, including Windsurf or VSCodium, depend on their extension API version and local extension policies. This is not a claim that every editor has been tested.
+
+For Cursor:
+
+1. Obtain the official Elf `.vsix` from the maintainer or official release distribution.
+2. Open Cursor’s **Extensions** view and choose **… → Install from VSIX** (or search for **Extensions: Install from VSIX** in the Command Palette).
+3. Select the Elf VSIX, reload the editor if requested, and open a trusted local project.
+4. Open the Elf activity-bar view and choose **Start**.
+
+Cursor uses a different extension registry from Microsoft’s Marketplace, so the Microsoft listing does not guarantee Elf appears in Cursor’s search. Use the official VSIX when it is not listed; do not assume a matching name in another registry is the same publisher. See [Cursor’s extension documentation](https://prod.cursor.com/help/customization/extensions).
+
+The current extension declares VS Code API compatibility with version 1.95 or later. Compatible editors must expose the APIs it uses. Monitoring and reviewed sync share the same runtime; AI-generated descriptions additionally depend on editor language-model support and may differ or be unavailable.
+
+## Connect your Figma file
+
+Install Elf Bridge using its [development manifest in Figma Desktop](/pairing). This setup requires the desktop app; it is not a Community installation.
+
+The extension bundles the shared Elf runtime. npm remains supported; you do not need to clone the repository to use a published build. Figma and Slack authorization can open a browser.
+
+Select an individual drift to inspect that resource. Use component review actions to prepare descriptions and review supported sync changes. AI descriptions depend on a compatible editor language model being available. Review generated content before applying it.

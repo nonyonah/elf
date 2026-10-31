@@ -7,6 +7,29 @@ import { test } from "node:test";
 import { findConfigPath } from "../src/config.js";
 import { loadDotEnvFile } from "../src/env.js";
 import { createSettingsServer } from "../src/settings.js";
+import { Bridge } from '../mcp/src/bridge.js';
+import { BridgeClient } from '../mcp/src/client.js';
+
+test('Settings reads actual initialized MCP presence without counting itself',async()=>{
+  const oldToken=process.env.ELF_MCP_TOKEN,oldPort=process.env.ELF_MCP_PORT;
+  const bridge=new Bridge({token:'settings-mcp-status-test-token',port:0});
+  const port=await bridge.start();
+  process.env.ELF_MCP_TOKEN='settings-mcp-status-test-token';process.env.ELF_MCP_PORT=String(port);
+  const workspace=createWorkspace();
+  const settings=await createSettingsServer(workspace.configPath,{distPath:workspace.dist,port:0});
+  const mcp=await BridgeClient.connect({token:process.env.ELF_MCP_TOKEN,port});
+  try{
+    assert.deepEqual(await (await settings.fetch('/api/mcp-status')).json(),{connected:false,count:0,available:true});
+    await mcp.call('__elf_mcp_presence',{connected:true});
+    assert.deepEqual(await (await settings.fetch('/api/mcp-status')).json(),{connected:true,count:1,available:true});
+    await mcp.close();
+    assert.deepEqual(await (await settings.fetch('/api/mcp-status')).json(),{connected:false,count:0,available:true});
+  }finally{
+    await mcp.close();await settings.close();await bridge.stop();rmSync(workspace.dir,{recursive:true,force:true});
+    if(oldToken===undefined)delete process.env.ELF_MCP_TOKEN;else process.env.ELF_MCP_TOKEN=oldToken;
+    if(oldPort===undefined)delete process.env.ELF_MCP_PORT;else process.env.ELF_MCP_PORT=oldPort;
+  }
+});
 
 const SLACK_WEBHOOK_URL = [
   "https://hooks.slack.com",

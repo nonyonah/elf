@@ -1,0 +1,48 @@
+---
+title: "Connect Figma"
+description: "Pair the open document with your local Elf runtime."
+---
+
+## Install in Figma Desktop
+
+**Figma Desktop is required for this development-plugin setup.** Use the desktop app, not Figma in a browser.
+
+Elf Bridge is currently installed from a development manifest. It is not approved or available through Figma Community; clarification of the review requirements is pending. Development installation does not imply Figma approval.
+
+### Locate the plugin files
+
+From your local project directory, install the beta package when available:
+
+```sh
+npm install --save-dev elf-tokens@beta
+node -p "require.resolve('elf-tokens/package.json')"
+```
+
+The second command prints the installed package’s `package.json` path. Open its containing folder, then find:
+
+```text
+dist/bridge-plugin-public/manifest.json
+```
+
+If you received a plugin folder directly from the maintainer, extract the whole folder and use its `manifest.json`. Keep `manifest.json`, `code.js`, and `ui.html` together. A manifest file alone is not the plugin.
+
+### Import and run
+
+1. Open the intended file in **Figma Desktop**.
+2. Choose **Plugins → Development → Import plugin from manifest**.
+3. Select the public bundle’s **manifest.json**. Do not select the source `manifest.public.json`.
+4. Run **Elf Bridge** from **Plugins → Development**.
+
+Keep the plugin folder on your machine. Reopen Elf Bridge from the Development menu on later visits. After a plugin update, close and reopen it; re-import the manifest if its location changed.
+
+## Pair and approve
+
+Run `npx elf-tokens@beta start`, open the intended Figma file, and open Elf Bridge. Enter the current terminal pairing code. If it expires, request a new code in Elf and use it once.
+
+The Figma file key must match the configured target. The file name may be anything, including Untitled. For a new design system, choose a blank file explicitly; for an existing system, inspect before proposing edits.
+
+Connecting the bridge and approving a document are separate steps. Strict verification checks account access. Plugin-only approval trusts the currently open plugin document without independent REST verification. Reconnection can require fresh approval even when pairing is saved.
+
+## Keep it connected
+
+The plugin must remain open to execute operations. Saved pairing does not make a closed Figma plugin run in the background. The MCP status row indicates initialized coding-assistant sessions; it does not authorize writes.

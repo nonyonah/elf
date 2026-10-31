@@ -2,8 +2,8 @@
   "name": "elf-design-system",
   "displayName": "Elf",
   "description": "Connect your project and Figma, monitor design drift, and review sync changes.",
-  "version": "0.3.24",
-  "publisher": "elf-local",
+  "version": "0.3.25",
+  "publisher": "NonsoOnah",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -370,5 +370,6 @@
     "prepare-runtime": "node scripts/prepare-runtime.mjs",
     "vscode:prepublish": "npm run prepare-runtime && npm test"
   },
-  "icon": "media/elf-mascot.png"
+  "icon": "media/elf-mascot.png",
+  "homepage": "https://elf-docs.riftlabs.xyz"
 }

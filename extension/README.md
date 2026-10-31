@@ -1,97 +1,70 @@
-# Elf editor extension (development preview)
+# Elf — design-system drift and sync
 
-This version runs the existing Elf engine from VS Code and presents it in the
-native **Elf** activity-bar view. It does not load the Settings page in a
-webview. Daily work is separated into **Overview**, **Changes**, and **Activity**.
-Use the gear in Overview for **Manage**: account connections, pairing, Slack,
-notification preferences, automatic sync, and MCP setup.
+Keep your project and Figma design system connected from a native editor sidebar. Elf helps you inspect drift, review supported changes, and monitor your design system while you work.
 
-AI-generated descriptions are available as a development preview through editor
-language models. Slack/Figma authorization opens
-your browser; return to VS Code and the native view refreshes connection status.
+## Beta requirements
 
-For plugin-only use without REST verification, select **Approve open document in
-Elf (no REST)** in the plugin, then **Manage → Approve open Figma document** in
-Elf. Each connection requires fresh confirmation; saved pairing is retained.
-Strict mode remains optional and existing strict projects are not downgraded.
-See [document authorization](https://github.com/nonyonah/elf/blob/main/docs/document-authorization.md) for the security
-model, upgrade steps, and draft recovery after an editor reload.
+- VS Code 1.95 or later and a trusted local workspace.
+- Node.js 22 available to the extension runtime.
+- Figma Desktop with Elf Bridge open in the intended file.
 
-To use a prepared local `.vsix` in your current workspace, open the Extensions
-view, choose **… → Install from VSIX…**, and select the Elf package. Then open
-the Elf icon in the activity bar. No development window is needed. This local
-preview is not a Marketplace publication.
+macOS with Node 22 has local acceptance evidence. Windows/Linux support remains unverified. This extension is a beta; review changes before applying them.
 
-Build Settings and the public bridge plugin from the repository root, then run
-`npm --prefix extension run prepare-runtime`. This bundles the local package and
-its dependencies; users will not install a runtime from their project. Do not
-distribute a build without first running the core tests and package audit.
+## Get started
 
-Launch an Extension Development Host with VS Code's `--extensionDevelopmentPath`
-pointing to this directory, or open this `extension` folder in VS Code and press
-F5 using the included launch configuration. Open a trusted local project folder
-in the new window and use the Elf activity-bar view:
+1. Install [Elf from the Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=NonsoOnah.elf-design-system) and choose the pre-release version. The extension ID is **NonsoOnah.elf-design-system**. You can also install a maintainer-provided VSIX with **Extensions → … → Install from VSIX**.
+2. Open your project and select the Elf activity-bar icon.
+3. Choose **Start** and complete project setup.
+4. In **Figma Desktop**, import Elf Bridge’s development `manifest.json` using **Plugins → Development → Import plugin from manifest**. See [plugin installation](https://elf-docs.riftlabs.xyz/pairing).
+5. Run Elf Bridge, paste the pairing code, and approve the intended document connection.
+6. Run a check and inspect the changes before enabling automatic sync.
 
-- **Start** to start the bundled monitor without a terminal.
-- **Overview** shows the selected project, monitoring state, paired file, and
-  drift summary. Use its title actions to check or refresh.
-  Expand a drift category to inspect individual resources; an item opens only
-  its own values. Category summaries, reports, and activity details use read-only
-  native documents and do not need saving.
-- **Changes** reviews planned writes and issues, applies the reviewed plan, and
-  lists synced resources. The apply/cancel title actions appear during review.
-- **Activity** contains recent results and before/after changes. Its title action
-  marks notifications as read or clears them. New results also appear as native
-  VS Code notifications; repeated identical checks are suppressed.
-  Checks compare resource fingerprints, so different drift can still notify
-  when the total count is unchanged.
-- **Manage** (the Overview gear) connects/disconnects Slack and Figma, generates
-  pairing codes, changes alert preferences, enables reviewed automatic sync, and
-  opens coding-assistant setup. Advanced description actions also live here.
-  Choose **Generate component description with AI** to select a discovered
-  component, inspect the exact source/token context, choose an available editor
-  model, and consent before sharing it. Elf opens a validated editable draft and
-  separate assumptions/unsupported-detail notes. Generation does not save a
-  project description or write to Figma. Manual preparation remains available.
-  If no model is available, configure an editor model provider or use MCP/manual
-  review; Elf does not install providers or ask for API keys itself.
-- **Elf: View Drift Report** opens Markdown as a native text document. Component
-  descriptions use an editable native diff; reviewed saves still use the engine's
-  validation and stale-review protection.
-- **Stop** to stop this extension's monitor. Shared bridge connections may
-  continue serving other clients.
+Keep Elf Bridge open: saved pairing does not make a closed Figma plugin run in the background.
 
-One project runs per editor window. Start is explicit; editor reload stops the
-owned runtime. A missing runtime produces an error, never a fallback to project
-scripts or an automatic network install. Secrets and runtime output are not
-written to editor logs. Private Settings links and pairing codes stay in memory.
-The extension authenticates through a fresh single-use link over the private
-process channel. Session credentials stay in the extension host. OAuth addresses
-must come from the local connection service before being opened externally.
-The Figma plugin must remain running for live Figma operations.
+## Cursor and compatible editors
 
-Description drafts offer project token completion inside JSON string values.
-Use **Elf: Description Source and Token Context** to inspect source, variants,
-tokens, and AI review notes. Saving still requires explicit review and rejects
-stale source, unknown references, invalid schemas, and mismatched projects.
-Figma-to-code token and component imports remain upcoming work.
-Verification respects Figma rate limits. Reconnecting an account does not bypass
-those limits. Older shared bridges without renewal support must be stopped
-after their clients close; saved pairings survive the replacement.
+In Cursor or another compatible VS Code-based desktop editor, install the official Elf VSIX with **Extensions → … → Install from VSIX**, reload if prompted, then open Elf in a trusted local project. The Microsoft Marketplace listing does not mean Elf is available in every editor’s registry. Verify the publisher when using another registry.
 
-### Component sync and token imports
+The editor must support the VS Code APIs required by this extension (declared minimum 1.95). AI features additionally require compatible editor language-model APIs. Cursor and other forks have not received the same live acceptance testing as VS Code; report compatibility issues with your editor/version. See [editor setup](https://elf-docs.riftlabs.xyz/vscode).
 
-Use **Save and Review Component Sync** on a description diff or its row in Changes.
-**Project components** suggests descriptions where needed and offers individual
-reviews. Planned resources can also be reviewed individually. Required dependencies
-are listed before applying. **Manage → Import Figma tokens** previews a new JSON
-file with modes and alias source data; it never overwrites existing code.
-See the [workflow and limitations](https://github.com/nonyonah/elf/blob/main/docs/component-sync-and-imports.md).
+## What you can do
 
-### Component code import preview
+- **Overview:** inspect project, bridge, and monitoring status.
+- **Changes:** inspect individual token/component drift and review supported sync changes.
+- **Activity:** see recent checks and sync outcomes.
+- **Manage:** connect/disconnect Figma and Slack, configure notifications, pair the plugin, and manage automatic sync.
+- Prepare AI-generated component descriptions using a compatible editor language model, then review and save them. Model availability and provider policies apply.
+- Review supported imports from Figma and choose component implementation targets. Generated code requires review.
 
-**Manage → Import Figma component** confirms React TSX, a supported declared library
-or native elements, selected local reuse, and a new destination. AI/manual drafts
-open in a diff; **Create Reviewed Component** applies only reviewed code. It does
-not install dependencies or adopt a managed Figma baseline. React is the first
-output adapter. See the [component import and plugin export guide](https://github.com/nonyonah/elf/blob/main/docs/component-sync-and-imports.md).
+Elf tracks project-managed components so unrelated Figma components do not create drift noise. Conflicts, missing descriptions, unresolved token bindings, and deprecations may require review; automatic sync does not bypass them.
+
+## npm and coding assistants
+
+The extension bundles the shared runtime. You can also use the npm beta independently:
+
+```sh
+npx elf-tokens@beta start
+```
+
+Local MCP connects supported desktop coding assistants to the paired file. Markdown-to-Figma design-system creation is an MCP workflow. There is no hosted MCP URL in this beta.
+
+## Permissions and data
+
+Elf reads design-system sources in the selected project and maintains local configuration, manifests, reports, and drafts. The plugin performs requested operations in the approved Figma document. Strict account verification uses the hosted Figma OAuth connection service; plugin-only approval requires explicit trust of the current document. Slack notifications send notification content to Slack. AI context is handled by your selected editor/assistant provider.
+
+Do not share pairing credentials, Settings session links, webhook URLs, or private design files in public issues.
+
+## Documentation and support
+
+- [Documentation](https://elf-docs.riftlabs.xyz)
+- [Report a bug](https://github.com/nonyonah/elf/issues) — include versions and redacted errors.
+- [Security and document authorization](https://github.com/nonyonah/elf/blob/beta/local-rc/docs/document-authorization.md)
+- [Help support this project](https://checkout.bachs.io/pay/pl_02b9f8010642)
+
+## Development
+
+Build the root package assets before packaging the extension. `npm --prefix extension run prepare-runtime` bundles the checkout runtime; `vscode:prepublish` also runs extension tests. The development host and local VSIX flow do not imply a Marketplace publication.
+
+## License
+
+MIT. See [LICENSE](LICENSE).

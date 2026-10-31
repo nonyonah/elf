@@ -1,0 +1,27 @@
+---
+title: "Local MCP"
+description: "Connect a coding assistant without hosting a server."
+---
+
+Use a desktop client with local stdio MCP support. Elf has no hosted connector URL in this beta.
+
+Settings → Coding assistants provides configuration for the current installation. A generic configuration is:
+
+```json
+{
+  "mcpServers": {
+    "elf": {
+      "command": "npx",
+      "args": ["-y", "elf-tokens@beta", "mcp", "--project", "/absolute/path/to/project"]
+    }
+  }
+}
+```
+
+Replace the project path. On Windows use an absolute Windows path escaped for JSON and your client’s documented npx-launch method. Beta Windows support remains unverified.
+
+Restart the assistant’s MCP connection after changing configuration. Ask for `figma_onboarding_status`, select the intended file URL, pair Elf Bridge, and complete document authorization before inspecting or editing.
+
+The plugin shows MCP session status. Review concrete changes before asking the assistant to apply them. npm can be used without an IDE; the plugin still needs to stay open in Figma.
+
+For reproducible installations, replace `@beta` with the exact reviewed package version.
