@@ -10,7 +10,7 @@ if(!input)throw new Error('Usage: node scripts/prepare-hosted-preview.mjs https:
 const url=new URL(input);
 if(url.protocol!=='https:'||url.username||url.password||url.port||url.search||url.hash||url.pathname!=='/'||
    !/^[a-z0-9-]+\.ngrok-free\.app$/.test(url.hostname))throw new Error('Supply the exact HTTPS ngrok-free.app origin, without a path or credentials.');
-const origin=url.origin,production='https://elf-console.nonyonah.workers.dev';
+const origin=url.origin,production='https://elf.riftlabs.xyz';
 const directory=join(root,'.elf','hosted-preview'),plugin=join(root,'dist','bridge-plugin-hosted-preview');
 if(!existsSync(join(root,'console','dist','client','index.html')))throw new Error('Build the Console client first: npm --prefix console run build');
 mkdirSync(directory,{recursive:true,mode:0o700});chmodSync(directory,0o700);
@@ -40,7 +40,7 @@ code=code.replace('const PUBLIC_FILE_LINK_REQUIRED = false;','const PUBLIC_FILE_
 writeFileSync(join(plugin,'code.js'),code);
 const ui=readFileSync(join(root,'bridge-plugin','ui.html'),'utf8');
 if(!ui.includes(`const HOSTED_ORIGIN = '${production}'`))throw new Error('Hosted UI origin marker missing');
-writeFileSync(join(plugin,'ui.html'),ui.replaceAll(production,origin).replace('<option value="local">Local Elf · editor or npm</option>', '<option value="local">Local Elf · editor or npm</option><option value="hosted">Hosted Elf · development preview</option>'));
+writeFileSync(join(plugin,'ui.html'),ui.replaceAll(production,origin).replace('<option value="hosted">Hosted Elf · web assistants</option>', '<option value="hosted">Hosted Elf · development preview</option>'));
 copyFileSync(join(root,'assets','brand','elf-mascot.png'),join(plugin,'plugin-icon.png'));
 writeFileSync(join(directory,'preview.json'),JSON.stringify({origin,mcpUrl:origin+'/mcp',plugin:join(plugin,'manifest.json'),config:join(directory,'wrangler.json')},null,2)+'\n',{mode:0o600});
 console.log('Prepared isolated hosted preview.');

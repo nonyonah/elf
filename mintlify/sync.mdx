@@ -1,0 +1,16 @@
+---
+title: "Review and sync"
+description: "Create or update supported tokens and components."
+---
+
+Review a full sync or select an individual resource. Elf includes required dependencies in an individual review, checks the target connection, and revalidates the reviewed resources before applying.
+
+Components need a valid visual description for layout, styling, bindings, and variants. Usage prose belongs in the component Description field; it is different from the structured visual description.
+
+If a description references an unknown token, save the description and resolve the binding before visual sync. Saving a description does not authorize an unsafe or unresolved write.
+
+When an editor language model is available, use Elf’s contextual description actions to generate a draft. Review the source context and proposed result, save it, and review its sync.
+
+Automatic sync applies supported independent changes after you enable it. Conflicts, deprecated resources, unsupported descriptions, or stale data can still need review. Elf does not silently overwrite a conflicting Figma edit.
+
+A stale review must be regenerated. Inspect the current document after a partial failure before retrying.

@@ -7,12 +7,16 @@ package. No IDE or VS Code extension is required for MCP. The extension remains
 an optional interface for project drift/sync workflows. The Figma plugin must
 stay open to execute reads and writes.
 
-Hosted MCP, remote connector OAuth, ngrok and hosted accountless authorization
-are deferred and are **not release dependencies**. Keep `HOSTED_MCP_ENABLED=false`.
-The unfinished hosted authorization branch is not accepted or production-ready;
-do not deploy it or package its preview as a public feature. Existing server-side
-Figma/Slack OAuth callbacks are a separate service and remain necessary for those
-optional account integrations; deferring hosted MCP does not remove them.
+Hosted MCP is a separate preview and is **not a local release dependency**.
+As of 31 October, the dedicated `elf-mcp` Worker serves
+`https://elf.riftlabs.xyz/mcp`; its tested setup is documented in
+[hosted connector](hosted-connector.md). It uses assistant OAuth and separate
+per-file plugin approvals, without Figma account OAuth. Protocol acceptance used
+simulated plugins; real-client acceptance remains a separate gate. Keep the
+existing Console deployment's hosted feature disabled unless testing it
+intentionally; the dedicated Worker has its own configuration and storage.
+Existing server-side Figma/Slack OAuth callbacks remain separate optional
+account integrations. Preview availability is not a production-readiness claim.
 
 The [30 October local acceptance record](acceptance-2026-10-30.md) records a
 successful clean tarball installation, real stdio protocol smoke test and all

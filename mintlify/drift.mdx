@@ -1,0 +1,14 @@
+---
+title: "Check design drift"
+description: "Detect meaningful changes without unrelated Figma noise."
+---
+
+With Elf running, save a token or component source file. Use **Check now** for an explicit check. The local report is available in Settings and as `drift-report.md` at the configured report location.
+
+Elf distinguishes code changes, Figma changes, and missing resources. A component counts as project-managed when it has been explicitly synced or adopted into the project manifest. Other Figma components remain import context and do not produce component drift merely because they are absent from your code.
+
+Removing a tracked component from code still produces drift if its Figma resource survives. Never delete the manifest to silence a warning: it holds identities and comparison baselines.
+
+Save-triggered automatic sync scopes its work to affected resources and dependencies. Periodic full checks remain separate. A changed implementation may require an updated visual description before it can safely sync.
+
+A clean result applies to supported comparisons and the selected project; it does not certify every property in a Figma file.

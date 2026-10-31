@@ -3,7 +3,7 @@ import { useApi } from '@/lib/api-context';
 import { Button } from '../../../../settings-next/src/components/ui/button';
 import { Card } from '../../../../settings-next/src/components/ui/card';
 
-interface ConnectionReview {id:string;fileKey:string;fileName:string;generation:string|null;approvedGeneration:string|null;connected:boolean;}
+interface ConnectionReview {id:string;fileKey:string;fileName:string;generation:string|null;approvedGeneration:string|null;connected:boolean;approvalInPlugin?:boolean;}
 interface PlanReview {id:string;fileKey:string;fileName:string;generation:string;hash:string;operations:{method:string;params:Record<string,unknown>}[];state:string;expires:number;sourceHash:string|null;}
 interface ConsentReview {handle:string;details:{clientName:string;clientDomain:string|null;redirectHost:string;redirectIsLoopback:boolean;scope:string[]};}
 
@@ -54,7 +54,7 @@ export function HostedReviewScreen({embedded=false}:{embedded?:boolean}={}) {
         <p className="font-medium">{connection.fileName||'Untitled'}</p><p className="break-all font-mono text-xs">{connection.fileKey}</p>
         <p className="text-sm">Plugin-only trust: Elf trusts the document reported by the open plugin. It is not independently verified through Figma REST. Confirm that this is the file you intend to use.</p>
         <p className="text-sm text-muted-foreground">{connection.connected?'Plugin connected.':'Plugin offline. Reopen it and refresh this page.'} Approving a connection does not approve resource changes.</p>
-        <div className="flex flex-wrap gap-3"><Button disabled={busy||!connection.connected||!connection.generation||!!message} onClick={()=>act(async()=>{await api.post(`/hosted/connections/${connection.id}/approve`,{generation:connection.generation,fileKey:connection.fileKey,trust:'plugin'});setMessage('Connection approved. Return to your assistant.');})}>Approve this document</Button>
+        <div className="flex flex-wrap gap-3">{connection.approvalInPlugin?<p className="text-xs">Approve this connection in the open Elf Bridge plugin.</p>:<Button disabled={busy||!connection.connected||!connection.generation||!!message} onClick={()=>act(async()=>{await api.post(`/hosted/connections/${connection.id}/approve`,{generation:connection.generation,fileKey:connection.fileKey,trust:'plugin'});setMessage('Connection approved. Return to your assistant.');})}>Approve this document</Button>}
         <Button variant="destructive" disabled={busy} onClick={()=>act(async()=>{await api.post(`/hosted/connections/${connection.id}/disconnect`);setConnection(null);setMessage('Disconnected. Saved plugin access is revoked.');})}>Disconnect</Button></div>
       </>}
       {plan&&<>

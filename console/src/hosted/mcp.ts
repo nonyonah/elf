@@ -17,7 +17,9 @@ export async function hostedMcp(request: Request, env: Env, owner: string, scope
   const parsed = await jsonBody(request, 1048576);
   if(clientId)await env.DB.prepare('INSERT INTO hosted_assistant_activity(owner,clientId,lastSeen) VALUES(?,?,?) ON CONFLICT(owner,clientId) DO UPDATE SET lastSeen=excluded.lastSeen').bind(owner,clientId,now()).run();
   await env.DB.prepare('UPDATE hosted_connections SET mcpSeenAt=? WHERE owner=?').bind(now(),owner).run();
-  const server = new McpServer({ name:'elf', version:'1.0.0' });
+  const server = new McpServer({ name:'elf', title:'Elf', version:'1.0.0',
+    websiteUrl:'https://elf-docs.riftlabs.xyz',
+    icons:[{src:`${origin(env)}/elf-logo.png`,mimeType:'image/png',sizes:['256x256']}] });
   const reply = (value:unknown, error=false) => ({content:[{type:'text' as const,text:JSON.stringify(value)}],isError:error});
   const tool = (name:string, description:string, schema:z.ZodRawShape, handler:(args:Record<string,unknown>)=>Promise<unknown>, write=false) => {
     server.registerTool(name,{description,inputSchema:schema},async args=>{
@@ -28,18 +30,22 @@ export async function hostedMcp(request: Request, env: Env, owner: string, scope
     });
   };
   const id=z.string().uuid();
-  tool('figma_onboarding_status','List your hosted file connections. Plugin-only approval is made by the user in Elf, not by the assistant.',{},async()=>{
+  tool('figma_onboarding_status','List approved and pending hosted Figma file connections. Always select the explicit connectionId for the intended file. New files require a separate user approval in Elf Bridge.',{},async()=>{
     const rows=await env.DB.prepare('SELECT id,fileKey,fileName,generation,approvedGeneration,heartbeat FROM hosted_connections WHERE owner=? ORDER BY createdAt DESC').bind(owner).all();
     return {settingsUrl:`${origin(env)}/settings`,connections:rows.results.map(row=>({connectionId:row.id,fileKey:row.fileKey,fileName:row.fileName,
       connected:typeof row.heartbeat==='number'&&row.heartbeat>now()-15000,approved:!!row.generation&&row.generation===row.approvedGeneration,
-      manageUrl:`${origin(env)}/settings?elf_connection=${row.id}`})),next:'Pair Elf Bridge in the intended file and approve the exact document in Elf Settings.'};
+      manageUrl:`${origin(env)}/settings?elf_connection=${row.id}`})),next:'For another file, call get_figma_pairing_code with its URL and have the user approve it in Elf Bridge. Use the exact connectionId for each operation.'};
   });
-  tool('get_figma_pairing_code','Create a single-use pairing code for a Figma file. Open Elf Bridge and choose Hosted Elf. Pairing does not approve writes.',{url:z.string().url()},async args=>{
-    if(owner.startsWith('plugin_'))throw new Error('This assistant is scoped to its approved file. Connect again from your assistant to authorize another file.');
+  tool('get_figma_pairing_code','Add or switch to a Figma file. Accountless hosted connections return an Add file review link; the user pairs and approves each new file in Elf Bridge without repeating OAuth. Pairing does not approve writes.',{url:z.string().url()},async args=>{
     const url=new URL(String(args.url));
     if(url.protocol!=='https:'||!['www.figma.com','figma.com'].includes(url.hostname)||url.username||url.password||url.port)throw new Error('Use a Figma design file URL');
     const key=/^\/(?:design|file)\/([A-Za-z0-9_-]{10,100})(?:\/|$)/.exec(url.pathname)?.[1];
     if(!key)throw new Error('Use a Figma design file URL');
+    const existing=await env.DB.prepare('SELECT id,fileKey,fileName,heartbeat FROM hosted_connections WHERE owner=? AND fileKey=? AND generation=approvedGeneration ORDER BY createdAt DESC').bind(owner,key).all();
+    if(existing.results.length)return {connections:existing.results.map(row=>({connectionId:row.id,fileKey:row.fileKey,fileName:row.fileName,connected:typeof row.heartbeat==='number'&&row.heartbeat>now()-15000})),
+      instructions:'This file is already approved. Use its exact connectionId. If offline, reopen Elf Bridge and approve the fresh plugin connection. Existing write plans remain attached to their original connection.'};
+    if(owner.startsWith('plugin_'))return {approvalRequired:true,reviewUrl:`${origin(env)}/settings?elf_add_file=${encodeURIComponent(url.href)}&elf_assistant=${encodeURIComponent(owner)}`,
+      instructions:'Open this link in the browser used to connect this assistant. Review Add file, pair Elf Bridge in that file, and approve it in the plugin. Then call figma_onboarding_status and use the exact connectionId. Existing files and write approvals are not retargeted.'};
     return pairCode(env,owner,key);
   },true);
   for(const resource of resourceTools.filter(t=>!writes.has(t.name))) {

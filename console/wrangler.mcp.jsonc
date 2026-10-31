@@ -1,0 +1,56 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "elf-mcp",
+  "main": "src/mcp-worker.ts",
+  "compatibility_date": "2026-10-31",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "assets": {
+    "directory": "./dist/mcp",
+    "binding": "ASSETS",
+    "run_worker_first": [
+      "/",
+      "/settings",
+      "/api/*",
+      "/mcp",
+      "/authorize",
+      "/oauth/*",
+      "/.well-known/*"
+    ]
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "elf-mcp",
+      "database_id": "2b9ebecd-61b1-4c6a-86a9-e51cb35d46d4",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "kv_namespaces": [
+    {
+      "binding": "OAUTH_KV",
+      "id": "6c8964f7e38849e4922d66d8fa96a579"
+    }
+  ],
+  "vars": {
+    "HOSTED_MCP_ENABLED": "true",
+    "CONSOLE_ORIGIN": "https://elf.riftlabs.xyz"
+  },
+  "routes": [
+    {
+      "pattern": "elf.riftlabs.xyz",
+      "custom_domain": true
+    }
+  ],
+  "workers_dev": false,
+  "triggers": {
+    "crons": [
+      "*/15 * * * *"
+    ]
+  },
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 0.01
+  }
+}

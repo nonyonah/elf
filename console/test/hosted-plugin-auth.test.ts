@@ -1,11 +1,11 @@
 import { env, createExecutionContext, waitOnExecutionContext } from 'cloudflare:test';
 import { beforeEach, expect, it } from 'vitest';
-import { createApp } from '../src/index.js';
+import { createMcpApp } from '../src/mcp-worker.js';
 import { hostedFetch } from '../src/hosted/oauth.js';
 import { connectPlugin, pairCode } from '../src/hosted/relay.js';
 import type { Env } from '../src/env.js';
 const bindings:Env={...env,HOSTED_MCP_ENABLED:'true',CONSOLE_ORIGIN:'https://console.test',DEV_ONLY_FAKE_USER:''};
-const app=createApp(),fileKey='eu8zGUOsrdyXXQqvJeyl1E';
+const app=createMcpApp(),fileKey='eu8zGUOsrdyXXQqvJeyl1E';
 async function run(path:string,init?:RequestInit){
  const ctx=createExecutionContext();
  const response=await hostedFetch(new Request('https://console.test'+path,init),bindings,ctx,app);
@@ -30,6 +30,7 @@ it('requires plugin approval without an account and separates file, browser and 
  const pair=await start.json() as {handle:string;code:string;connectionId:string};
  const cookies=start.headers.getSetCookie();
  expect(cookies.some(c=>c.startsWith('__Host-elf-settings=')&&c.includes('HttpOnly')&&c.includes('Secure')&&c.includes('SameSite=Strict'))).toBe(true);
+ expect(cookies.some(c=>c.startsWith('__Host-oauth-consent-'))).toBe(true);
  const cookie=cookies.map(c=>c.split(';')[0]).join('; ');
  const finish=()=>run('/api/hosted/consent/finish',json({handle:pair.handle,approve:true},cookie));
  expect((await finish()).status).toBe(400);
@@ -43,6 +44,9 @@ it('requires plugin approval without an account and separates file, browser and 
  expect((await finish()).status).toBe(400);
  const pluginApproval=await run('/api/hosted-bridge/approve',{...json(approve),headers:{'Content-Type':'application/json',Authorization:`Bearer ${connected.session}`}});
  expect(pluginApproval.status).toBe(200);
+ const approvalRows=await env.DB.prepare('SELECT c.generation,c.approvedGeneration,p.approvedGeneration AS consentGeneration FROM hosted_connections c JOIN hosted_plugin_consents p ON p.connectionId=c.id WHERE c.id=?').bind(pair.connectionId).first();
+ expect(approvalRows?.approvedGeneration).toBe(connected.generation);
+ expect(approvalRows?.consentGeneration).toBe(connected.generation);
  expect((await run('/api/hosted/consent/finish',json({handle:pair.handle,approve:true}))).status).toBe(401);
  const finished=await finish();expect(finished.status).toBe(200);
  const redirect=new URL((await finished.json() as {redirectTo:string}).redirectTo);
@@ -51,13 +55,46 @@ it('requires plugin approval without an account and separates file, browser and 
  const tokenResponse=await run('/oauth/token',{method:'POST',body:tokenBody});expect(tokenResponse.status).toBe(200);
  const token=await tokenResponse.json() as {access_token:string};
  expect((await finish()).status).toBe(400);
- expect((await run('/api/me',{headers:{Cookie:cookie}})).status).toBe(401);
+ expect((await run('/api/me',{headers:{Cookie:cookie}})).status).toBe(404);
  expect((await run('/api/hosted/assistants',{headers:{Authorization:`Bearer ${token.access_token}`}})).status).toBe(401);
  const call=async(name:string,args:unknown)=>{
   const response=await run('/mcp',{method:'POST',headers:{'Content-Type':'application/json',Accept:'application/json, text/event-stream',Authorization:`Bearer ${token.access_token}`},body:JSON.stringify({jsonrpc:'2.0',id:1,method:'tools/call',params:{name,arguments:args}})});
   return await response.json() as {result:{isError?:boolean;content:{text:string}[]}};
  };
- expect((await call('get_figma_pairing_code',{url:'https://www.figma.com/design/otherFile012345/Other'})).result.isError).toBe(true);
+ const fileUrl='https://www.figma.com/design/otherFile012345/Other';
+ const suggestion=await call('get_figma_pairing_code',{url:fileUrl});
+ expect(suggestion.result.isError).not.toBe(true);
+ const review=JSON.parse(suggestion.result.content[0].text);
+ expect(review.approvalRequired).toBe(true);
+ expect(new URL(review.reviewUrl).searchParams.get('elf_add_file')).toBe(fileUrl);
+ expect(review.code).toBeUndefined();
+ // Assistant bearer authority cannot create or approve another file by itself.
+ expect((await run('/api/hosted/connections',{...json({url:fileUrl}),headers:{'Content-Type':'application/json',Origin:'https://console.test',Authorization:`Bearer ${token.access_token}`}})).status).toBe(401);
+ expect((await run('/api/hosted/connections',json({url:fileUrl},cookie,'https://attacker.test'))).status).toBe(403);
+ expect((await run('/api/hosted/connections',json({url:fileUrl,expectedOwner:'plugin_other-assistant'},cookie))).status).toBe(400);
+ expect((await run('/api/hosted/connections',json({url:'https://attacker.test/design/otherFile012345'},cookie))).status).toBe(400);
+ const added=await run('/api/hosted/connections',json({url:fileUrl},cookie));
+ expect(added.status).toBe(200);
+ const second=await added.json() as {code:string;connectionId:string};
+ expect(second.connectionId).not.toBe(pair.connectionId);
+ expect((await call('list_collections',{connectionId:second.connectionId})).result.isError).toBe(true);
+ const secondPlugin=await connectPlugin(bindings,{code:second.code,fileKey:'otherFile012345',fileName:'Other'},null);
+ expect(secondPlugin.assistant?.clientName).toBe('Accountless test');
+ expect((await call('list_collections',{connectionId:second.connectionId})).result.isError).toBe(true);
+ // Another plugin's credential cannot approve the new file's generation.
+ expect((await run('/api/hosted-bridge/approve',{...json({generation:secondPlugin.generation}),headers:{'Content-Type':'application/json',Authorization:`Bearer ${connected.session}`}})).status).toBe(400);
+ expect((await run('/api/hosted-bridge/approve',{...json({generation:secondPlugin.generation}),headers:{'Content-Type':'application/json',Authorization:`Bearer ${secondPlugin.session}`}})).status).toBe(200);
+ expect((await call('list_collections',{connectionId:second.connectionId})).result.isError).not.toBe(true);
+ expect((await call('list_collections',{connectionId:pair.connectionId})).result.isError).not.toBe(true);
+ const switchBack=JSON.parse((await call('get_figma_pairing_code',{url:input.url})).result.content[0].text);
+ expect(switchBack.connections[0].connectionId).toBe(pair.connectionId);
+ expect(switchBack.reviewUrl).toBeUndefined();
+ const original=await env.DB.prepare('SELECT fileKey,approvedGeneration FROM hosted_connections WHERE id=?').bind(pair.connectionId).first();
+ expect(original).toMatchObject({fileKey,approvedGeneration:connected.generation});
+ // Removing one file leaves the other approved and available with the same OAuth token.
+ expect((await run(`/api/hosted/connections/${second.connectionId}/disconnect`,json({},cookie))).status).toBe(200);
+ expect((await call('list_collections',{connectionId:second.connectionId})).result.isError).toBe(true);
+ expect((await call('list_collections',{connectionId:pair.connectionId})).result.isError).not.toBe(true);
  const own=await call('figma_onboarding_status',{});
  expect(JSON.parse(own.result.content[0].text).connections).toHaveLength(1);
  const other=await pairCode(bindings,'other-owner','otherFile012345');

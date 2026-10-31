@@ -1,0 +1,40 @@
+---
+title: "Troubleshooting"
+description: "Resolve common setup and sync problems."
+---
+
+## Pairing code invalid or expired
+
+Use the latest code from the runtime connected to this project. Codes are single-use. Reopen the current public plugin build if it retains an old UI. Never paste pairing codes into public support threads.
+
+## Hosted MCP approval page is blank
+
+Close the old authorization tab and reconnect from your assistant using `https://elf.riftlabs.xyz/mcp`. The rendering fix is deployed; reload without the browser cache if necessary. See the [hosted connector walkthrough](/hosted-mcp) for plugin approval and finishing the connection. Share only redacted error text, never the authorization URL or pairing code.
+
+## Hosted MCP logo is missing
+
+Elf includes its mascot in MCP icon metadata, but the assistant controls whether it displays it. Claude has an [open issue about custom connector icon support](https://github.com/anthropics/claude-ai-mcp/issues/152); removing and re-adding the connector is not a reliable fix. The logo is also the favicon on [Elf Settings](https://elf.riftlabs.xyz/settings).
+
+## File does not match
+
+Check the configured Figma file URL and the document currently open in the plugin. File identity is the key, not the display name. Select the intended target explicitly.
+
+## File not verified
+
+For strict mode, reconnect Figma and confirm that the authorized account can access the file. Alternatively, explicitly select plugin-only approval when appropriate. Do not silently downgrade verification.
+
+## Port already serves a different bridge
+
+Stop only the bridge you own, or choose a free port. Do not share or expose bridge secrets to get around authentication. The standard public plugin expects port 8765; a custom port also requires a compatible plugin endpoint.
+
+## Sync needs review
+
+Inspect conflicts, unknown token references, deprecated entries, and missing component descriptions. Regenerate stale reviews. Automatic sync does not bypass these safeguards.
+
+## Figma rate limits
+
+Keep the plugin connected for supported document operations. Respect REST retry instructions when account verification is limited. Repeated reconnects are not a rate-limit bypass.
+
+## Support
+
+File an issue at [GitHub](https://github.com/nonyonah/elf/issues) with your package version, operating system, and redacted error. Do not include credentials or private design-system documents.

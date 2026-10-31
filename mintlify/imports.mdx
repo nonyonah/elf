@@ -1,0 +1,12 @@
+---
+title: "Import from Figma"
+description: "Bring existing design resources into your project."
+---
+
+Connect and approve the intended file, then use the token or component import flow in Elf. Choose the resources and review generated files before saving.
+
+For tokens, inspect collections and modes. The same token name may occur in multiple collections; use collection identity rather than guessing which duplicate to import. Imported references can have different reverse-sync capabilities from native code tokens; follow the review warnings before writing back.
+
+For components, choose a supported framework/library target and review the setup proposal. Library choices describe an implementation target; they do not guarantee pixel-identical reconstruction or automatically install arbitrary dependencies without your involvement.
+
+Review generated code for accessibility, behavior, imports, and styling. Keep existing project components when reusing them is appropriate. Importing is not permission to overwrite existing files or adopt unrelated resources silently.

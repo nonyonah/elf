@@ -1,5 +1,5 @@
 import { Hono, type MiddlewareHandler } from 'hono';
-import { getCookie, setCookie } from 'hono/cookie';
+import { getCookie } from 'hono/cookie';
 import type { AppEnv } from '../auth.js';
 import { hash, jsonBody, noStore, now, origin, secret } from './common.js';
 import { pairCode } from './relay.js';
@@ -46,8 +46,9 @@ export function pluginAuthorizationRoutes(){
     const headers=new Headers(consent.headers);
     headers.set('Content-Type','application/json');
     for(const [key,value]of Object.entries(noStore))headers.set(key,value);
-    setCookie(c,cookie,token,{secure:true,httpOnly:true,sameSite:'Strict',path:'/',maxAge:30*86400});
-    headers.append('Set-Cookie',c.res.headers.get('Set-Cookie')!);
+    // Keep both cookies on the returned response. Mutating c.res here makes
+    // Hono replace the provider's anti-CSRF Set-Cookie during response merging.
+    headers.append('Set-Cookie',`${cookie}=${token}; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=${30*86400}`);
     return new Response(JSON.stringify({handle:consent.handle,details,...paired,expiresAt:Math.min(expires,paired.expiresAt)}),{headers});
   });
   return app;

@@ -30,7 +30,7 @@ const DEFAULT_HOST = "localhost:8765";
 async function loadBridgeState() {
     const legacy = (await figma.clientStorage.getAsync(SETTINGS_KEY));
     const storedHost = (await figma.clientStorage.getAsync(HOST_KEY));
-    const hosted = storedHost === 'https://elf-console.nonyonah.workers.dev';
+    const hosted = storedHost === 'https://elf.riftlabs.xyz';
     const session = (await figma.clientStorage.getAsync(`${SESSION_KEY}:${hosted ? 'hosted:' : ''}${currentFile().key}`) ?? (hosted ? undefined : await figma.clientStorage.getAsync(SESSION_KEY)));
     // Drop the old handshake token from storage; pairing replaces it.
     if (legacy?.token) {
@@ -45,14 +45,14 @@ async function saveHost(host) {
     await figma.clientStorage.setAsync(HOST_KEY, host.trim() || DEFAULT_HOST);
 }
 async function saveSession(session) {
-    const hosted = (await figma.clientStorage.getAsync(HOST_KEY)) === 'https://elf-console.nonyonah.workers.dev';
+    const hosted = (await figma.clientStorage.getAsync(HOST_KEY)) === 'https://elf.riftlabs.xyz';
     if (hosted !== session.startsWith('elfh_'))
         throw new Error('Session does not match the selected bridge.');
     await figma.clientStorage.setAsync(`${SESSION_KEY}:${hosted ? 'hosted:' : ''}${currentFile().key}`, session);
     await figma.clientStorage.deleteAsync(SESSION_KEY);
 }
 async function forgetSession() {
-    const hosted = (await figma.clientStorage.getAsync(HOST_KEY)) === 'https://elf-console.nonyonah.workers.dev';
+    const hosted = (await figma.clientStorage.getAsync(HOST_KEY)) === 'https://elf.riftlabs.xyz';
     await figma.clientStorage.deleteAsync(`${SESSION_KEY}:${hosted ? 'hosted:' : ''}${currentFile().key}`);
     await figma.clientStorage.deleteAsync(SESSION_KEY);
 }
@@ -1540,7 +1540,7 @@ figma.ui.onmessage = async (message) => {
             const id = String(message.connectionId ?? '');
             if (!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(id))
                 throw new Error('Invalid connection.');
-            figma.openExternal('https://elf-console.nonyonah.workers.dev/settings?elf_connection=' + id);
+            figma.openExternal('https://elf.riftlabs.xyz/settings?elf_connection=' + id);
             return;
         }
         if (message.type === "save-session") {

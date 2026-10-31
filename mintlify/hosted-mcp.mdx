@@ -1,0 +1,81 @@
+---
+title: "Hosted MCP connector"
+description: "Connect an assistant once and approve each Figma file in Elf Bridge."
+---
+
+## Connector URL
+
+```text
+https://elf.riftlabs.xyz/mcp
+```
+
+Use this in an assistant that supports remote **Streamable HTTP MCP** and **OAuth authorization with PKCE**. Choose OAuth or automatic authorization. There is no shared API key, and you should not put tokens in the URL. Availability depends on your assistant’s connector support; the URL does not make unsupported clients compatible.
+
+The hosted service runs separately from the local npm monitor. You do not need an IDE or local MCP server for this connection. **Figma Desktop and an open Elf Bridge plugin are still required.**
+
+## Connect your assistant
+
+1. In your assistant’s connector settings, add Elf with the URL above.
+2. When Elf Settings opens, paste the first Figma file URL you intend to use. No Elf account or Figma OAuth sign-in is required. The OAuth screen authorizes your assistant to use Elf; file access is approved in the plugin.
+3. [Download the hosted-capable Elf Bridge bundle](https://elf.riftlabs.xyz/downloads/elf-bridge-hosted.zip) and extract the whole folder.
+4. Open the intended file in **Figma Desktop**. Choose **Plugins → Development → Import plugin from manifest** and select the extracted `manifest.json`. Keep `code.js` and `ui.html` alongside it.
+5. In the plugin, enter the open file’s URL if prompted and choose **plugin-only document approval**. Select **Hosted Elf · web assistants**, then enter the current single-use code from Elf Settings.
+6. Check the assistant name, return host, and exact file. Names are self-declared; approve only a connection you initiated. Click **Approve assistant for this file** in the plugin.
+7. Return to Elf Settings and choose **Finish connection**. Return to your assistant and ask it to inspect the connected file.
+
+Keep the plugin open. Saved pairing can be reused, but reconnecting the plugin requires fresh document approval.
+
+## Add or switch Figma files
+
+You do not need to repeat assistant OAuth for each file.
+
+1. Give your assistant the new file URL and ask it to connect that file. It calls `get_figma_pairing_code` and returns an **Add file** Settings link. You can also choose **Add Figma file** in [Elf Settings](https://elf.riftlabs.xyz/settings).
+2. Open the link in the browser used for the original connection. Review the URL, then choose **Add file with Elf Bridge** to generate a single-use pairing code.
+3. Open that exact file in Figma Desktop, run Elf Bridge, select Hosted Elf, and enter the code. Check the assistant and file details, then click **Approve assistant for this file**.
+4. Return to the assistant and ask it to run `figma_onboarding_status`. It must use that file’s exact `connectionId` for reads and proposed changes.
+
+For an already approved file, `get_figma_pairing_code` returns its existing connection instead of creating another pairing. Ask the assistant to select that connection. If the plugin is offline, reopen it; a fresh plugin connection needs fresh document approval.
+
+Settings lists your file connections and their approval status. Open a file entry to disconnect it independently. Existing approved files stay available; closing their plugins makes them offline. Moving to another Figma tab never authorizes it automatically.
+
+Write plans and pending operations stay attached to their original file and connection generation. Adding or switching files does not transfer approval or retarget an existing plan. Inspect the new target before preparing a new plan. Disconnecting the assistant revokes its access to all its approved files.
+
+If Settings access has expired or the browser has lost its cookie, reconnect the assistant to establish browser authority again. The Add file link alone grants no access.
+
+The Community plugin remains unapproved while Figma’s requirements are clarified. Development installation is not a statement of policy approval.
+
+## Read and write tools
+
+Figma OAuth is not part of hosted setup. Local Elf can optionally use a Figma account for strict REST verification; that separate local feature is not required for hosted plugin approval.
+
+The hosted connector exposes scoped Figma reads, Markdown preparation/validation, operation results, and reviewed changes. It does not expose your computer’s filesystem, shell, local watcher, or project configuration tools.
+
+Reads return a `jobId` when execution is queued through the plugin. Ask the assistant to poll `get_operation_result`; queued is not success.
+
+For writes:
+
+1. Inspect the current file.
+2. Use `prepare_figma_changes` with the explicit operations.
+3. Open its review link in the browser that connected the assistant, check the operations, and approve the exact plan.
+4. Return to the assistant to call `apply_figma_changes`.
+5. Inspect operation results and read back the resources before declaring success.
+
+The assistant cannot approve its own plan. Connection changes, expired plans, changed snapshots, or revoked access require a fresh review. A partial failure is not automatically rolled back or blindly replayed.
+
+## Manage access
+
+[Elf Settings](https://elf.riftlabs.xyz/settings) shows the current browser’s authorized assistant connections and Disconnect controls. Disconnecting revokes the selected grant and cancels queued work; already-running work may have an uncertain outcome that needs inspection.
+
+Hosted approval trusts the document reported by the open plugin; it does not independently verify the file through Figma REST. See [data and permissions](/privacy).
+
+## Troubleshooting authorization
+
+If the approval page is blank, close the old authorization tab and start a fresh connection from your assistant using `https://elf.riftlabs.xyz/mcp`. The Settings rendering fix is deployed. If an old page persists, reload it without the browser cache. Never share the authorization URL, pairing code, or cookies when reporting a problem.
+
+If **Finish connection** is disabled, keep Elf Bridge open in the intended file, select **Hosted Elf · web assistants**, and approve the assistant in the plugin. Pairing alone does not authorize it. If the code has expired or was already used, restart authorization from your assistant.
+
+Elf publishes the mascot in the MCP server’s icon metadata and as the Settings favicon. Claude has an [open issue about custom connector icons](https://github.com/anthropics/claude-ai-mcp/issues/152): its connector list may show a generic icon even when the server supplies valid logo metadata. Reconnecting is not a reliable fix, and a missing icon does not indicate a failed connection. Other assistants control their own icon display.
+
+## Validation status
+
+The live service passed OAuth/PKCE, SDK initialization/tool discovery, mascot metadata and image checks, a read relay with a **simulated plugin**, write blocking without plan approval, and revocation checks. A two-file protocol check verified separate browser/plugin approval, reuse of the same OAuth token, preservation of the original plan’s target, and independent file removal. Settings, the authorization form and Add file form were also verified to render in Chrome. These protocol tests did not modify real Figma files. Real assistant/Figma approval remains an end-to-end user check; do not assume every assistant provider has been tested.

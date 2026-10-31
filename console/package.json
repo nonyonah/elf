@@ -12,7 +12,10 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit && tsc -p client/tsconfig.json --noEmit",
     "db:local": "wrangler d1 migrations apply elf-console --local",
-    "db:remote": "wrangler d1 migrations apply elf-console --remote"
+    "db:remote": "wrangler d1 migrations apply elf-console --remote",
+    "build:mcp": "npm --prefix .. run build:bridge-plugin && vite build --config vite.mcp.config.ts && python3 scripts/package-hosted-plugin.py",
+    "typecheck:mcp": "tsc --noEmit && tsc -p tsconfig.mcp-client.json --noEmit",
+    "deploy:mcp": "npm run build:mcp && wrangler deploy --config wrangler.mcp.jsonc"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",

@@ -197,7 +197,7 @@ test("MCP runtime reuses an authenticated bridge without taking ownership", asyn
     assert.equal(owner.connection.status.port, port);
     const probe = await createBridgeClient({ port, token: TOKEN });
     probe.close();
-    await assert.rejects(acquireBridge({ token: "a-different-secret", port, timeoutMs: 500 }), /verify the bridge identity/);
+    await assert.rejects(acquireBridge({ token: "a-different-secret", port, timeoutMs: 500 }), /different credentials/);
   } finally { await owner.close(); }
 });
 

@@ -7,6 +7,7 @@ export default defineConfig({
   root: "client",
   plugins: [react(), tailwindcss()],
   resolve: {
+    dedupe: ["react", "react-dom"],
     alias: {
       "@": fileURLToPath(new URL("./client/src", import.meta.url)),
     },

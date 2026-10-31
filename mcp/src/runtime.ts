@@ -49,7 +49,13 @@ export async function acquireBridge(config: BridgeConfig, logger: Logger = silen
     };
   } catch (error) {
     if (((error as Error).cause as NodeJS.ErrnoException | undefined)?.code !== "EADDRINUSE") throw error;
-    const connection = await BridgeClient.connect(config);
+    let connection: BridgeClient;
+    try { connection = await BridgeClient.connect(config); }
+    catch (connectError) {
+      const collision = identityCollision(connectError, config.port);
+      if (collision) throw collision;
+      throw connectError;
+    }
     await requireFileVerification(connection);
     logger.log("using the existing authenticated Elf bridge");
     return {
@@ -63,10 +69,22 @@ export async function acquireBridge(config: BridgeConfig, logger: Logger = silen
 }
 
 /** A shared host outlives individual adapters and watcher terminals. */
+function identityCollision(error: unknown, port: number): Error | null {
+  const cause = error as { name?: string; code?: string; message?: string };
+  if (cause.name === "BridgeError" && cause.code === "auth") return new Error(
+    `Port ${port} already serves an Elf bridge with different credentials. ` +
+    "Close that bridge (or the terminal running it) and retry, set ELF_MCP_TOKEN to that bridge's secret if both projects should share it, " +
+    "or set ELF_MCP_PORT to a free port to run this project's bridge independently. Authentication was verified and rejected the connection.",
+  );
+  return null;
+}
+
 async function acquireSharedHost(config: BridgeConfig, logger: Logger): Promise<BridgeRuntime> {
   let connection: BridgeClient;
   try { connection = await BridgeClient.connect(config); }
   catch (error) {
+    const collision = identityCollision(error, config.port);
+    if (collision) throw collision;
     if (!(error as Error).message.includes("Cannot reach the Elf bridge")) throw error;
     const require = createRequire(import.meta.url);
     const host = spawn(process.execPath, ["--import", require.resolve("tsx"), fileURLToPath(new URL("./host.ts", import.meta.url))], {
@@ -81,7 +99,12 @@ async function acquireSharedHost(config: BridgeConfig, logger: Logger): Promise<
       host.once("exit", () => { clearTimeout(timer); resolve(); }); // A racing starter may have won the port.
     });
     if (host.connected) host.disconnect(); host.unref();
-    connection = await BridgeClient.connect(config);
+    try { connection = await BridgeClient.connect(config); }
+    catch (connectedError) {
+      const retryCollision = identityCollision(connectedError, config.port);
+      if (retryCollision) { host.kill?.(); throw retryCollision; }
+      throw connectedError;
+    }
   }
   await requireFileVerification(connection);
   logger.log("using the shared authenticated Elf bridge");
