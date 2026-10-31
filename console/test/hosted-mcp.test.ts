@@ -29,7 +29,7 @@ async function approvedPlan(id:string){
   return plan;
 }
 beforeEach(async()=>{
-  for(const table of ['hosted_operations','hosted_plans','hosted_connections','hosted_sources','hosted_consents'])await env.DB.prepare(`DELETE FROM ${table}`).run();
+  for(const table of ['hosted_operations','hosted_plans','hosted_connections','hosted_sources','hosted_consents','hosted_assistant_activity'])await env.DB.prepare(`DELETE FROM ${table}`).run();
   await env.DB.prepare("DELETE FROM rate_limits WHERE scope LIKE 'hosted:%'").run();
 });
 
@@ -165,8 +165,25 @@ describe('hosted MCP transport',()=>{
     expect(token.access_token).toBeTruthy();
     const mcp=await served('/mcp',{method:'POST',headers:{'Content-Type':'application/json',Accept:'application/json, text/event-stream',Authorization:`Bearer ${token.access_token}`},body:JSON.stringify({jsonrpc:'2.0',id:1,method:'tools/list'})});
     expect(mcp.status).toBe(200);
+    const list=await served('/api/hosted/assistants',{headers:{Authorization:'Bearer human-a'}});
+    expect(list.status).toBe(200);
+    const assistants=await list.json() as {assistants:{id:string;name:string;lastUsedAt:number}[]};
+    expect(assistants.assistants).toHaveLength(1);
+    expect(assistants.assistants[0].name).toBe('Elf test client');
+    expect(assistants.assistants[0].lastUsedAt).toBeGreaterThan(0);
+    const other=await served('/api/hosted/assistants',{headers:{Authorization:'Bearer human-b'}});
+    expect(await other.json()).toMatchObject({assistants:[]});
+    const refused=await served(`/api/hosted/assistants/${assistants.assistants[0].id}/disconnect`,{method:'POST',headers:{Authorization:'Bearer human-b'}});
+    expect(refused.status).toBe(400);
     const wrongResource=await served('/oauth/token',{method:'POST',body:new URLSearchParams({grant_type:'refresh_token',refresh_token:token.refresh_token,client_id:client.client_id,resource:'https://attacker.test/mcp'})});
     expect(wrongResource.status).not.toBe(200);
+    const pairedFile=await paired();
+    const pending=await queueRead(bindings,'user_a',pairedFile.connectionId,{method:'list_collections',params:{}},client.client_id);
+    const disconnected=await served(`/api/hosted/assistants/${assistants.assistants[0].id}/disconnect`,{method:'POST',headers:{Authorization:'Bearer human-a'}});
+    expect(disconnected.status).toBe(200);
+    expect((await env.DB.prepare('SELECT state FROM hosted_operations WHERE id=?').bind(pending.jobId).first<{state:string}>())?.state).toBe('cancelled');
+    const revoked=await served('/mcp',{method:'POST',headers:{'Content-Type':'application/json',Accept:'application/json, text/event-stream',Authorization:`Bearer ${token.access_token}`},body:JSON.stringify({jsonrpc:'2.0',id:2,method:'tools/list'})});
+    expect(revoked.status).toBe(401);
     expect((await served('/oauth/token',{method:'POST',body:tokenBody})).status).not.toBe(200);
     const replay=await served('/api/hosted/consent/finish',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer human-a',Cookie:cookie,Origin:'https://console.test'},body:JSON.stringify({handle:consent.handle,approve:true})});
     expect(replay.status).toBe(400);

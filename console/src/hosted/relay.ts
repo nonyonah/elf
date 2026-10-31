@@ -20,7 +20,7 @@ export async function pairCode(env: Env, owner: string, fileKey: string) {
   const id = crypto.randomUUID(), code = secret(6), expires = now() + 300000;
   await env.DB.prepare('INSERT INTO hosted_connections(id,owner,fileKey,codeHash,codeExpires,createdAt) VALUES(?,?,?,?,?,?)')
     .bind(id, owner, fileKey, await hash(code), expires, now()).run();
-  return { connectionId: id, code, expiresAt: expires, fileKey, hostedOrigin: env.CONSOLE_ORIGIN, manageUrl:`${env.CONSOLE_ORIGIN}/?elf_connection=${id}`,
+  return { connectionId: id, code, expiresAt: expires, fileKey, hostedOrigin: env.CONSOLE_ORIGIN, manageUrl:`${env.CONSOLE_ORIGIN}/settings?elf_connection=${id}`,
     instructions: 'Open this file in Figma, choose Hosted Elf in Elf Bridge, paste this code, then approve the exact document in the Elf connection page.' };
 }
 export async function authenticatePlugin(env: Env, authorization: string | null) {
@@ -55,7 +55,8 @@ export async function connectPlugin(env: Env, input: {code?: string; fileKey: st
     env.DB.prepare("UPDATE hosted_operations SET state=CASE WHEN state='running' THEN 'unknown' ELSE 'cancelled' END WHERE connectionId=? AND state IN ('running','queued')").bind(row.id),
     env.DB.prepare("UPDATE hosted_plans SET state='stale' WHERE connectionId=? AND state IN ('review','approved','applying')").bind(row.id),
   ]);
-  return { connectionId: row.id, generation, session, approvalUrl: `${env.CONSOLE_ORIGIN}/?elf_connection=${row.id}`, authorization: 'plugin' };
+  const consent=await env.DB.prepare('SELECT clientName,redirectHost,scopes FROM hosted_plugin_consents WHERE owner=? AND connectionId=?').bind(row.owner,row.id).first<{clientName:string;redirectHost:string;scopes:string}>();
+  return { assistant:consent?{...consent,scopes:JSON.parse(consent.scopes)}:null, connectionId: row.id, generation, session, approvalUrl: `${env.CONSOLE_ORIGIN}/settings?elf_connection=${row.id}`, authorization: 'plugin' };
 }
 export async function disconnect(env: Env, owner: string, id: string) {
   await connection(env, owner, id);
@@ -65,19 +66,19 @@ export async function disconnect(env: Env, owner: string, id: string) {
     env.DB.prepare('DELETE FROM hosted_connections WHERE id=? AND owner=?').bind(id, owner),
   ]);
 }
-export async function queueRead(env: Env, owner: string, id: string, input: unknown) {
+export async function queueRead(env: Env, owner: string, id: string, input: unknown, clientId?: string) {
   const c = await connection(env, owner, id, true), op = validateOperation(input, false);
   await queueCapacity(env, c.id);
   const jobId = crypto.randomUUID(), time = now();
-  await env.DB.prepare('INSERT INTO hosted_operations(id,owner,connectionId,generation,method,params,createdAt,expires) VALUES(?,?,?,?,?,?,?,?)')
-    .bind(jobId, owner, id, c.generation, op.method, JSON.stringify(op.params), time, time + 120000).run();
+  await env.DB.prepare('INSERT INTO hosted_operations(id,owner,connectionId,generation,method,params,createdAt,expires,clientId) VALUES(?,?,?,?,?,?,?,?,?)')
+    .bind(jobId, owner, id, c.generation, op.method, JSON.stringify(op.params), time, time + 120000, clientId ?? null).run();
   return { jobId, state: 'queued', next: 'Call get_operation_result with this jobId. Queued is not success.' };
 }
 async function queueCapacity(env: Env, id: string) {
   const count = await env.DB.prepare("SELECT count(*) AS n FROM hosted_operations WHERE connectionId=? AND state IN ('running','queued') AND expires>?").bind(id, now()).first<{n:number}>();
   if ((count?.n ?? 0) >= 50) throw new Error('Wait for pending operations to finish');
 }
-export async function preparePlan(env: Env, owner: string, id: string, inputs: unknown[], sourceHash?: string) {
+export async function preparePlan(env: Env, owner: string, id: string, inputs: unknown[], sourceHash?: string, clientId?: string) {
   const c = await connection(env, owner, id, true);
   if (!c.snapshot) throw new Error('Wait for the plugin to inspect the current page before preparing changes');
   if (!inputs.length || inputs.length > 50) throw new Error('Review 1–50 operations at a time');
@@ -87,13 +88,13 @@ export async function preparePlan(env: Env, owner: string, id: string, inputs: u
   const pending = await env.DB.prepare("SELECT count(*) AS n FROM hosted_plans WHERE owner=? AND state IN ('review','approved') AND expires>?").bind(owner, now()).first<{n:number}>();
   if ((pending?.n ?? 0) >= 10) throw new Error('Too many pending plans');
   const planId = crypto.randomUUID(), digest = await hash(text);
-  await env.DB.prepare('INSERT INTO hosted_plans(id,owner,connectionId,generation,hash,operations,expires,sourceHash,snapshot,createdAt) VALUES(?,?,?,?,?,?,?,?,?,?)')
-    .bind(planId, owner, id, c.generation, digest, text, now() + 600000, sourceHash ?? null, c.snapshot, now()).run();
-  return { planId, hash: digest, operationCount: operations.length, reviewUrl: `${env.CONSOLE_ORIGIN}/?elf_plan=${planId}`, next: 'The user must review and approve this exact plan in Elf. Then call apply_figma_changes. No writes have run.' };
+  await env.DB.prepare('INSERT INTO hosted_plans(id,owner,connectionId,generation,hash,operations,expires,sourceHash,snapshot,createdAt,clientId) VALUES(?,?,?,?,?,?,?,?,?,?,?)')
+    .bind(planId, owner, id, c.generation, digest, text, now() + 600000, sourceHash ?? null, c.snapshot, now(), clientId ?? null).run();
+  return { planId, hash: digest, operationCount: operations.length, reviewUrl: `${env.CONSOLE_ORIGIN}/settings?elf_plan=${planId}`, next: 'The user must review and approve this exact plan in Elf Settings. Then call apply_figma_changes. No writes have run.' };
 }
 export async function applyPlan(env: Env, owner: string, planId: string) {
   const plan = await env.DB.prepare("SELECT * FROM hosted_plans WHERE id=? AND owner=? AND expires>?").bind(planId, owner, now())
-    .first<{connectionId:string;generation:string;operations:string;state:string;hash:string;snapshot:string;sourceHash:string|null}>();
+    .first<{connectionId:string;generation:string;operations:string;state:string;hash:string;snapshot:string;sourceHash:string|null;clientId:string|null}>();
   if (!plan) throw new Error('Plan expired or not found');
   // Retries return the existing job IDs; they never enqueue duplicates.
   if (plan.state === 'applying' || plan.state === 'complete' || plan.state === 'failed') return planJobs(env, owner, planId);
@@ -105,9 +106,9 @@ export async function applyPlan(env: Env, owner: string, planId: string) {
   const operations: Operation[] = JSON.parse(plan.operations), time = now();
   // Conditional inserts plus state transition in one D1 transaction prevent duplicate apply.
   await env.DB.batch([
-    ...operations.map((op, index) => env.DB.prepare(`INSERT INTO hosted_operations(id,owner,connectionId,generation,planId,ordinal,method,params,createdAt,expires)
-      SELECT ?,?,?,?,?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM hosted_plans WHERE id=? AND owner=? AND state='approved' AND generation=?)`)
-      .bind(crypto.randomUUID(), owner, c.id, c.generation, planId, index, op.method, JSON.stringify(op.params), time, time + 600000, planId, owner, c.generation)),
+    ...operations.map((op, index) => env.DB.prepare(`INSERT INTO hosted_operations(id,owner,connectionId,generation,planId,ordinal,method,params,createdAt,expires,clientId)
+      SELECT ?,?,?,?,?,?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM hosted_plans WHERE id=? AND owner=? AND state='approved' AND generation=?)`)
+      .bind(crypto.randomUUID(), owner, c.id, c.generation, planId, index, op.method, JSON.stringify(op.params), time, time + 600000, plan.clientId, planId, owner, c.generation)),
     env.DB.prepare("UPDATE hosted_plans SET state='applying' WHERE id=? AND owner=? AND state='approved'").bind(planId, owner),
   ]);
   return planJobs(env, owner, planId);

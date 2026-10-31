@@ -10,9 +10,10 @@
   ],
   "networkAccess": {
     "allowedDomains": [
-      "wss://*.ngrok-free.app"
+      "wss://*.ngrok-free.app",
+      "https://elf.riftlabs.xyz"
     ],
-    "reasoning": "Elf connects to your authenticated local bridge. Pairing and document approval are required; Figma account credentials are never sent to the plugin.",
+    "reasoning": "Elf connects to your authenticated local bridge or the Elf hosted connector. Hosted access requires file-specific plugin approval; each write plan requires separate browser review.",
     "devAllowedDomains": [
       "ws://localhost:8765"
     ]

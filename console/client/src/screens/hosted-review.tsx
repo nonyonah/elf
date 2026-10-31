@@ -1,9 +1,9 @@
 import * as React from 'react';
 import { useApi } from '@/lib/api-context';
-import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
+import { Button } from '../../../../settings-next/src/components/ui/button';
+import { Card } from '../../../../settings-next/src/components/ui/card';
 
-interface ConnectionReview {id:string;fileKey:string;fileName:string;generation:string|null;approvedGeneration:string|null;connected:boolean;}
+interface ConnectionReview {id:string;fileKey:string;fileName:string;generation:string|null;approvedGeneration:string|null;connected:boolean;approvalInPlugin?:boolean;}
 interface PlanReview {id:string;fileKey:string;fileName:string;generation:string;hash:string;operations:{method:string;params:Record<string,unknown>}[];state:string;expires:number;sourceHash:string|null;}
 interface ConsentReview {handle:string;details:{clientName:string;clientDomain:string|null;redirectHost:string;redirectIsLoopback:boolean;scope:string[]};}
 
@@ -12,7 +12,7 @@ export function isHostedReview() {
   return ['elf_authorize','elf_connection','elf_plan'].some(key=>query.has(key));
 }
 
-export function HostedReviewScreen() {
+export function HostedReviewScreen({embedded=false}:{embedded?:boolean}={}) {
   const api=useApi(),query=React.useMemo(()=>new URLSearchParams(location.search),[]);
   const [connection,setConnection]=React.useState<ConnectionReview|null>(null);
   const [plan,setPlan]=React.useState<PlanReview|null>(null);
@@ -35,8 +35,8 @@ export function HostedReviewScreen() {
     // The server validates the registered exact redirect URI before returning this URL.
     location.assign(result.redirectTo);
   };
-  return <main className="mx-auto flex min-h-screen w-full max-w-2xl flex-col justify-center gap-5 px-5 py-10">
-    <a className="w-fit font-heading text-lg font-semibold" href="/">elf</a>
+  return <section className={embedded?'mb-5':'mx-auto flex min-h-screen w-full max-w-2xl flex-col justify-center gap-5 px-5 py-10'}>
+    {!embedded&&<a className="w-fit font-heading text-lg font-semibold" href="/settings">Elf Settings</a>}
     <Card className="gap-5 overflow-hidden p-6">
       <header><h1 className="font-heading text-xl font-semibold">{authorize?'Connect your assistant':planId?'Review Figma changes':'Approve this Figma connection'}</h1>
         <p className="mt-2 text-sm text-muted-foreground">Review access and changes before continuing.</p></header>
@@ -54,7 +54,7 @@ export function HostedReviewScreen() {
         <p className="font-medium">{connection.fileName||'Untitled'}</p><p className="break-all font-mono text-xs">{connection.fileKey}</p>
         <p className="text-sm">Plugin-only trust: Elf trusts the document reported by the open plugin. It is not independently verified through Figma REST. Confirm that this is the file you intend to use.</p>
         <p className="text-sm text-muted-foreground">{connection.connected?'Plugin connected.':'Plugin offline. Reopen it and refresh this page.'} Approving a connection does not approve resource changes.</p>
-        <div className="flex flex-wrap gap-3"><Button disabled={busy||!connection.connected||!connection.generation||!!message} onClick={()=>act(async()=>{await api.post(`/hosted/connections/${connection.id}/approve`,{generation:connection.generation,fileKey:connection.fileKey,trust:'plugin'});setMessage('Connection approved. Return to your assistant.');})}>Approve this document</Button>
+        <div className="flex flex-wrap gap-3">{connection.approvalInPlugin?<p className="text-xs">Approve this connection in the open Elf Bridge plugin.</p>:<Button disabled={busy||!connection.connected||!connection.generation||!!message} onClick={()=>act(async()=>{await api.post(`/hosted/connections/${connection.id}/approve`,{generation:connection.generation,fileKey:connection.fileKey,trust:'plugin'});setMessage('Connection approved. Return to your assistant.');})}>Approve this document</Button>}
         <Button variant="destructive" disabled={busy} onClick={()=>act(async()=>{await api.post(`/hosted/connections/${connection.id}/disconnect`);setConnection(null);setMessage('Disconnected. Saved plugin access is revoked.');})}>Disconnect</Button></div>
       </>}
       {plan&&<>
@@ -65,5 +65,5 @@ export function HostedReviewScreen() {
         <Button disabled={busy||plan.state!=='review'||plan.expires<Date.now()||!!message} onClick={()=>act(async()=>{await api.post(`/hosted/plans/${plan.id}/approve`,{hash:plan.hash,generation:plan.generation});setMessage('Plan approved. Return to your assistant to apply these exact changes.');})}>Approve these changes</Button>
       </>}
     </Card>
-  </main>;
+  </section>;
 }

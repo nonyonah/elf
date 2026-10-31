@@ -29,14 +29,14 @@ export async function hostedFetch(request: Request, env: Env, ctx: ExecutionCont
     apiHandler:{async fetch(req,bindings,execution){
       const context=execution as OAuthResourceContext<{userId?:string}>;
       if(typeof context.props?.userId!=='string'||!context.auth?.scope.includes('elf:read'))return new Response('Unauthorized',{status:401});
-      try{return await hostedMcp(req,bindings,context.props.userId,context.auth.scope);}
+      try{return await hostedMcp(req,bindings,context.props.userId,context.auth.scope,context.auth.clientId);}
       catch{return Response.json({error:'Invalid hosted MCP request'},{status:400,headers:noStore});}
     }},
     defaultHandler:{fetch(req,bindings,execution){
       const target=new URL(req.url);
       if(target.pathname==='/authorize'){
         if(req.method!=='GET')return new Response('Method not allowed',{status:405});
-        return new Response(null,{status:302,headers:{...noStore,Location:`${serviceOrigin}/?elf_authorize=${encodeURIComponent(target.search.slice(1))}`}});
+        return new Response(null,{status:302,headers:{...noStore,Location:`${serviceOrigin}/settings?elf_authorize=${encodeURIComponent(target.search.slice(1))}`}});
       }
       return Promise.resolve(app.fetch(req,bindings,execution)).then(response=>{
         const headers=new Headers(response.headers);

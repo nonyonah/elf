@@ -6,7 +6,7 @@ import { runInNewContext } from "node:vm";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
-function ui() {
+function ui(fetcher?: typeof fetch) {
   const sockets: any[] = [];
   class Socket {static OPEN = 1; readyState = 1; onmessage: any; onclose: any; sent: string[] = []; closed: any; url: string; constructor(_url: string) {this.url=_url;sockets.push(this);} send(value: string) {this.sent.push(value);} close(code: number, reason: string) {this.closed = {code, reason};}}
   const elements = new Map<string, any>();
@@ -23,7 +23,7 @@ function ui() {
   (document as any).createElement=(_tag:string)=>({value:'',textContent:'',className:'',children:[] as any[],listeners:{} as any,addEventListener(event:string,listener:unknown){this.listeners[event]=listener;},appendChild(child:any){this.children.push(child);}});
   const window: any = {};
   const parent = {postMessage(message: any) { messages.push(message.pluginMessage); }};
-  const context = {window, parent, document, crypto: webcrypto, TextEncoder, URL, URLSearchParams, WebSocket: Socket,
+  const context = {window, parent, document, crypto: webcrypto, TextEncoder, URL, URLSearchParams, AbortSignal, fetch: fetcher, WebSocket: Socket,
     setTimeout(fn: () => void) { timers.set(++id, fn); return id; }, clearTimeout(key: number) { timers.delete(key); }};
   const html = readFileSync(new URL("../../bridge-plugin/ui.html", import.meta.url), "utf8");
   for (const match of html.matchAll(/<script>([\s\S]*?)<\/script>/g)) runInNewContext(match[1], context);
@@ -82,7 +82,7 @@ const channel = "a".repeat(64);
 test("the public bundle always prompts for a file link even when a development import exposes fileKey", async () => {
   execFileSync(process.execPath, [fileURLToPath(new URL("../../scripts/build-public-bridge.mjs", import.meta.url))]);
   const manifest = JSON.parse(readFileSync(new URL("../../dist/bridge-plugin-public/manifest.json", import.meta.url), "utf8"));
-  assert.deepEqual(manifest.networkAccess.allowedDomains, ["ws://localhost:8765"]);
+  assert.deepEqual(manifest.networkAccess.allowedDomains, ["ws://localhost:8765", "https://elf.riftlabs.xyz"]);
   assert.equal(manifest.enablePrivatePluginApi, undefined);
   const plugin = main(async () => undefined, new URL("../../dist/bridge-plugin-public/code.js", import.meta.url));
   await plugin.figma.ui.onmessage({type: "context", channel});
@@ -289,4 +289,33 @@ test('a refused pairing code never schedules automatic session authentication',(
  const first=app.sockets[0];first.onclose({code:4001,reason:'invalid code'});
  for(const timer of [...app.timers.values()])timer();
  assert.equal(app.sockets.length,1);
+});
+
+
+test('hosted pairing requires an explicit plugin click before approving the assistant',async()=>{
+ const calls:{path:string;body:any;authorization:string|null}[]=[];
+ let approved=false;
+ const fetcher=async(input:any,init:any)=>{
+  const path=new URL(String(input)).pathname;
+  const headers=new Headers(init.headers);const body=JSON.parse(init.body);
+  calls.push({path,body,authorization:headers.get('Authorization')});
+  if(path.endsWith('/connect'))return Response.json({connectionId:'test-connection',generation:'test-generation',session:'elfh_'+'a'.repeat(64),assistant:{clientName:'Test assistant',redirectHost:'client.test'}});
+  if(path.endsWith('/approve')){approved=true;return Response.json({ok:true});}
+  if(path.endsWith('/poll'))return Response.json({approved,command:null,assistantActive:false});
+  throw new Error('Unexpected hosted endpoint');
+ };
+ const app=ui(fetcher as typeof fetch),channel=app.messages[0].channel;
+ app.window.onmessage({data:{pluginMessage:{type:'context',channel,file:{name:'Test file',key:'file123456',verification:{method:'plugin',nonce:channel}},bridge:{host:'https://elf.riftlabs.xyz',session:''}}}});
+ app.document.getElementById('code').value='abcdef123456';app.elements.get('pair').listeners.click();
+ await new Promise(resolve=>setImmediate(resolve));
+ const snapshot=app.messages.find(message=>message.method==='get_hosted_snapshot');assert.ok(snapshot);
+ app.window.onmessage({data:{pluginMessage:{type:'response',channel,id:snapshot.id,ok:true,result:{nodes:[],variables:[]}}}});
+ await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(approved,false);assert.equal(calls.some(call=>call.path.endsWith('/approve')),false);
+ assert.equal(app.elements.get('hosted-approve').hidden,false);
+ assert.match(app.elements.get('pairing-detail').textContent,/Test assistant/);
+ await app.elements.get('hosted-approve').onclick();
+ const approval=calls.find(call=>call.path.endsWith('/approve'));assert.ok(approval);
+ assert.equal(approval.authorization,'Bearer elfh_'+'a'.repeat(64));assert.equal(approval.body.generation,'test-generation');
+ assert.equal(approved,true);
 });

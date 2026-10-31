@@ -414,7 +414,7 @@
           <h2 id="pair-heading">Pair this file</h2>
           <p class="sub">Request a pairing code in Elf or your connected assistant, then paste it here.</p>
           <label class="field-label" for="connection-kind">Connect through</label>
-          <select id="connection-kind"><option value="local">Local Elf · editor or npm</option></select>
+          <select id="connection-kind"><option value="local">Local Elf · editor or npm</option><option value="hosted">Hosted Elf · web assistants</option></select>
 
           <label class="field-label" for="code">Pairing code</label>
           <input
@@ -621,7 +621,7 @@ function pairingHmac(key, text) {
 
     const $ = (id) => document.getElementById(id);
 
-    const HOSTED_ORIGIN = 'https://elf-console.nonyonah.workers.dev';
+    const HOSTED_ORIGIN = 'https://elf.riftlabs.xyz';
     const hostedSnapshots = new Map();
     function getHostedSnapshot() {
       const id = 'hosted-snapshot-' + Array.from(crypto.getRandomValues(new Uint8Array(16)), b => b.toString(16).padStart(2, '0')).join('');
@@ -752,13 +752,25 @@ function pairingHmac(key, text) {
         if(closed)return;
         generation = connected.generation;
         $('hosted-approve').hidden = false;
-        $('hosted-approve').onclick = () => postPluginMessage({type:'open-hosted-approval',connectionId:connected.connectionId});
+        if(connected.assistant){
+          $('hosted-approve').textContent = 'Approve assistant for this file';
+          $('hosted-approve').onclick = async () => {
+            $('hosted-approve').disabled = true;
+            try { await request('approve',{generation}); $('hosted-approve').hidden = true; }
+            catch(error){fail(error);}finally{$('hosted-approve').disabled = false;}
+          };
+        } else {
+          $('hosted-approve').textContent = 'Review this connection in Elf';
+          $('hosted-approve').onclick = () => postPluginMessage({type:'open-hosted-approval',connectionId:connected.connectionId});
+        }
         if(connected.session) {state.session = connected.session;state.sessionSaved = false;postPluginMessage({type:'save-session',session:connected.session});}
         snapshot = await getHostedSnapshot();
         state.ready = true; state.projectPanel = false;
         $('export-code').disabled = true; $('export-code').textContent = 'Manage code sync in local Elf';
-        $('pairing-heading').textContent = 'Approve this document in Elf';
-        $('pairing-detail').textContent = 'Open the connection link from your assistant. Confirm this exact file using plugin-only trust.';
+        $('pairing-heading').textContent = connected.assistant ? 'Approve assistant access' : 'Approve this document in Elf';
+        $('pairing-detail').textContent = connected.assistant
+          ? connected.assistant.clientName + ' requests read access and separately reviewed changes to ' + (state.file.name || 'Untitled') + ' (' + state.file.key + '). Return host: ' + connected.assistant.redirectHost + '. Names are self-declared. Approve only if you started this connection. Elf trusts this plugin document without independent Figma account verification.'
+          : 'Open the connection link from your assistant. Confirm this exact file using plugin-only trust.';
         state.send = async message => {
           if(closed || message.type !== 'response' || message.id !== inFlight)return;
           try {

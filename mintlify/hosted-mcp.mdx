@@ -1,0 +1,54 @@
+---
+title: "Hosted MCP connector"
+description: "Connect a remote MCP assistant to an approved Figma file."
+---
+
+## Connector URL
+
+```text
+https://elf.riftlabs.xyz/mcp
+```
+
+Use this in an assistant that supports remote **Streamable HTTP MCP** and **OAuth authorization with PKCE**. Choose OAuth or automatic authorization. There is no shared API key, and you should not put tokens in the URL. Availability depends on your assistant’s connector support; the URL does not make unsupported clients compatible.
+
+The hosted service runs separately from the local npm monitor. You do not need an IDE or local MCP server for this connection. **Figma Desktop and an open Elf Bridge plugin are still required.**
+
+## Connect once per approved file
+
+1. In your assistant’s connector settings, add Elf with the URL above.
+2. When Elf Settings opens, paste the Figma file URL you intend to use. No Elf account sign-in is required.
+3. [Download the hosted-capable Elf Bridge bundle](https://elf.riftlabs.xyz/downloads/elf-bridge-hosted.zip) and extract the whole folder.
+4. Open the intended file in **Figma Desktop**. Choose **Plugins → Development → Import plugin from manifest** and select the extracted `manifest.json`. Keep `code.js` and `ui.html` alongside it.
+5. In the plugin, enter the open file’s URL if prompted and choose **plugin-only document approval**. Select **Hosted Elf · web assistants**, then enter the current single-use code from Elf Settings.
+6. Check the assistant name, return host, and exact file. Names are self-declared; approve only a connection you initiated. Click **Approve assistant for this file** in the plugin.
+7. Return to Elf Settings and choose **Finish connection**. Return to your assistant and ask it to inspect the connected file.
+
+Keep the plugin open. Saved pairing can be reused, but reconnecting requires fresh document approval. To target a different file, start a fresh authorization rather than reusing a grant for another document.
+
+The Community plugin remains unapproved while Figma’s requirements are clarified. Development installation is not a statement of policy approval.
+
+## Read and write tools
+
+The hosted connector exposes scoped Figma reads, Markdown preparation/validation, operation results, and reviewed changes. It does not expose your computer’s filesystem, shell, local watcher, or project configuration tools.
+
+Reads return a `jobId` when execution is queued through the plugin. Ask the assistant to poll `get_operation_result`; queued is not success.
+
+For writes:
+
+1. Inspect the current file.
+2. Use `prepare_figma_changes` with the explicit operations.
+3. Open its review link in the browser that connected the assistant, check the operations, and approve the exact plan.
+4. Return to the assistant to call `apply_figma_changes`.
+5. Inspect operation results and read back the resources before declaring success.
+
+The assistant cannot approve its own plan. Connection changes, expired plans, changed snapshots, or revoked access require a fresh review. A partial failure is not automatically rolled back or blindly replayed.
+
+## Manage access
+
+[Elf Settings](https://elf.riftlabs.xyz/settings) shows the current browser’s authorized assistant connections and Disconnect controls. Disconnecting revokes the selected grant and cancels queued work; already-running work may have an uncertain outcome that needs inspection.
+
+Hosted approval trusts the document reported by the open plugin; it does not independently verify the file through Figma REST. See [data and permissions](/privacy).
+
+## Validation status
+
+The live service passed OAuth/PKCE, SDK initialization/tool discovery, a read relay with a **simulated plugin**, write blocking without plan approval, and revocation checks. That protocol test did not modify a real Figma file. Real assistant/Figma approval remains an end-to-end user check; do not assume every assistant provider has been tested.

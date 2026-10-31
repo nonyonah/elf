@@ -37,6 +37,15 @@ export function pluginRoutes() {
     await result(c.env,plugin,body.generation,body.id,{ok:body.ok,result:body.result,error:body.error},body.snapshot);
     return c.json({ok:true});
   });
+  app.post('/approve',async c=>{
+    const body=z.object({generation:z.string().uuid()}).strict().parse(await jsonBody(c.req.raw,2048));
+    const plugin=await authenticatePlugin(c.env,c.req.header('Authorization')??null);
+    if(!plugin.owner.startsWith('plugin_')||plugin.generation!==body.generation)throw new Error('Connection changed');
+    const approved=await c.env.DB.prepare('UPDATE hosted_plugin_consents SET approvedGeneration=? WHERE owner=? AND connectionId=? RETURNING owner').bind(body.generation,plugin.owner,plugin.id).first();
+    if(!approved)throw new Error('Authorization unavailable');
+    await c.env.DB.prepare('UPDATE hosted_connections SET approvedGeneration=? WHERE id=? AND generation=?').bind(body.generation,plugin.id,body.generation).run();
+    return c.json({ok:true});
+  });
   app.post('/disconnect',async c=>{
     const plugin=await authenticatePlugin(c.env,c.req.header('Authorization')??null);
     await disconnect(c.env,plugin.owner,plugin.id);
@@ -52,16 +61,52 @@ export function hostedRoutes() {
   app.use('*',async(c,next)=>{
     if(c.env.HOSTED_MCP_ENABLED!=='true')return c.json({error:{message:'Hosted preview is disabled'}},404);
     const requestOrigin=c.req.header('Origin');
-    if(requestOrigin&&requestOrigin!==origin(c.env))return c.json({error:{message:'Origin rejected'}},403);
+    if((getSession(c).userId.startsWith('plugin_')&&c.req.method!=='GET'&&requestOrigin!==origin(c.env))||(requestOrigin&&requestOrigin!==origin(c.env)))return c.json({error:{message:'Origin rejected'}},403);
     if(!(await takeRateLimit(c.env.DB,`hosted:human:${getSession(c).userId}`,90)).allowed)return c.json({error:{message:'Too many requests'}},429);
     for(const [k,v]of Object.entries(noStore))c.header(k,v);
     try{await next();}catch{return c.json({error:{message:'Review expired, changed, or unavailable. Start again in your assistant.'}},400);}
   });
+  app.get('/assistants',async c=>{
+    const oauth=c.env.OAUTH_PROVIDER;if(!oauth)throw new Error('OAuth unavailable');
+    const owner=getSession(c).userId,cursor=c.req.query('cursor');
+    if(cursor&&cursor.length>2000)throw new Error('Invalid cursor');
+    const grants=await oauth.listUserGrants(owner,{limit:50,...(cursor?{cursor}:{})});
+    const assistants=[];
+    for(const grant of grants.items){
+      const resource=`${origin(c.env)}/mcp`;
+      if(grant.expiresAt&&grant.expiresAt*1000<=now())continue;
+      if(grant.resource!==resource&&!(Array.isArray(grant.resource)&&grant.resource.includes(resource)))continue;
+      const client=await oauth.lookupClient(grant.clientId);
+      const activity=await c.env.DB.prepare('SELECT lastSeen FROM hosted_assistant_activity WHERE owner=? AND clientId=?').bind(owner,grant.clientId).first<{lastSeen:number}>();
+      assistants.push({id:grant.id,name:client?.clientName?.slice(0,200)||'MCP assistant',connected:true,connectedAt:grant.createdAt*1000,lastUsedAt:activity?.lastSeen??null});
+    }
+    return c.json({assistants,cursor:grants.cursor??null,connectorUrl:`${origin(c.env)}/mcp`});
+  });
+  app.post('/assistants/:id/disconnect',async c=>{
+    const oauth=c.env.OAUTH_PROVIDER;if(!oauth)throw new Error('OAuth unavailable');
+    const owner=getSession(c).userId,id=c.req.param('id');
+    // Find the grant under this owner before touching its client or pending work.
+    let cursor:string|undefined,found:{id:string;clientId:string}|undefined;
+    for(let page=0;page<5&&!found;page++){
+      const grants=await oauth.listUserGrants(owner,{limit:50,...(cursor?{cursor}:{})});
+      found=grants.items.find(g=>g.id===id);cursor=grants.cursor;
+      if(!cursor)break;
+    }
+    if(!found)throw new Error('Assistant not found');
+    await oauth.revokeGrant(found.id,owner);
+    await c.env.DB.batch([
+      c.env.DB.prepare("UPDATE hosted_operations SET state=CASE WHEN state='running' THEN 'unknown' ELSE 'cancelled' END WHERE owner=? AND clientId=? AND state IN ('running','queued')").bind(owner,found.clientId),
+      c.env.DB.prepare("UPDATE hosted_plans SET state='stale' WHERE owner=? AND clientId=? AND state IN ('review','approved','applying')").bind(owner,found.clientId),
+      c.env.DB.prepare('DELETE FROM hosted_assistant_activity WHERE owner=? AND clientId=?').bind(owner,found.clientId),
+    ]);
+    return c.json({ok:true});
+  });
   app.get('/connections/:id',async c=>{
     const row=await connection(c.env,getSession(c).userId,c.req.param('id'));
-    return c.json({...row,authorization:'plugin',connected:!!row.heartbeat&&row.heartbeat>now()-15000});
+    return c.json({...row,authorization:'plugin',approvalInPlugin:getSession(c).userId.startsWith('plugin_'),connected:!!row.heartbeat&&row.heartbeat>now()-15000});
   });
   app.post('/connections/:id/approve',async c=>{
+    if(getSession(c).userId.startsWith('plugin_'))throw new Error('Approve this connection in Elf Bridge');
     const body=z.object({generation:z.string().uuid(),fileKey:z.string(),trust:z.literal('plugin')}).strict().parse(await jsonBody(c.req.raw,2048));
     const row=await connection(c.env,getSession(c).userId,c.req.param('id'));
     if(row.generation!==body.generation||row.fileKey!==body.fileKey||!row.heartbeat||row.heartbeat<now()-15000)throw new Error('Connection changed');
@@ -87,6 +132,7 @@ export function hostedRoutes() {
     return c.json({ok:true,next:'Return to your assistant to apply this approved plan.'});
   });
   app.post('/consent/start',async c=>{
+    if(getSession(c).userId.startsWith('plugin_'))throw new Error('Start a fresh plugin authorization from Settings');
     const input=z.object({query:z.string().max(16000)}).strict().parse(await jsonBody(c.req.raw,20000));
     const oauth=c.env.OAUTH_PROVIDER;
     if(!oauth)throw new Error('OAuth unavailable');
@@ -100,6 +146,11 @@ export function hostedRoutes() {
   app.post('/consent/finish',async c=>{
     const body=z.object({handle:z.string().max(500),approve:z.boolean()}).strict().parse(await jsonBody(c.req.raw,2048));
     const oauth=c.env.OAUTH_PROVIDER;if(!oauth)throw new Error('OAuth unavailable');
+    if(body.approve && getSession(c).userId.startsWith('plugin_')){
+      const approved=await c.env.DB.prepare(`SELECT c.id FROM hosted_connections c JOIN hosted_plugin_consents p ON p.connectionId=c.id
+        WHERE p.owner=? AND p.expires>? AND p.approvedGeneration=c.generation AND c.approvedGeneration=c.generation AND c.heartbeat>?`).bind(getSession(c).userId,now(),now()-15000).first();
+      if(!approved)throw new Error('Approve the assistant and file in Elf Bridge first');
+    }
     const consumed=await c.env.DB.prepare('DELETE FROM hosted_consents WHERE handleHash=? AND owner=? AND expires>? RETURNING owner').bind(await hash(body.handle),getSession(c).userId,now()).first();
     if(!consumed)throw new Error('Consent expired');
     if(!body.approve){const denied=await oauth.denyConsent(c.req.raw,body.handle);return new Response(JSON.stringify({redirectTo:denied.headers.get('Location')}),{headers:{...noStore,'Content-Type':'application/json'}});}
