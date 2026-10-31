@@ -61,7 +61,40 @@ it('requires plugin approval without an account and separates file, browser and 
   const response=await run('/mcp',{method:'POST',headers:{'Content-Type':'application/json',Accept:'application/json, text/event-stream',Authorization:`Bearer ${token.access_token}`},body:JSON.stringify({jsonrpc:'2.0',id:1,method:'tools/call',params:{name,arguments:args}})});
   return await response.json() as {result:{isError?:boolean;content:{text:string}[]}};
  };
- expect((await call('get_figma_pairing_code',{url:'https://www.figma.com/design/otherFile012345/Other'})).result.isError).toBe(true);
+ const fileUrl='https://www.figma.com/design/otherFile012345/Other';
+ const suggestion=await call('get_figma_pairing_code',{url:fileUrl});
+ expect(suggestion.result.isError).not.toBe(true);
+ const review=JSON.parse(suggestion.result.content[0].text);
+ expect(review.approvalRequired).toBe(true);
+ expect(new URL(review.reviewUrl).searchParams.get('elf_add_file')).toBe(fileUrl);
+ expect(review.code).toBeUndefined();
+ // Assistant bearer authority cannot create or approve another file by itself.
+ expect((await run('/api/hosted/connections',{...json({url:fileUrl}),headers:{'Content-Type':'application/json',Origin:'https://console.test',Authorization:`Bearer ${token.access_token}`}})).status).toBe(401);
+ expect((await run('/api/hosted/connections',json({url:fileUrl},cookie,'https://attacker.test'))).status).toBe(403);
+ expect((await run('/api/hosted/connections',json({url:fileUrl,expectedOwner:'plugin_other-assistant'},cookie))).status).toBe(400);
+ expect((await run('/api/hosted/connections',json({url:'https://attacker.test/design/otherFile012345'},cookie))).status).toBe(400);
+ const added=await run('/api/hosted/connections',json({url:fileUrl},cookie));
+ expect(added.status).toBe(200);
+ const second=await added.json() as {code:string;connectionId:string};
+ expect(second.connectionId).not.toBe(pair.connectionId);
+ expect((await call('list_collections',{connectionId:second.connectionId})).result.isError).toBe(true);
+ const secondPlugin=await connectPlugin(bindings,{code:second.code,fileKey:'otherFile012345',fileName:'Other'},null);
+ expect(secondPlugin.assistant?.clientName).toBe('Accountless test');
+ expect((await call('list_collections',{connectionId:second.connectionId})).result.isError).toBe(true);
+ // Another plugin's credential cannot approve the new file's generation.
+ expect((await run('/api/hosted-bridge/approve',{...json({generation:secondPlugin.generation}),headers:{'Content-Type':'application/json',Authorization:`Bearer ${connected.session}`}})).status).toBe(400);
+ expect((await run('/api/hosted-bridge/approve',{...json({generation:secondPlugin.generation}),headers:{'Content-Type':'application/json',Authorization:`Bearer ${secondPlugin.session}`}})).status).toBe(200);
+ expect((await call('list_collections',{connectionId:second.connectionId})).result.isError).not.toBe(true);
+ expect((await call('list_collections',{connectionId:pair.connectionId})).result.isError).not.toBe(true);
+ const switchBack=JSON.parse((await call('get_figma_pairing_code',{url:input.url})).result.content[0].text);
+ expect(switchBack.connections[0].connectionId).toBe(pair.connectionId);
+ expect(switchBack.reviewUrl).toBeUndefined();
+ const original=await env.DB.prepare('SELECT fileKey,approvedGeneration FROM hosted_connections WHERE id=?').bind(pair.connectionId).first();
+ expect(original).toMatchObject({fileKey,approvedGeneration:connected.generation});
+ // Removing one file leaves the other approved and available with the same OAuth token.
+ expect((await run(`/api/hosted/connections/${second.connectionId}/disconnect`,json({},cookie))).status).toBe(200);
+ expect((await call('list_collections',{connectionId:second.connectionId})).result.isError).toBe(true);
+ expect((await call('list_collections',{connectionId:pair.connectionId})).result.isError).not.toBe(true);
  const own=await call('figma_onboarding_status',{});
  expect(JSON.parse(own.result.content[0].text).connections).toHaveLength(1);
  const other=await pairCode(bindings,'other-owner','otherFile012345');

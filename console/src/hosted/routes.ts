@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { getSession, type AppEnv } from '../auth.js';
 import { takeRateLimit } from '../ratelimit.js';
 import { hash, jsonBody, noStore, now, origin } from './common.js';
-import { authenticatePlugin, connectPlugin, connection, disconnect, poll, result } from './relay.js';
+import { authenticatePlugin, connectPlugin, connection, disconnect, pairCode, poll, result } from './relay.js';
 
 /** Bearer-only plugin routes. Never use a browser cookie as plugin authority. */
 export function pluginRoutes() {
@@ -104,6 +104,29 @@ export function hostedRoutes() {
   app.get('/connections/:id',async c=>{
     const row=await connection(c.env,getSession(c).userId,c.req.param('id'));
     return c.json({...row,authorization:'plugin',approvalInPlugin:getSession(c).userId.startsWith('plugin_'),connected:!!row.heartbeat&&row.heartbeat>now()-15000});
+  });
+  app.get('/connections',async c=>{
+    const rows=await c.env.DB.prepare('SELECT id,fileKey,fileName,generation,approvedGeneration,heartbeat FROM hosted_connections WHERE owner=? ORDER BY createdAt DESC').bind(getSession(c).userId).all();
+    return c.json({connections:rows.results.map(row=>({...row,connected:typeof row.heartbeat==='number'&&row.heartbeat>now()-15000,approved:!!row.generation&&row.generation===row.approvedGeneration}))});
+  });
+  // Browser authority and a separate plugin click are both required for every new file.
+  app.post('/connections',async c=>{
+    const owner=getSession(c).userId;
+    if(!owner.startsWith('plugin_'))throw new Error('Use the hosted plugin authorization flow');
+    const body=z.object({url:z.string().url().max(2000),expectedOwner:z.string().max(100).optional()}).strict().parse(await jsonBody(c.req.raw,4096));
+    if(body.expectedOwner&&body.expectedOwner!==owner)throw new Error('Use the browser connected to this assistant');
+    const url=new URL(body.url);
+    if(url.protocol!=='https:'||!['figma.com','www.figma.com'].includes(url.hostname)||url.port||url.username||url.password)throw new Error('Invalid URL');
+    const fileKey=/^\/(?:design|file)\/([A-Za-z0-9_-]{10,100})(?:\/|$)/.exec(url.pathname)?.[1];
+    if(!fileKey)throw new Error('Invalid URL');
+    const oauth=c.env.OAUTH_PROVIDER;if(!oauth)throw new Error('OAuth unavailable');
+    const grants=await oauth.listUserGrants(owner,{limit:1});
+    if(!grants.items.some(grant=>!grant.expiresAt||grant.expiresAt*1000>now()))throw new Error('Reconnect your assistant first');
+    const consent=await c.env.DB.prepare('SELECT clientName,redirectHost,scopes FROM hosted_plugin_consents WHERE owner=? ORDER BY expires DESC LIMIT 1').bind(owner).first<{clientName:string;redirectHost:string;scopes:string}>();
+    if(!consent)throw new Error('Reconnect your assistant first');
+    const paired=await pairCode(c.env,owner,fileKey);
+    await c.env.DB.prepare('INSERT INTO hosted_plugin_consents(owner,connectionId,clientName,redirectHost,scopes,expires) VALUES(?,?,?,?,?,?)').bind(owner,paired.connectionId,consent.clientName,consent.redirectHost,consent.scopes,now()+600000).run();
+    return c.json({...paired,details:{clientName:consent.clientName,redirectHost:consent.redirectHost}});
   });
   app.post('/connections/:id/approve',async c=>{
     if(getSession(c).userId.startsWith('plugin_'))throw new Error('Approve this connection in Elf Bridge');

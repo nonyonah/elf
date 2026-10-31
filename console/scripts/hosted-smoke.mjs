@@ -8,7 +8,7 @@ const base = process.argv[2] || 'https://elf.riftlabs.xyz';
 assert.equal(new URL(base).protocol, 'https:');
 const endpoint = base + '/mcp';
 const fileKey = 'ElfAcceptance' + randomBytes(8).toString('hex');
-let browserCookie = '', pluginToken = '', connectionId = '', assistantId = '', accessToken = '';
+let browserCookie = '', pluginToken = '', secondPluginToken = '', connectionId = '', assistantId = '', accessToken = '';
 let client;
 const request = (path, body, headers = {}) => fetch(base + path, {
   method: body === undefined ? 'GET' : 'POST',
@@ -83,6 +83,29 @@ try {
   assert.ok(plan.planId);
   const apply = await client.callTool({name:'apply_figma_changes',arguments:{planId:plan.planId}});
   assert.equal(apply.isError,true); summary.checks.push('writes remain blocked without separate plan review');
+  const secondFileKey='ElfAcceptance'+randomBytes(8).toString('hex');
+  const secondUrl=`https://www.figma.com/design/${secondFileKey}/Other`;
+  const review=value(await client.callTool({name:'get_figma_pairing_code',arguments:{url:secondUrl}}));
+  assert.equal(review.approvalRequired,true);assert.equal(review.code,undefined);
+  assert.equal(new URL(review.reviewUrl).searchParams.get('elf_add_file'),secondUrl);
+  assert.equal((await request('/api/hosted/connections',{url:secondUrl},{Authorization:'Bearer '+accessToken,Origin:base})).status,401);
+  const secondStart=await request('/api/hosted/connections',{url:secondUrl,expectedOwner:new URL(review.reviewUrl).searchParams.get('elf_assistant')},browser());
+  assert.equal(secondStart.status,200);const second=await secondStart.json();
+  assert.equal((await client.callTool({name:'list_collections',arguments:{connectionId:second.connectionId}})).isError,true);
+  const secondConnect=await request('/api/hosted-bridge/connect',{code:second.code,fileKey:secondFileKey,fileName:'Second simulated file'});
+  assert.equal(secondConnect.status,200);const secondPair=await secondConnect.json();secondPluginToken=secondPair.session;
+  assert.equal((await client.callTool({name:'list_collections',arguments:{connectionId:second.connectionId}})).isError,true);
+  assert.equal((await request('/api/hosted-bridge/approve',{generation:secondPair.generation},{Authorization:'Bearer '+secondPluginToken})).status,200);
+  assert.ok(value(await client.callTool({name:'list_collections',arguments:{connectionId:second.connectionId}})).jobId);
+  const originalPlan=await (await request(`/api/hosted/plans/${plan.planId}`,undefined,browser())).json();
+  assert.equal(originalPlan.connectionId,connectionId);assert.equal(originalPlan.state,'review');
+  assert.equal((await client.callTool({name:'apply_figma_changes',arguments:{planId:plan.planId}})).isError,true);
+  const multiple=value(await client.callTool({name:'figma_onboarding_status',arguments:{}}));
+  assert.equal(multiple.connections.length,2);
+  assert.equal((await request('/api/hosted-bridge/disconnect',{}, {Authorization:'Bearer '+secondPluginToken})).status,200);secondPluginToken='';
+  const remaining=value(await client.callTool({name:'figma_onboarding_status',arguments:{}}));
+  assert.equal(remaining.connections.length,1);assert.equal(remaining.connections[0].connectionId,connectionId);
+  summary.checks.push('second file requires browser and plugin approval, same OAuth token works, original plan stays scoped, independent removal');
   const assistants = await (await request('/api/hosted/assistants',undefined,browser())).json();
   assert.equal(assistants.assistants.length,1); assistantId = assistants.assistants[0].id;
   assert.equal((await request(`/api/hosted/assistants/${assistantId}/disconnect`,{},browser())).status,200);assistantId='';
@@ -91,6 +114,7 @@ try {
   summary.passed=true;
 } finally {
   await client?.close();
+  if(secondPluginToken)await request('/api/hosted-bridge/disconnect',{}, {Authorization:'Bearer '+secondPluginToken});
   if(assistantId)await request(`/api/hosted/assistants/${assistantId}/disconnect`,{},browser());
   if(pluginToken)assert.equal((await request('/api/hosted-bridge/disconnect',{},plugin())).status,200);
 }

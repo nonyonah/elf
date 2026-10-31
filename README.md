@@ -22,7 +22,8 @@ Figma Desktop is required. Import `dist/bridge-plugin-public/manifest.json` from
 
 - **npm:** local onboarding, Settings, monitoring, reports, and reviewed sync.
 - **VS Code and compatible editors such as Cursor:** [install Elf](https://marketplace.visualstudio.com/items?itemName=NonsoOnah.elf-design-system) for native Overview, Changes, Activity, and Manage views; the extension bundles the shared runtime. Use the official VSIX in compatible editors whose registry does not list Elf. See [editor setup](https://elf-docs.riftlabs.xyz/vscode). Run `npx elf-tokens@beta extension` for discovery instructions.
-- **Local MCP:** connect a supported desktop assistant using `npx -y elf-tokens@beta mcp --project /absolute/project/path`. Settings provides client configuration. There is no hosted MCP URL in this beta.
+- **Local MCP:** connect a supported desktop assistant using `npx -y elf-tokens@beta mcp --project /absolute/project/path`. Settings provides client configuration.
+- **Hosted MCP preview:** use `https://elf.riftlabs.xyz/mcp` in an assistant supporting OAuth and Streamable HTTP. Authorize the assistant once, then approve each Figma file separately in Elf Bridge; no Figma OAuth sign-in is required. Follow the [hosted connector guide](https://elf-docs.riftlabs.xyz/hosted-mcp) for the plugin download and setup. Figma Desktop and an open plugin are required.
 
 ## What gets checked
 

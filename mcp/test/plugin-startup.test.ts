@@ -17,6 +17,7 @@ function ui(fetcher?: typeof fetch) {
     if (!elements.has(key)) elements.set(key, { value: "", hidden: false, textContent: "", listeners: {} as any,
       setAttribute() {}, removeAttribute() {}, querySelector() {return document.getElementById(key + '-label');},
       addEventListener(event: string, listener: unknown) { this.listeners[event] = listener; },
+      options: [{disabled:false,hidden:false},{disabled:false,hidden:false}],
       children: [] as any[], replaceChildren(){this.children=[];},appendChild(child:any){this.children.push(child);}, classList: {toggle() {}, add() {}, remove() {}} });
     return elements.get(key);
   }};
@@ -29,6 +30,17 @@ function ui(fetcher?: typeof fetch) {
   for (const match of html.matchAll(/<script>([\s\S]*?)<\/script>/g)) runInNewContext(match[1], context);
   return {window, parent, document, elements, messages, timers, sockets};
 }
+
+test('Hosted Elf offers plugin approval without Figma OAuth or REST verification',()=>{
+ const app=ui(),channel=app.messages[0].channel;
+ app.window.onmessage({data:{pluginMessage:{type:'context',channel,file:{name:'Untitled',key:'file123456',verification:{method:'strict'}},bridge:{host:'localhost:8765',session:''}}}});
+ app.elements.get('connection-kind').listeners.change({target:{value:'hosted'}});
+ assert.equal(app.elements.get('file-link-form').hidden,false);
+ assert.equal(app.elements.get('file-authorization').value,'plugin');
+ assert.equal(app.elements.get('file-authorization').options[0].disabled,true);
+ assert.equal(app.elements.get('file-authorization').options[0].hidden,true);
+ assert.match(app.elements.get('file-authorization-help').textContent,/No Figma account sign-in/);
+});
 
 test('MCP indicator follows authenticated ready and presence messages, and clears on disconnect',()=>{
  const app=ui(),channel=app.messages[0].channel;

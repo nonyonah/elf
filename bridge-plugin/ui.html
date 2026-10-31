@@ -398,7 +398,7 @@
           <p class="sub" id="context-detail">Bridge state is kept in Figma, not in the document.</p>
           <button class="secondary" id="retry-context" hidden>Try again</button>
           <div id="file-link-form" hidden style="text-align:left;width:100%;margin-top:16px">
-            <p class="sub">Paste this open file’s link to select your project. Choose plugin approval without REST, or strict URL verification using your connected Figma account.</p>
+            <p class="sub" id="file-authorization-help">Paste this open file’s link to select your project. Hosted Elf uses approval in this plugin, without Figma account sign-in.</p>
             <label class="field-label" for="figma-file-link">Figma file link</label>
             <input id="figma-file-link" type="url" placeholder="https://www.figma.com/design/…" />
             <label class="field-label" for="file-authorization">Document authorization</label>
@@ -810,6 +810,7 @@ function pairingHmac(key, text) {
       state.session = '';state.ready = false;state.identityVerified = false;
       $('host').value = state.host;
       postPluginMessage({type:'save-host',host:state.host});
+      if(state.host === HOSTED_ORIGIN && state.file?.verification?.method !== 'plugin'){showFileLink();return;}
       showPairing('');
     });
 
@@ -1143,6 +1144,11 @@ function pairingHmac(key, text) {
       closeCurrentSocket();
       $("figma-file-link").value = state.file ? `https://www.figma.com/design/${encodeURIComponent(state.file.key)}` : "";
       $('file-authorization').value = state.file && state.file.verification ? state.file.verification.method || 'strict' : 'plugin';
+      const hosted = state.host === HOSTED_ORIGIN;
+      $('file-authorization').options[0].disabled = hosted;
+      $('file-authorization').options[0].hidden = hosted;
+      if(hosted)$('file-authorization').value = 'plugin';
+      $('file-authorization-help').textContent = hosted ? 'Approve this open file in Elf Bridge. No Figma account sign-in is needed.' : 'Paste this open file’s link. Choose plugin approval, or optional strict verification using a connected Figma account.';
       clearTimeout(contextTimer); setPhase("loading");
       $("context-spinner").hidden = true; $("retry-context").hidden = true;
       $("context-heading").textContent = "Link this Figma file";

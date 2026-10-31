@@ -11,6 +11,18 @@ import '../../../settings-next/src/app/globals.css';
 
 type Assistant={id:string;name:string;connected:boolean;connectedAt:number;lastUsedAt:number|null};
 type AssistantList={assistants:Assistant[];cursor:string|null;connectorUrl:string};
+function Files(){
+  const api=useApi();
+  const [files,setFiles]=React.useState<{id:string;fileKey:string;fileName:string|null;approved:boolean;connected:boolean}[]>([]);
+  const [authorized,setAuthorized]=React.useState(false);
+  React.useEffect(()=>{let active=true;const load=async()=>{try{const data=await api.get<{connections:typeof files}>('/hosted/connections');if(active){setFiles(data.connections);setAuthorized(true);}}catch(e){if(active&&e instanceof ApiError&&e.status===401){setFiles([]);setAuthorized(false);}}};void load();const timer=setInterval(load,10000);return()=>{active=false;clearInterval(timer);};},[api]);
+  return <section className="mb-6" aria-labelledby="files-heading"><h2 id="files-heading" className="mb-2.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Figma files</h2>
+    <p className="mb-3 text-xs text-muted-foreground">Approve each file in Elf Bridge. No Figma account sign-in is required.</p>
+    {files.map(file=><Card key={file.id} className="mb-3 gap-1 border-[0.5px] p-3.5 shadow-none before:hidden"><a className="break-words underline" href={`?elf_connection=${file.id}`}>{file.fileName||'Untitled'}</a><p className="break-all text-xs text-muted-foreground">{file.fileKey}</p><p className="text-xs">{!file.connected?'Plugin offline':file.approved?'Approved · connected':'Waiting for approval in Elf Bridge'}</p></Card>)}
+    <Button variant="outline" size="sm" disabled={!authorized} onClick={()=>location.assign('/settings?elf_add_file=')}>Add Figma file</Button>
+    {!authorized&&<p className="mt-2 text-xs text-muted-foreground">Connect an assistant first, using this browser.</p>}
+  </section>;
+}
 function Assistants() {
   const api=useApi();
   const [data,setData]=React.useState<AssistantList|null>(null),[error,setError]=React.useState(''),[busy,setBusy]=React.useState<string|null>(null);
@@ -40,10 +52,11 @@ function Assistants() {
     </>}
   </section>;
 }
-function PluginAuthorization(){
+function PluginAuthorization({addFile=false}:{addFile?:boolean}){
   const api=useApi();
   const query=new URLSearchParams(location.search).get('elf_authorize')!;
-  const [url,setUrl]=React.useState(''),[error,setError]=React.useState(''),[busy,setBusy]=React.useState(false);
+  const expectedOwner=new URLSearchParams(location.search).get('elf_assistant')||undefined;
+  const [url,setUrl]=React.useState(addFile?new URLSearchParams(location.search).get('elf_add_file')||'':''),[error,setError]=React.useState(''),[busy,setBusy]=React.useState(false);
   const [pair,setPair]=React.useState<{handle:string;code:string;connectionId:string;fileKey:string;expiresAt:number;details:{clientName:string;redirectHost:string}}|null>(null);
   const [approved,setApproved]=React.useState(false);
   React.useEffect(()=>{
@@ -54,12 +67,12 @@ function PluginAuthorization(){
   },[api,pair]);
   const act=async(work:()=>Promise<void>)=>{setBusy(true);setError('');try{await work();}catch(e){setError(e instanceof Error?e.message:'Connection failed');}finally{setBusy(false);}};
   return <Card className="mb-5 gap-3 border-[0.5px] p-4 shadow-none before:hidden">
-    <h2 className="font-medium">Connect your assistant</h2>
-    <p className="text-xs text-muted-foreground">No Elf account needed. Access stays scoped to the file you approve in Elf Bridge.</p>
+    <h2 className="font-medium">{addFile?'Add a Figma file':'Connect your assistant'}</h2>
+    <p className="text-xs text-muted-foreground">No Elf account or Figma account sign-in needed. Each file requires approval in Elf Bridge.</p>
     {error&&<p role="alert" className="text-xs text-destructive">{error}</p>}
-    {!pair?<form className="flex flex-col gap-3" onSubmit={event=>{event.preventDefault();void act(async()=>setPair(await api.post('/hosted-auth/start',{query,url})));}}>
+    {!pair?<form className="flex flex-col gap-3" onSubmit={event=>{event.preventDefault();void act(async()=>setPair(await api.post(addFile?'/hosted/connections':'/hosted-auth/start',addFile?{url,expectedOwner}:{query,url})));}}>
       <label className="text-xs" htmlFor="file-url">Figma file URL</label><input id="file-url" type="url" required value={url} onChange={e=>setUrl(e.target.value)} className="min-w-0 rounded-lg border bg-background px-3 py-2 text-sm" placeholder="https://www.figma.com/design/…"/>
-      <Button disabled={busy} type="submit">Continue with Elf Bridge</Button>
+      <Button disabled={busy} type="submit">{addFile?'Add file with Elf Bridge':'Continue with Elf Bridge'}</Button>
     </form>:<>
       <p className="text-sm"><strong>{pair.details.clientName}</strong> · returns to {pair.details.redirectHost}</p>
       <p className="text-xs text-muted-foreground">Assistant names are self-declared. Continue only if you started this request.</p>
@@ -68,17 +81,20 @@ function PluginAuthorization(){
       <p className="break-all text-xs">File: {pair.fileKey}</p>
       <p className="text-xs text-muted-foreground">Code expires at {new Date(pair.expiresAt).toLocaleTimeString()}. Keep this browser tab for Settings and future change reviews.</p>
       <p role="status" className="text-xs">{approved?'Approved in Elf Bridge. Ready to return to your assistant.':'Waiting for approval in Elf Bridge…'}</p>
-      <Button disabled={busy||!approved} onClick={()=>void act(async()=>{const result=await api.post<{redirectTo:string}>('/hosted/consent/finish',{handle:pair.handle,approve:true});location.assign(result.redirectTo);})}>Finish connection</Button>
-      <Button variant="outline" disabled={busy} onClick={()=>void act(async()=>{const result=await api.post<{redirectTo:string}>('/hosted/consent/finish',{handle:pair.handle,approve:false});location.assign(result.redirectTo);})}>Cancel</Button>
+      {addFile?<><p className="text-xs">Existing file approvals stay unchanged. Ask your assistant to check figma_onboarding_status and select this file’s connection ID.</p><Button variant="outline" disabled={busy} onClick={()=>void act(async()=>{await api.post(`/hosted/connections/${pair.connectionId}/disconnect`);location.assign('/settings');})}>Remove this file connection</Button></>:<>
+        <Button disabled={busy||!approved} onClick={()=>void act(async()=>{const result=await api.post<{redirectTo:string}>('/hosted/consent/finish',{handle:pair.handle,approve:true});location.assign(result.redirectTo);})}>Finish connection</Button>
+        <Button variant="outline" disabled={busy} onClick={()=>void act(async()=>{const result=await api.post<{redirectTo:string}>('/hosted/consent/finish',{handle:pair.handle,approve:false});location.assign(result.redirectTo);})}>Cancel</Button>
+      </>}
     </>}
   </Card>;
 }
 function Settings() {
   const api=React.useMemo(()=>createApi(async()=>null),[]);
   const authorize=new URLSearchParams(location.search).has('elf_authorize');
+  const addFile=new URLSearchParams(location.search).has('elf_add_file');
   return <ApiProvider client={api}><main className="mx-auto w-full min-w-0 max-w-[420px] px-5 pb-8 pt-8 [overflow-wrap:anywhere]">
     <header className="mb-6 flex items-center gap-3"><img src={mascot} width={32} height={32} alt=""/><div><p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Elf</p><h1 className="text-[15px] font-medium">Settings</h1></div></header>
-    {authorize?<PluginAuthorization/>:<>{isHostedReview()&&<HostedReviewScreen embedded/>}<Assistants/></>}
+    {authorize?<PluginAuthorization/>:addFile?<PluginAuthorization addFile/>:<>{isHostedReview()&&<HostedReviewScreen embedded/>}<Files/><Assistants/></>}
     <footer className="mt-6 text-center text-[11px] text-faint">Elf · your design system, connected<a className="mt-3 block underline underline-offset-4" href="/downloads/elf-bridge-hosted.zip" download>Download Elf Bridge for Figma Desktop</a></footer>
   </main></ApiProvider>;
 }
