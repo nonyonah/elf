@@ -220,6 +220,14 @@ test('pairing, report, resources, and assistants use native affordances', async 
   h.infoResponses.push('Copy snippet');
   await h.commands.get('elf.assistants')();
   assert.match(h.clipboard.at(-1), /mcpServers/);
+  h.quickPicks.push({ label: 'OpenCode', value: 'opencode' });
+  h.infoResponses.push('Copy snippet');
+  await h.commands.get('elf.assistants')();
+  const openCode = JSON.parse(h.clipboard.at(-1));
+  assert.equal(openCode.mcp.elf.type, 'local');
+  assert.equal(openCode.mcp.elf.enabled, true);
+  assert.deepEqual(openCode.mcp.elf.command, ['node', '/elf/bin/elf-tokens.js', 'mcp', '--project', '/project']);
+  assert.equal(h.documents.at(-1).languageId, 'json');
 });
 
 test('description review opens a native diff and saves with the review hash', async t => {

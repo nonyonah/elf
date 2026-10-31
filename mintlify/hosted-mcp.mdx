@@ -13,6 +13,25 @@ Use this in an assistant that supports remote **Streamable HTTP MCP** and **OAut
 
 The hosted service runs separately from the local npm monitor. You do not need an IDE or local MCP server for this connection. **Figma Desktop and an open Elf Bridge plugin are still required.**
 
+## OpenCode remote configuration
+
+For hosted access in OpenCode, merge this into `opencode.json` or `opencode.jsonc`:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "elf": {
+      "type": "remote",
+      "url": "https://elf.riftlabs.xyz/mcp",
+      "enabled": true
+    }
+  }
+}
+```
+
+Run `opencode mcp auth elf`, then follow the file and plugin approval steps below. This authorizes OpenCode to use Elf; it is not Figma account OAuth. Choose either this remote connection or the [local OpenCode setup](/local-mcp#opencode) for a given server name. Local OpenCode connection was tested; hosted OpenCode OAuth still needs a user-completed end-to-end check.
+
 ## Connect your assistant
 
 1. In your assistant’s connector settings, add Elf with the URL above.

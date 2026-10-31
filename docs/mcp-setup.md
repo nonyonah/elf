@@ -98,3 +98,13 @@ Verified against the installed Codex CLI and official documentation:
 [Codex MCP](https://learn.chatgpt.com/docs/extend/mcp),
 [Claude Code MCP](https://code.claude.com/docs/en/mcp),
 [Cursor MCP](https://prod.cursor.com/docs/mcp).
+
+## OpenCode
+
+Use `mcp.elf` with `type: "local"`, `enabled: true`, and a command array containing
+`[nodeExecutable, elfEntryPoint, "mcp", "--project", projectPath]` in `opencode.json`
+or `opencode.jsonc`. Settings and the native extension generate an OpenCode
+configuration using the installed absolute paths. See the [complete local guide](https://elf-docs.riftlabs.xyz/local-mcp#opencode).
+
+A real `opencode --pure mcp list` check passed with isolated config/storage and
+the published package. No real Figma resources were read or modified.

@@ -70,6 +70,27 @@ claude mcp add --transport stdio --scope user elf -- npx -y elf-tokens@1.0.0-bet
 
 For desktop PATH problems, replace `npx -y elf-tokens@1.0.0-beta.1` with the absolute Node executable followed by the installed Elf entry point, as above. Restart the client’s MCP connection after registration. This is for **Claude Code/local clients**, not the custom connector URL field on Claude’s website.
 
+## OpenCode
+
+OpenCode uses `mcp`, not `mcpServers`. Merge this into your project's `opencode.json` or `opencode.jsonc`, keeping existing settings:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "elf": {
+      "type": "local",
+      "command": ["npx", "-y", "elf-tokens@1.0.0-beta.1", "mcp", "--project", "/absolute/path/to/project"],
+      "enabled": true
+    }
+  }
+}
+```
+
+For desktop PATH issues, replace the command array with `["/absolute/path/to/node", "/absolute/path/to/project/node_modules/elf-tokens/bin/elf-tokens.js", "mcp", "--project", "/absolute/path/to/project"]`. Settings → Coding assistants and the extension’s **Coding assistants → OpenCode** generate this using the current installation’s absolute paths.
+
+Restart OpenCode and run `opencode mcp list`; Elf should appear connected. Then follow the local Figma pairing steps below. Local stdio needs no MCP OAuth login. See [OpenCode’s MCP documentation](https://opencode.ai/docs/en/mcp-servers/).
+
 ## Cursor and other stdio clients
 
 Settings → Coding assistants provides configuration for the current installation. For a client using `mcpServers` JSON, use:
@@ -124,3 +145,5 @@ When switching local MCP targets, give the assistant the new URL and have it sel
 ## Verification
 
 The published npm release `1.0.0-beta.1` was installed into a clean temporary folder and checked on macOS with Node.js `22.23.0`. Real MCP SDK connections through `npx`, the installed package’s absolute Node entry point, and the repository entry point each initialized, listed 44 tools, selected a synthetic file with plugin-only authorization, and generated a pairing code. No real Figma resources were accessed or modified. Codex registration syntax and installed Claude Code command help were checked; this does not claim end-to-end testing in every desktop client.
+
+OpenCode’s real `mcp list` connection check also passed using an isolated configuration and the published Elf package. This verified client initialization without accessing real Figma resources.

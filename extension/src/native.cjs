@@ -298,7 +298,7 @@ class NativeElf {
       { label: 'Notification preferences', command: 'elf.preferences' },
       {label:'Import Figma component',description:'Confirm framework/library, then review a new code draft',command:'elf.importComponent'},
       { label: 'Import Figma tokens', description:'Preview a new JSON file; existing files stay unchanged', command:'elf.importTokens' },
-      { label: 'Coding assistants', description: 'Cursor, Claude Code, Codex', command: 'elf.assistants' },
+      { label: 'Coding assistants', description: 'Cursor, Claude Code, Codex, OpenCode', command: 'elf.assistants' },
       { label: 'Automatic sync', description: project?.mode === 'automatic' ? 'On · pause' : 'Off · review before enabling', command: 'elf.toggleAutomatic' },
       { label: 'Generate component description with AI', command: 'elf.generateDescription' },
       { label: 'Prepare component description manually', command: 'elf.prepareDescription' },
@@ -793,15 +793,17 @@ class NativeElf {
       { label: 'Cursor', value: 'cursor' },
       { label: 'Claude Code', value: 'claude' },
       { label: 'Codex', value: 'codex' },
+      { label: 'OpenCode', value: 'opencode' },
     ], { title: 'Connect a coding assistant', placeHolder: 'Choose where to add the Elf MCP server' });
     if (!choice) return;
     const quote = value => "'" + value.replace(/'/g, "'\\''") + "'";
     const command = [integration.command, ...integration.args].map(quote).join(' ');
     const snippet = choice.value === 'cursor'
       ? JSON.stringify({ mcpServers: { elf: { type: 'stdio', command: integration.command, args: integration.args } } }, null, 2)
+      : choice.value === 'opencode' ? JSON.stringify({ $schema: 'https://opencode.ai/config.json', mcp: { elf: { type: 'local', command: [integration.command, ...integration.args], enabled: true } } }, null, 2)
       : choice.value === 'claude' ? `claude mcp add --transport stdio --scope local elf -- ${command}` : `codex mcp add elf -- ${command}`;
-    await this.text(snippet, choice.value === 'cursor' ? 'json' : 'shellscript');
-    const copy = await this.vscode.window.showInformationMessage(`Add this Elf MCP configuration for ${choice.label}. Keep the Figma plugin open.`, 'Copy snippet');
+    await this.text(snippet, ['cursor', 'opencode'].includes(choice.value) ? 'json' : 'shellscript');
+    const copy = await this.vscode.window.showInformationMessage(`Add this Elf MCP configuration for ${choice.label}${choice.value === 'opencode' ? ' to opencode.json or opencode.jsonc' : ''}. Keep the Figma plugin open.`, 'Copy snippet');
     if (copy === 'Copy snippet' && this.vscode.env.clipboard) await this.vscode.env.clipboard.writeText(snippet);
   }
   notificationKey() { return `elf.notifications:${this.getRuntime()?.root || ''}`; }
