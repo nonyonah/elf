@@ -43,6 +43,7 @@ async function parseError(response: Response): Promise<ApiError> {
 
 export function createApi(
   getToken: () => Promise<string | null>,
+  getAssistant?: () => string | null,
 ): ApiClient {
   async function request<T>(
     method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE",
@@ -52,6 +53,8 @@ export function createApi(
     const token = await getToken();
     const headers = new Headers({ Accept: "application/json" });
     if (token) headers.set("Authorization", `Bearer ${token}`);
+    const assistant=getAssistant?.();
+    if (assistant) headers.set('X-Elf-Assistant',assistant);
     if (body !== undefined) headers.set("Content-Type", "application/json");
     const response = await fetch(`/api${path}`, {
       method,

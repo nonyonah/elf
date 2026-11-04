@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { HTTPException } from 'hono/http-exception';
 import { z } from 'zod';
 import { getSession, type AppEnv } from '../auth.js';
 import { takeRateLimit } from '../ratelimit.js';
@@ -57,14 +58,14 @@ export function pluginRoutes() {
 /** Signed-in human review. MCP bearer tokens cannot approve their own plans. */
 export function hostedRoutes() {
   const app=new Hono<AppEnv>();
-  app.onError((_error,c)=>c.json({error:{message:'Review expired, changed, or unavailable. Start again in your assistant.'}},400));
+  app.onError((error,c)=>c.json({error:{message:error instanceof HTTPException?error.message:'Review expired, changed, or unavailable. Start again in your assistant.'}},error instanceof HTTPException?error.status:400));
   app.use('*',async(c,next)=>{
     if(c.env.HOSTED_MCP_ENABLED!=='true')return c.json({error:{message:'Hosted preview is disabled'}},404);
     const requestOrigin=c.req.header('Origin');
     if((getSession(c).userId.startsWith('plugin_')&&c.req.method!=='GET'&&requestOrigin!==origin(c.env))||(requestOrigin&&requestOrigin!==origin(c.env)))return c.json({error:{message:'Origin rejected'}},403);
     if(!(await takeRateLimit(c.env.DB,`hosted:human:${getSession(c).userId}`,90)).allowed)return c.json({error:{message:'Too many requests'}},429);
     for(const [k,v]of Object.entries(noStore))c.header(k,v);
-    try{await next();}catch{return c.json({error:{message:'Review expired, changed, or unavailable. Start again in your assistant.'}},400);}
+    try{await next();}catch(error){return c.json({error:{message:error instanceof HTTPException?error.message:'Review expired, changed, or unavailable. Start again in your assistant.'}},error instanceof HTTPException?error.status:400);}
   });
   app.get('/assistants',async c=>{
     const oauth=c.env.OAUTH_PROVIDER;if(!oauth)throw new Error('OAuth unavailable');
@@ -114,19 +115,19 @@ export function hostedRoutes() {
     const owner=getSession(c).userId;
     if(!owner.startsWith('plugin_'))throw new Error('Use the hosted plugin authorization flow');
     const body=z.object({url:z.string().url().max(2000),expectedOwner:z.string().max(100).optional()}).strict().parse(await jsonBody(c.req.raw,4096));
-    if(body.expectedOwner&&body.expectedOwner!==owner)throw new Error('Use the browser connected to this assistant');
+    if(body.expectedOwner&&body.expectedOwner!==owner)throw new HTTPException(400,{message:'This link belongs to another assistant. Open it in the browser used to connect that assistant, or reconnect there.'});
     const url=new URL(body.url);
     if(url.protocol!=='https:'||!['figma.com','www.figma.com'].includes(url.hostname)||url.port||url.username||url.password)throw new Error('Invalid URL');
     const fileKey=/^\/(?:design|file)\/([A-Za-z0-9_-]{10,100})(?:\/|$)/.exec(url.pathname)?.[1];
     if(!fileKey)throw new Error('Invalid URL');
     const oauth=c.env.OAUTH_PROVIDER;if(!oauth)throw new Error('OAuth unavailable');
     const grants=await oauth.listUserGrants(owner,{limit:1});
-    if(!grants.items.some(grant=>!grant.expiresAt||grant.expiresAt*1000>now()))throw new Error('Reconnect your assistant first');
+    if(!grants.items.some(grant=>!grant.expiresAt||grant.expiresAt*1000>now()))throw new HTTPException(401,{message:'Assistant access expired or was disconnected. Reconnect it, then request a new Add file link.'});
     const consent=await c.env.DB.prepare('SELECT clientName,redirectHost,scopes FROM hosted_plugin_consents WHERE owner=? ORDER BY expires DESC LIMIT 1').bind(owner).first<{clientName:string;redirectHost:string;scopes:string}>();
-    if(!consent)throw new Error('Reconnect your assistant first');
+    if(!consent)throw new HTTPException(409,{message:'The original plugin connection is no longer available. Reconnect your assistant to pair a new file.'});
     const paired=await pairCode(c.env,owner,fileKey);
     await c.env.DB.prepare('INSERT INTO hosted_plugin_consents(owner,connectionId,clientName,redirectHost,scopes,expires) VALUES(?,?,?,?,?,?)').bind(owner,paired.connectionId,consent.clientName,consent.redirectHost,consent.scopes,now()+600000).run();
-    return c.json({...paired,details:{clientName:consent.clientName,redirectHost:consent.redirectHost}});
+    return c.json({owner,...paired,details:{clientName:consent.clientName,redirectHost:consent.redirectHost}});
   });
   app.post('/connections/:id/approve',async c=>{
     if(getSession(c).userId.startsWith('plugin_'))throw new Error('Approve this connection in Elf Bridge');

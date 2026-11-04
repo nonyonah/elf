@@ -34,7 +34,7 @@ export async function hostedMcp(request: Request, env: Env, owner: string, scope
     const rows=await env.DB.prepare('SELECT id,fileKey,fileName,generation,approvedGeneration,heartbeat FROM hosted_connections WHERE owner=? ORDER BY createdAt DESC').bind(owner).all();
     return {settingsUrl:`${origin(env)}/settings`,connections:rows.results.map(row=>({connectionId:row.id,fileKey:row.fileKey,fileName:row.fileName,
       connected:typeof row.heartbeat==='number'&&row.heartbeat>now()-15000,approved:!!row.generation&&row.generation===row.approvedGeneration,
-      manageUrl:`${origin(env)}/settings?elf_connection=${row.id}`})),next:'For another file, call get_figma_pairing_code with its URL and have the user approve it in Elf Bridge. Use the exact connectionId for each operation.'};
+      manageUrl:`${origin(env)}/settings?elf_connection=${row.id}&elf_assistant=${encodeURIComponent(owner)}`})),next:'For another file, call get_figma_pairing_code with its URL and have the user approve it in Elf Bridge. Use the exact connectionId for each operation.'};
   });
   tool('get_figma_pairing_code','Add or switch to a Figma file. Accountless hosted connections return an Add file review link; the user pairs and approves each new file in Elf Bridge without repeating OAuth. Pairing does not approve writes.',{url:z.string().url()},async args=>{
     const url=new URL(String(args.url));

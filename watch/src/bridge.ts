@@ -2,18 +2,21 @@ import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { BridgeClient } from "../../mcp/src/client.js";
-import { loadDotEnvFile } from "../../mcp/src/config.js";
+import { loadDotEnvFile, loadRuntimeBridgeConfig } from "../../mcp/src/config.js";
 import { BridgeError } from "../../mcp/src/errors.js";
 import type { WatchBridge } from "./types.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
 /**
- * The bridge reads `ELF_MCP_*` from the environment. Load the repo's
- * `mcp/.env` and the consumer project's `.env` without overriding real shell
- * variables, then let BridgeClient.connect() apply its usual defaults.
+ * Choose the bridge identity from explicit process configuration or the private
+ * machine identity before loading project settings. Legacy dotenv credentials
+ * cannot silently split the shared bridge identity across workspaces.
  */
-export function loadWatchEnv(projectRoot = process.cwd()): void {
+export function loadWatchEnv(projectRoot = process.cwd(), env: NodeJS.ProcessEnv = process.env, credentialDir?: string): void {
+  // A project dotenv must not change the machine-wide bridge identity.
+  // Explicit process environment overrides remain authoritative.
+  env.ELF_MCP_TOKEN = loadRuntimeBridgeConfig(env,credentialDir).token;
   for (const path of [
     resolve(projectRoot, ".env"),
     resolve(projectRoot, ".env.local"),
@@ -21,7 +24,7 @@ export function loadWatchEnv(projectRoot = process.cwd()): void {
     resolve(process.cwd(), "mcp/.env"),
     resolve(here, "../../mcp/.env"),
   ]) {
-    if (existsSync(path)) loadDotEnvFile(path);
+    if (existsSync(path)) loadDotEnvFile(path,env);
   }
 }
 

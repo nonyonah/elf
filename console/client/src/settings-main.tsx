@@ -70,7 +70,7 @@ function PluginAuthorization({addFile=false}:{addFile?:boolean}){
     <h2 className="font-medium">{addFile?'Add a Figma file':'Connect your assistant'}</h2>
     <p className="text-xs text-muted-foreground">No Elf account or Figma account sign-in needed. Each file requires approval in Elf Bridge.</p>
     {error&&<p role="alert" className="text-xs text-destructive">{error}</p>}
-    {!pair?<form className="flex flex-col gap-3" onSubmit={event=>{event.preventDefault();void act(async()=>setPair(await api.post(addFile?'/hosted/connections':'/hosted-auth/start',addFile?{url,expectedOwner}:{query,url})));}}>
+    {!pair?<form className="flex flex-col gap-3" onSubmit={event=>{event.preventDefault();void act(async()=>{const next=await api.post<{owner?:string;handle:string;code:string;connectionId:string;fileKey:string;expiresAt:number;details:{clientName:string;redirectHost:string}}>(addFile?'/hosted/connections':'/hosted-auth/start',addFile?{url,expectedOwner}:{query,url});if(next.owner){const target=new URL(location.href);target.searchParams.set('elf_assistant',next.owner);history.replaceState(null,'',target);}setPair(next);});}}>
       <label className="text-xs" htmlFor="file-url">Figma file URL</label><input id="file-url" type="url" required value={url} onChange={e=>setUrl(e.target.value)} className="min-w-0 rounded-lg border bg-background px-3 py-2 text-sm" placeholder="https://www.figma.com/design/…"/>
       <Button disabled={busy} type="submit">{addFile?'Add file with Elf Bridge':'Continue with Elf Bridge'}</Button>
     </form>:<>
@@ -89,7 +89,7 @@ function PluginAuthorization({addFile=false}:{addFile?:boolean}){
   </Card>;
 }
 function Settings() {
-  const api=React.useMemo(()=>createApi(async()=>null),[]);
+  const api=React.useMemo(()=>createApi(async()=>null,()=>new URLSearchParams(location.search).get('elf_assistant')),[]);
   const authorize=new URLSearchParams(location.search).has('elf_authorize');
   const addFile=new URLSearchParams(location.search).has('elf_add_file');
   return <ApiProvider client={api}><main className="mx-auto w-full min-w-0 max-w-[420px] px-5 pb-8 pt-8 [overflow-wrap:anywhere]">

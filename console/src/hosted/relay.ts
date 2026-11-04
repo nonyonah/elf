@@ -20,7 +20,7 @@ export async function pairCode(env: Env, owner: string, fileKey: string) {
   const id = crypto.randomUUID(), code = secret(6), expires = now() + 300000;
   await env.DB.prepare('INSERT INTO hosted_connections(id,owner,fileKey,codeHash,codeExpires,createdAt) VALUES(?,?,?,?,?,?)')
     .bind(id, owner, fileKey, await hash(code), expires, now()).run();
-  return { connectionId: id, code, expiresAt: expires, fileKey, hostedOrigin: env.CONSOLE_ORIGIN, manageUrl:`${env.CONSOLE_ORIGIN}/settings?elf_connection=${id}`,
+  return { connectionId: id, code, expiresAt: expires, fileKey, hostedOrigin: env.CONSOLE_ORIGIN, manageUrl:`${env.CONSOLE_ORIGIN}/settings?elf_connection=${id}&elf_assistant=${encodeURIComponent(owner)}`,
     instructions: 'Open this file in Figma, choose Hosted Elf in Elf Bridge, paste this code, then approve the exact document in the Elf connection page.' };
 }
 export async function authenticatePlugin(env: Env, authorization: string | null) {
@@ -56,7 +56,7 @@ export async function connectPlugin(env: Env, input: {code?: string; fileKey: st
     env.DB.prepare("UPDATE hosted_plans SET state='stale' WHERE connectionId=? AND state IN ('review','approved','applying')").bind(row.id),
   ]);
   const consent=await env.DB.prepare('SELECT clientName,redirectHost,scopes FROM hosted_plugin_consents WHERE owner=? AND connectionId=?').bind(row.owner,row.id).first<{clientName:string;redirectHost:string;scopes:string}>();
-  return { assistant:consent?{...consent,scopes:JSON.parse(consent.scopes)}:null, connectionId: row.id, generation, session, approvalUrl: `${env.CONSOLE_ORIGIN}/settings?elf_connection=${row.id}`, authorization: 'plugin' };
+  return { assistant:consent?{...consent,scopes:JSON.parse(consent.scopes)}:null, connectionId: row.id, generation, session, approvalUrl: `${env.CONSOLE_ORIGIN}/settings?elf_connection=${row.id}&elf_assistant=${encodeURIComponent(row.owner)}`, authorization: 'plugin' };
 }
 export async function disconnect(env: Env, owner: string, id: string) {
   await connection(env, owner, id);
@@ -90,7 +90,7 @@ export async function preparePlan(env: Env, owner: string, id: string, inputs: u
   const planId = crypto.randomUUID(), digest = await hash(text);
   await env.DB.prepare('INSERT INTO hosted_plans(id,owner,connectionId,generation,hash,operations,expires,sourceHash,snapshot,createdAt,clientId) VALUES(?,?,?,?,?,?,?,?,?,?,?)')
     .bind(planId, owner, id, c.generation, digest, text, now() + 600000, sourceHash ?? null, c.snapshot, now(), clientId ?? null).run();
-  return { planId, hash: digest, operationCount: operations.length, reviewUrl: `${env.CONSOLE_ORIGIN}/settings?elf_plan=${planId}`, next: 'The user must review and approve this exact plan in Elf Settings. Then call apply_figma_changes. No writes have run.' };
+  return { planId, hash: digest, operationCount: operations.length, reviewUrl: `${env.CONSOLE_ORIGIN}/settings?elf_plan=${planId}&elf_assistant=${encodeURIComponent(owner)}`, next: 'The user must review and approve this exact plan in Elf Settings. Then call apply_figma_changes. No writes have run.' };
 }
 export async function applyPlan(env: Env, owner: string, planId: string) {
   const plan = await env.DB.prepare("SELECT * FROM hosted_plans WHERE id=? AND owner=? AND expires>?").bind(planId, owner, now())

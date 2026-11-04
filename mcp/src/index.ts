@@ -43,6 +43,7 @@ async function main(): Promise<void> {
   }
   // `mcp/.env` sits next to this file's package, wherever the client starts us
   // from. Shell environment variables win over the file.
+  process.env[TOKEN_ENV] = loadRuntimeBridgeConfig().token;
   loadDotEnvFile(fileURLToPath(new URL("../.env", import.meta.url)));
 
   const projectIndex = process.argv.indexOf("--project");

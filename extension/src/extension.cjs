@@ -37,9 +37,9 @@ function activate(context) {
   async function ensureRuntime() {
     const current = runtime?.child ? runtime : await start();
     if (!current) return;
-    const deadline = Date.now() + 20_000;
+    const deadline = Date.now() + 60_000;
     while (runtime === current && current.state === 'starting' && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 100));
-    if (runtime !== current || current.state !== 'running') throw new Error('Elf is not ready. Retry Start or Refresh.');
+    if (runtime !== current || current.state !== 'running') throw new Error(current.startupError || 'Elf is still starting. Wait a moment, then retry Start or Refresh.');
     return current;
   }
   native = new NativeElf(vscode, context, () => runtime, ensureRuntime);

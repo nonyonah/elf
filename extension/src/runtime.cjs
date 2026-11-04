@@ -13,6 +13,15 @@ function settingsLink(line) {
   } catch { return null; }
 }
 
+// Classify startup failures without exposing stderr, credentials or project content.
+function startupFailure(output) {
+  if (/different credentials|different bridge identity/.test(output)) return 'Another Elf bridge is using a different identity. Stop Elf watchers and MCP clients, then restart the shared bridge from its original project. Do not copy bridge secrets between projects.';
+  if (/older Elf shared bridge/.test(output)) return 'An older Elf bridge is running. Stop Elf watchers and MCP clients, then restart the shared bridge.';
+  if (/Settings assets are missing|Cannot find (?:module|package)|ERR_MODULE_NOT_FOUND/.test(output)) return 'The bundled Elf runtime is incomplete. Reinstall the latest Elf extension and reload the window.';
+  if (/EACCES|EPERM/.test(output)) return 'Elf cannot access a required local file or port. Check workspace permissions and retry.';
+  return 'Elf stopped before startup completed. Reload the window or reinstall the latest extension, then retry.';
+}
+
 class Runtime {
   constructor(root, changed, launch = spawn, packageRoot = join(__dirname, '../runtime/node_modules/elf-tokens')) {
     this.root = root;
@@ -26,6 +35,7 @@ class Runtime {
     this.requestId = 0;
     this.session = null;
     this.sessionOpening = null;
+    this.startupError = null;
   }
   start() {
     if (this.child) return;
@@ -40,6 +50,7 @@ class Runtime {
       { cwd: this.root, env: { ...process.env, ELECTRON_RUN_AS_NODE: '1', NODE_OPTIONS: '', NODE_PATH: '', ELF_SETTINGS_NO_OPEN: '1' }, stdio: ['ignore', 'pipe', 'pipe', 'ipc'] });
     this.child = child;
     this.state = 'starting';
+    this.startupError = null;
     this.changed();
     let buffer = '';
     child.stdout.on('data', chunk => {
@@ -55,9 +66,12 @@ class Runtime {
       this.changed();
     });
     // Consume stderr without persisting private links, tokens, or file content.
-    child.stderr.on('data', () => {});
+    let diagnostic = '';
+    child.stderr.on('data', chunk => { if(this.state==='starting')diagnostic=(diagnostic+chunk.toString()).slice(-8192); });
     const finish = state => {
       if (this.child !== child) return;
+      if(state==='failed')this.startupError=startupFailure(diagnostic);
+      diagnostic='';
       this.child = null; this.link = null; this.pairing = null; this.session = null; this.state = state;
       this.changed();
     };
@@ -133,4 +147,4 @@ class Runtime {
     this.start();
   }
 }
-module.exports = { Runtime, settingsLink };
+module.exports = { Runtime, settingsLink, startupFailure };

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, dirname } from "node:path";
 import { test } from "node:test";
 import { generateToken, loadBridgeConfig, loadDotEnvFile, tokenFingerprint } from "../src/config.js";
 import { DEFAULT_PORT, DEFAULT_TIMEOUT_MS, TOKEN_ENV } from "../src/protocol.js";
@@ -109,6 +109,24 @@ test("loadDotEnvFile stays quiet when the file is missing", () => {
 // Runtime identity is outside consumer projects and is never silently rotated.
 import { chmodSync, mkdirSync, readFileSync, statSync, symlinkSync } from "node:fs";
 import { loadRuntimeBridgeConfig } from "../src/config.js";
+import { loadWatchEnv } from '../../watch/src/bridge.js';
+
+test('fresh workspaces and legacy project dotenv files share the machine identity',()=>{
+ const dir=credentials();
+ const project=dirname(dir);
+ mkdirSync(join(project,'mcp'),{recursive:true});
+ writeFileSync(join(project,'mcp/.env'),'ELF_MCP_TOKEN=legacy-project-secret\nELF_TEST_ENV=loaded\n');
+ const first:NodeJS.ProcessEnv={},second:NodeJS.ProcessEnv={};
+ loadWatchEnv(project,first,dir);
+ const other=join(project,'fresh');mkdirSync(other);
+ loadWatchEnv(other,second,dir);
+ assert.equal(first.ELF_MCP_TOKEN,second.ELF_MCP_TOKEN);
+ assert.notEqual(first.ELF_MCP_TOKEN,'legacy-project-secret');
+ assert.equal(first.ELF_TEST_ENV,'loaded');
+ const explicit:NodeJS.ProcessEnv={ELF_MCP_TOKEN:'explicit-process-secret'};
+ loadWatchEnv(project,explicit,dir);
+ assert.equal(explicit.ELF_MCP_TOKEN,'explicit-process-secret');
+});
 
 function credentials(): string {
   return join(mkdtempSync(join(tmpdir(), "elf-identity-")), "private");

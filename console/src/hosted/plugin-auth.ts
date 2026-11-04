@@ -11,8 +11,13 @@ const cookie='__Host-elf-settings';
 export const requireHostedBrowser:MiddlewareHandler<AppEnv>=async(c,next)=>{
   const token=getCookie(c,cookie);
   if(!token||!/^[a-f0-9]{64}$/.test(token))return c.json({error:{message:'Open Settings from the browser used to connect your assistant.'}},401);
-  const session=await c.env.DB.prepare('SELECT owner FROM hosted_browser_sessions WHERE tokenHash=? AND expires>?').bind(await hash(token),now()).first<{owner:string}>();
-  if(!session)return c.json({error:{message:'Settings access expired. Reconnect your assistant.'}},401);
+  const owner=c.req.header('X-Elf-Assistant');
+  if(owner&&!/^plugin_[a-f0-9-]{36}$/.test(owner))return c.json({error:{message:'Invalid assistant connection. Open a fresh link from your assistant.'}},400);
+  const digest=await hash(token);
+  const session=owner
+    ?await c.env.DB.prepare('SELECT owner FROM hosted_browser_sessions WHERE tokenHash=? AND owner=? AND expires>?').bind(digest,owner,now()).first<{owner:string}>()
+    :await c.env.DB.prepare('SELECT owner FROM hosted_browser_sessions WHERE tokenHash=? AND expires>? ORDER BY expires DESC LIMIT 1').bind(digest,now()).first<{owner:string}>();
+  if(!session)return c.json({error:{message:owner?'This browser is not connected to that assistant. Reconnect the assistant in this browser, then request a fresh link.':'Settings access expired. Reconnect your assistant.'}},401);
   c.set('session',{userId:session.owner});
   await next();
 };
@@ -35,7 +40,9 @@ export function pluginAuthorizationRoutes(){
     const auth=await oauth.parseAuthRequest(new Request(`${origin(c.env)}/authorize?${body.query}`));
     if(auth.codeChallengeMethod!=='S256'||!auth.codeChallenge)throw new Error('PKCE required');
     const details=await oauth.describeConsent(auth),consent=await oauth.beginConsent(auth);
-    const owner='plugin_'+crypto.randomUUID(),token=secret(),expires=now()+600000;
+    const prior=getCookie(c,cookie);
+    const known=prior&&/^[a-f0-9]{64}$/.test(prior)&&await c.env.DB.prepare('SELECT owner FROM hosted_browser_sessions WHERE tokenHash=? AND expires>? LIMIT 1').bind(await hash(prior),now()).first();
+    const owner='plugin_'+crypto.randomUUID(),token=known?prior!:secret(),expires=now()+600000;
     const paired=await pairCode(c.env,owner,fileKey);
     await c.env.DB.batch([
       c.env.DB.prepare('INSERT INTO hosted_browser_sessions(tokenHash,owner,expires) VALUES(?,?,?)').bind(await hash(token),owner,now()+30*86400000),
@@ -49,7 +56,7 @@ export function pluginAuthorizationRoutes(){
     // Keep both cookies on the returned response. Mutating c.res here makes
     // Hono replace the provider's anti-CSRF Set-Cookie during response merging.
     headers.append('Set-Cookie',`${cookie}=${token}; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=${30*86400}`);
-    return new Response(JSON.stringify({handle:consent.handle,details,...paired,expiresAt:Math.min(expires,paired.expiresAt)}),{headers});
+    return new Response(JSON.stringify({owner,handle:consent.handle,details,...paired,expiresAt:Math.min(expires,paired.expiresAt)}),{headers});
   });
   return app;
 }

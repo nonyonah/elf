@@ -45,6 +45,17 @@ test('unexpected exit clears credentials and reports failure', () => {
   assert.equal(h.runtime.state, 'failed'); assert.equal(h.runtime.link, null); assert.equal(h.runtime.child, null);
 });
 
+test('startup reports a safe bridge identity error instead of hiding it or leaking stderr',()=>{
+ const h=harness();h.runtime.start();
+ const secret='private-test-value-do-not-show';
+ h.child.stderr.emit('data',Buffer.from(`Port 8765 already serves an Elf bridge with different credentials ${secret}`));
+ h.child.emit('exit',1);
+ assert.match(h.runtime.startupError,/different identity/);
+ assert(!h.runtime.startupError.includes(secret));
+ h.runtime.start();assert.equal(h.runtime.startupError,null);
+ h.child.emit('exit',1);
+});
+
 test('missing bundled runtime fails before spawning any executable', () => {
   let spawned = false;
   const runtime = new Runtime('/tmp', () => {}, () => { spawned = true; }, '/missing/elf-runtime');

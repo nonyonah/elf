@@ -6,13 +6,16 @@ import { connectPlugin, pairCode } from '../src/hosted/relay.js';
 import type { Env } from '../src/env.js';
 const bindings:Env={...env,HOSTED_MCP_ENABLED:'true',CONSOLE_ORIGIN:'https://console.test',DEV_ONLY_FAKE_USER:''};
 const app=createMcpApp(),fileKey='eu8zGUOsrdyXXQqvJeyl1E';
+let selectedAssistant:string|undefined;
 async function run(path:string,init?:RequestInit){
  const ctx=createExecutionContext();
+ if(selectedAssistant){const headers=new Headers(init?.headers);if(!headers.has('X-Elf-Assistant'))headers.set('X-Elf-Assistant',selectedAssistant);init={...init,headers};}
  const response=await hostedFetch(new Request('https://console.test'+path,init),bindings,ctx,app);
  await waitOnExecutionContext(ctx);return response;
 }
 const json=(body:unknown,cookie?:string,origin='https://console.test'):RequestInit=>({method:'POST',headers:{'Content-Type':'application/json',Origin:origin,...(cookie?{Cookie:cookie}:{})},body:JSON.stringify(body)});
 beforeEach(async()=>{
+ selectedAssistant=undefined;
  for(const table of ['hosted_operations','hosted_plans','hosted_connections','hosted_sources','hosted_consents','hosted_assistant_activity','hosted_browser_sessions','hosted_plugin_consents'])await env.DB.prepare(`DELETE FROM ${table}`).run();
  await env.DB.prepare("DELETE FROM rate_limits WHERE scope LIKE 'hosted:%'").run();
 });
@@ -55,6 +58,17 @@ it('requires plugin approval without an account and separates file, browser and 
  const tokenResponse=await run('/oauth/token',{method:'POST',body:tokenBody});expect(tokenResponse.status).toBe(200);
  const token=await tokenResponse.json() as {access_token:string};
  expect((await finish()).status).toBe(400);
+ const ownerA=await env.DB.prepare('SELECT owner FROM hosted_connections WHERE id=?').bind(pair.connectionId).first<{owner:string}>();
+ const secondAuth=await run('/api/hosted-auth/start',json(input,cookie));
+ expect(secondAuth.status).toBe(200);
+ const secondBrowser=await secondAuth.json() as {owner:string};
+ expect(secondBrowser.owner).not.toBe(ownerA!.owner);
+ // Explicitly starting another OAuth flow must not replace the first authority.
+ expect(secondAuth.headers.getSetCookie().find(c=>c.startsWith('__Host-elf-settings='))?.split(';')[0]).toBe(cookies.find(c=>c.startsWith('__Host-elf-settings='))?.split(';')[0]);
+ selectedAssistant=ownerA!.owner;
+ expect((await run('/api/hosted/connections',{headers:{Cookie:cookie,'X-Elf-Assistant':'plugin_00000000-0000-4000-8000-000000000000'}})).status).toBe(401);
+ const priorFiles=await (await run('/api/hosted/connections',{headers:{Cookie:cookie}})).json() as {connections:{id:string}[]};
+ expect(priorFiles.connections.map(c=>c.id)).toEqual([pair.connectionId]);
  expect((await run('/api/me',{headers:{Cookie:cookie}})).status).toBe(404);
  expect((await run('/api/hosted/assistants',{headers:{Authorization:`Bearer ${token.access_token}`}})).status).toBe(401);
  const call=async(name:string,args:unknown)=>{

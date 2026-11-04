@@ -8,14 +8,14 @@ const base = process.argv[2] || 'https://elf.riftlabs.xyz';
 assert.equal(new URL(base).protocol, 'https:');
 const endpoint = base + '/mcp';
 const fileKey = 'ElfAcceptance' + randomBytes(8).toString('hex');
-let browserCookie = '', pluginToken = '', secondPluginToken = '', connectionId = '', assistantId = '', accessToken = '';
+let browserCookie = '', browserOwner = '', pluginToken = '', secondPluginToken = '', connectionId = '', assistantId = '', accessToken = '';
 let client;
 const request = (path, body, headers = {}) => fetch(base + path, {
   method: body === undefined ? 'GET' : 'POST',
   headers: {...(body === undefined ? {} : {'Content-Type':'application/json'}), ...headers},
   ...(body === undefined ? {} : {body:JSON.stringify(body)}), redirect:'manual', signal:AbortSignal.timeout(20000),
 });
-const browser = () => ({Cookie:browserCookie, Origin:base});
+const browser = () => ({Cookie:browserCookie, Origin:base,...(browserOwner?{'X-Elf-Assistant':browserOwner}:{})});
 const plugin = () => ({Authorization:'Bearer ' + pluginToken});
 const value = result => {
   const text = result.content?.find(item => item.type === 'text')?.text;
@@ -47,7 +47,7 @@ try {
   assert.ok(cookies.some(cookie=>cookie.startsWith('__Host-elf-settings=')));
   assert.ok(cookies.some(cookie=>cookie.startsWith('__Host-oauth-consent-')));
   browserCookie = cookies.map(cookie=>cookie.split(';')[0]).join('; ');
-  const consent = await start.json(); connectionId = consent.connectionId;
+  const consent = await start.json(); connectionId = consent.connectionId;browserOwner=consent.owner;
   const finish = () => request('/api/hosted/consent/finish',{handle:consent.handle,approve:true},browser());
   assert.equal((await finish()).status,400); summary.checks.push('consent refuses unapproved plugin');
   const connected = await request('/api/hosted-bridge/connect',{code:consent.code,fileKey,fileName:'Protocol test (simulated)'});
@@ -58,6 +58,13 @@ try {
   const tokenResponse = await fetch(metadata.token_endpoint,{method:'POST',body:new URLSearchParams({grant_type:'authorization_code',client_id:clientId,redirect_uri:'https://example.invalid/elf-callback',code:redirect.searchParams.get('code'),code_verifier:verifier,resource:endpoint}),signal:AbortSignal.timeout(20000)});
   assert.equal(tokenResponse.status,200); accessToken = (await tokenResponse.json()).access_token;
   assert.equal((await finish()).status,400); summary.checks.push('browser binding, PKCE and single-use consent');
+  const otherAuth=await request('/api/hosted-auth/start',{query,url:`https://www.figma.com/design/${fileKey}/Second-consent`},browser());
+  assert.equal(otherAuth.status,200);
+  const settingsCookie=cookies.find(cookie=>cookie.startsWith('__Host-elf-settings=')).split(';')[0];
+  assert.equal(otherAuth.headers.getSetCookie().find(cookie=>cookie.startsWith('__Host-elf-settings=')).split(';')[0],settingsCookie);
+  const originalFiles=await (await request('/api/hosted/connections',undefined,browser())).json();
+  assert.equal(originalFiles.connections.length,1);assert.equal(originalFiles.connections[0].id,connectionId);
+  summary.checks.push('another assistant authorization preserves the original browser authority and owner isolation');
   await request('/api/hosted-bridge/poll',{generation:pairing.generation,snapshot:'a'.repeat(64)},plugin());
   client = new Client({name:'elf-live-acceptance',version:'1.0.0'});
   await client.connect(new StreamableHTTPClientTransport(new URL(endpoint),{requestInit:{headers:{Authorization:'Bearer '+accessToken}}}));

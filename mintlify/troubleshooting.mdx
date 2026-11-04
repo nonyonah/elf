@@ -38,3 +38,15 @@ Keep the plugin connected for supported document operations. Respect REST retry 
 ## Support
 
 File an issue at [GitHub](https://github.com/nonyonah/elf/issues) with your package version, operating system, and redacted error. Do not include credentials or private design-system documents.
+
+## Add file reports an expired or unavailable review
+
+Use the link from the intended assistant in the browser where you connected it. Elf now retains separate assistant permissions in the same browser and includes the assistant identity in file and plan review links. A link alone never grants access.
+
+If the connection predates this fix and another assistant replaced its browser session, reconnect the affected assistant once and request a fresh Add file link. Existing links cannot restore lost browser authority. Expired grants and missing plugin connections now show specific recovery messages.
+
+## Extension starts in one workspace but not another
+
+Install the maintainer-provided Elf 0.3.26 VSIX (or update through the Marketplace once that version is published), then run **Developer: Reload Window** in VS Code. The fix selects the machine-wide bridge identity before loading project dotenv files; an old `mcp/.env` token no longer silently gives a project a different identity. Explicit shell overrides remain supported.
+
+A legacy bridge may need one restart: stop Elf watchers and local MCP clients, stop the old bridge from the original installation/project, then start the updated extension. Never copy bridge secrets between projects or force-stop a host used by other clients. Existing saved credentials are not deleted; the plugin may need pairing with the new identity. Startup failures now report safe recovery instructions instead of only “Elf is not ready.”
